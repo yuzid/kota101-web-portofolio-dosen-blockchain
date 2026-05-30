@@ -16,6 +16,7 @@ jobs:
   deploy:
     name: Build & Deploy to AWS
     runs-on: ubuntu-latest
+    environment: AWS
 
     steps:
     - name: Checkout Code
