@@ -1,4 +1,6 @@
-version: '3.8'
+# docker-compose.yml - DEVELOPMENT ENVIRONMENT
+# Untuk development lokal dengan database PostgreSQL lokal
+# Untuk production dengan Amazon RDS, gunakan docker-compose.prod.yml
 
 services:
   # Database Off-Chain Relasional
@@ -13,6 +15,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+
 
   # Jaringan Blockchain Node (MultiChain Placeholder / Simulation Service)
   multichain_node:

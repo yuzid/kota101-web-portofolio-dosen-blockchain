@@ -5,6 +5,27 @@ import * as crypto from 'crypto';
 const app = express();
 app.use(express.json());
 
+// Enable CORS untuk client
+app.use((req: Request, res: Response, next: Function) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Test endpoint
+app.get('/api/status', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Backend server sedang berjalan!',
+    timestamp: new Date().toISOString(),
+    server: 'Node.js + Express + TypeScript'
+  });
+});
+
 // Interface untuk tipe data (Keunggulan TypeScript!)
 interface DocumentPayload {
   title: string;
