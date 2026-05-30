@@ -1,20 +1,26 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import { MainLayout } from '../components/layout/MainLayout';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router";
+import { MainLayout } from "../components/layout/MainLayout";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { Badge } from '../components/ui/badge';
+} from "../components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Badge } from "../components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,14 +30,26 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../components/ui/alert-dialog';
-import { Calendar } from '../components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { CalendarIcon, X, Search, FileText, Trash2, Highlighter, Plus } from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '../../lib/utils';
-import { toast } from 'sonner';
-import { useAuth } from '../contexts/AuthContext';
+} from "../components/ui/alert-dialog";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import {
+  CalendarIcon,
+  X,
+  Search,
+  FileText,
+  Trash2,
+  Highlighter,
+  Plus,
+} from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { useAuth } from "../contexts/AuthContext";
 
 interface Dosen {
   id: string;
@@ -50,22 +68,77 @@ interface Document {
 }
 
 const mockDosen: Dosen[] = [
-  { id: '1', name: 'Dr. Ahmad Fauzi', nidn: '0420059102', programStudi: 'D4 Teknik Informatika' },
-  { id: '2', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', programStudi: 'D4 Teknik Informatika' },
-  { id: '3', name: 'Prof. Budi Santoso', nidn: '0418088902', programStudi: 'D3 Teknik Informatika' },
+  {
+    id: "1",
+    name: "Dr. Ahmad Fauzi",
+    nidn: "0420059102",
+    programStudi: "D4 Teknik Informatika",
+  },
+  {
+    id: "2",
+    name: "Dr. Siti Nurhaliza",
+    nidn: "0405067801",
+    programStudi: "D4 Teknik Informatika",
+  },
+  {
+    id: "3",
+    name: "Prof. Budi Santoso",
+    nidn: "0418088902",
+    programStudi: "D3 Teknik Informatika",
+  },
 ];
 
 const mockDocuments: Document[] = [
-  { id: '1', name: 'Sertifikat Pelatihan Web Development', jenis: 'Sertifikat', tanggal: '2026-05-10', uploadedBy: '1', uploadedByName: 'Dr. John Doe' },
-  { id: '2', name: 'Laporan Penelitian Blockchain', jenis: 'Laporan Kegiatan', tanggal: '2026-04-15', uploadedBy: '1', uploadedByName: 'Dr. John Doe' },
-  { id: '3', name: 'Artikel Jurnal - IoT in Education', jenis: 'Artikel Jurnal', tanggal: '2026-03-20', uploadedBy: '2', uploadedByName: 'Dr. Ahmad Fauzi' },
+  {
+    id: "1",
+    name: "Sertifikat Pelatihan Web Development",
+    jenis: "Sertifikat",
+    tanggal: "2026-05-10",
+    uploadedBy: "1",
+    uploadedByName: "Dr. John Doe",
+  },
+  {
+    id: "2",
+    name: "Laporan Penelitian Blockchain",
+    jenis: "Laporan Kegiatan",
+    tanggal: "2026-04-15",
+    uploadedBy: "1",
+    uploadedByName: "Dr. John Doe",
+  },
+  {
+    id: "3",
+    name: "Artikel Jurnal - IoT in Education",
+    jenis: "Artikel Jurnal",
+    tanggal: "2026-03-20",
+    uploadedBy: "2",
+    uploadedByName: "Dr. Ahmad Fauzi",
+  },
 ];
 
 const kategoriByJenis: Record<string, string[]> = {
-  pengajaran: ['Mengajar', 'Pembimbing TA', 'Pembimbing PKL', 'Pengembangan Kurikulum'],
-  penelitian: ['Penelitian Mandiri', 'Penelitian Kelompok', 'Publikasi Jurnal', 'Publikasi Prosiding'],
-  pengabdian: ['Pengabdian Kepada Masyarakat', 'Pelatihan Masyarakat', 'Konsultasi Masyarakat'],
-  tugas_tambahan: ['Koordinator Laboratorium', 'Sekretaris Prodi', 'Koordinator Mata Kuliah', 'Lainnya'],
+  pengajaran: [
+    "Mengajar",
+    "Pembimbing TA",
+    "Pembimbing PKL",
+    "Pengembangan Kurikulum",
+  ],
+  penelitian: [
+    "Penelitian Mandiri",
+    "Penelitian Kelompok",
+    "Publikasi Jurnal",
+    "Publikasi Prosiding",
+  ],
+  pengabdian: [
+    "Pengabdian Kepada Masyarakat",
+    "Pelatihan Masyarakat",
+    "Konsultasi Masyarakat",
+  ],
+  tugas_tambahan: [
+    "Koordinator Laboratorium",
+    "Sekretaris Prodi",
+    "Koordinator Mata Kuliah",
+    "Lainnya",
+  ],
 };
 
 export function ActivityFormPage() {
@@ -75,19 +148,19 @@ export function ActivityFormPage() {
   const isEdit = Boolean(id);
 
   const [formData, setFormData] = useState({
-    namaKegiatan: '',
-    jenisTridharma: '',
-    kategori: '',
+    namaKegiatan: "",
+    jenisTridharma: "",
+    kategori: "",
     tanggalMulai: undefined as Date | undefined,
     tanggalSelesai: undefined as Date | undefined,
-    tahunAkademik: '',
-    semester: '',
-    sumberDana: '',
-    biaya: '',
+    tahunAkademik: "",
+    semester: "",
+    sumberDana: "",
+    biaya: "",
   });
 
   const [anggota, setAnggota] = useState<Dosen[]>([]);
-  const [searchAnggota, setSearchAnggota] = useState('');
+  const [searchAnggota, setSearchAnggota] = useState("");
   const [lampiran, setLampiran] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -96,15 +169,15 @@ export function ActivityFormPage() {
     if (isEdit) {
       // Load existing data
       setFormData({
-        namaKegiatan: 'Mata Kuliah Pemrograman Web',
-        jenisTridharma: 'pengajaran',
-        kategori: 'Mengajar',
-        tanggalMulai: new Date('2026-01-15'),
-        tanggalSelesai: new Date('2026-05-30'),
-        tahunAkademik: '2025/2026',
-        semester: 'ganjil',
-        sumberDana: 'DIPA POLBAN',
-        biaya: '5000000',
+        namaKegiatan: "Mata Kuliah Pemrograman Web",
+        jenisTridharma: "pengajaran",
+        kategori: "Mengajar",
+        tanggalMulai: new Date("2026-01-15"),
+        tanggalSelesai: new Date("2026-05-30"),
+        tahunAkademik: "2025/2026",
+        semester: "ganjil",
+        sumberDana: "DIPA POLBAN",
+        biaya: "5000000",
       });
       setLampiran([mockDocuments[0], mockDocuments[1]]);
     }
@@ -114,28 +187,33 @@ export function ActivityFormPage() {
     const newErrors: Record<string, string> = {};
 
     if (!formData.namaKegiatan.trim()) {
-      newErrors.namaKegiatan = 'Nama kegiatan wajib diisi';
+      newErrors.namaKegiatan = "Nama kegiatan wajib diisi";
     }
     if (!formData.jenisTridharma) {
-      newErrors.jenisTridharma = 'Jenis Tridharma wajib dipilih';
+      newErrors.jenisTridharma = "Jenis Tridharma wajib dipilih";
     }
     if (!formData.kategori) {
-      newErrors.kategori = 'Kategori kegiatan wajib dipilih';
+      newErrors.kategori = "Kategori kegiatan wajib dipilih";
     }
     if (!formData.tanggalMulai) {
-      newErrors.tanggalMulai = 'Tanggal mulai wajib diisi';
+      newErrors.tanggalMulai = "Tanggal mulai wajib diisi";
     }
     if (!formData.tanggalSelesai) {
-      newErrors.tanggalSelesai = 'Tanggal selesai wajib diisi';
+      newErrors.tanggalSelesai = "Tanggal selesai wajib diisi";
     }
-    if (formData.tanggalMulai && formData.tanggalSelesai && formData.tanggalSelesai < formData.tanggalMulai) {
-      newErrors.tanggalSelesai = 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai';
+    if (
+      formData.tanggalMulai &&
+      formData.tanggalSelesai &&
+      formData.tanggalSelesai < formData.tanggalMulai
+    ) {
+      newErrors.tanggalSelesai =
+        "Tanggal selesai tidak boleh lebih awal dari tanggal mulai";
     }
     if (!formData.tahunAkademik) {
-      newErrors.tahunAkademik = 'Tahun akademik wajib dipilih';
+      newErrors.tahunAkademik = "Tahun akademik wajib dipilih";
     }
     if (!formData.semester) {
-      newErrors.semester = 'Semester wajib dipilih';
+      newErrors.semester = "Semester wajib dipilih";
     }
 
     setErrors(newErrors);
@@ -144,51 +222,57 @@ export function ActivityFormPage() {
 
   const handleSubmit = () => {
     if (!validateForm()) {
-      toast.error('Mohon lengkapi semua field yang wajib diisi');
+      toast.error("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
 
     if (isEdit) {
-      toast.success('Kegiatan berhasil diperbarui.');
+      toast.success("Kegiatan berhasil diperbarui.");
       navigate(`/activities/${id}`);
     } else {
-      toast.success('Kegiatan berhasil dicatat.');
-      navigate('/activities');
+      toast.success("Kegiatan berhasil dicatat.");
+      navigate("/activities");
     }
   };
 
   const handleDelete = () => {
     toast.success(`Kegiatan "${formData.namaKegiatan}" berhasil dihapus.`);
-    navigate('/activities');
+    navigate("/activities");
   };
 
   const handleAddAnggota = (dosen: Dosen) => {
-    if (!anggota.find(a => a.id === dosen.id)) {
+    if (!anggota.find((a) => a.id === dosen.id)) {
       setAnggota([...anggota, dosen]);
     }
-    setSearchAnggota('');
+    setSearchAnggota("");
   };
 
   const handleRemoveAnggota = (dosenId: string) => {
-    setAnggota(anggota.filter(a => a.id !== dosenId));
+    setAnggota(anggota.filter((a) => a.id !== dosenId));
   };
 
-  const filteredDosen = mockDosen.filter(d =>
-    d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
-    !anggota.find(a => a.id === d.id)
+  const filteredDosen = mockDosen.filter(
+    (d) =>
+      d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
+      !anggota.find((a) => a.id === d.id)
   );
 
   const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   return (
     <MainLayout
-      title={isEdit ? 'Edit Kegiatan' : 'Tambah Kegiatan Baru'}
+      title={isEdit ? "Edit Kegiatan" : "Tambah Kegiatan Baru"}
       breadcrumbs={[
-        { label: 'Beranda', path: '/dashboard' },
-        { label: 'Kegiatan Tridharma', path: '/activities' },
-        { label: isEdit ? 'Edit' : 'Tambah Kegiatan Baru' },
+        { label: "Beranda", path: "/dashboard" },
+        { label: "Kegiatan Tridharma", path: "/activities" },
+        { label: isEdit ? "Edit" : "Tambah Kegiatan Baru" },
       ]}
     >
       <div className="space-y-6 max-w-4xl">
@@ -204,12 +288,16 @@ export function ActivityFormPage() {
                 id="nama"
                 placeholder="Tuliskan nama lengkap kegiatan"
                 value={formData.namaKegiatan}
-                onChange={(e) => setFormData({ ...formData, namaKegiatan: e.target.value })}
-                className={errors.namaKegiatan ? 'border-destructive' : ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, namaKegiatan: e.target.value })
+                }
+                className={errors.namaKegiatan ? "border-destructive" : ""}
                 rows={2}
               />
               {errors.namaKegiatan && (
-                <p className="text-sm text-destructive">{errors.namaKegiatan}</p>
+                <p className="text-sm text-destructive">
+                  {errors.namaKegiatan}
+                </p>
               )}
             </div>
 
@@ -219,22 +307,36 @@ export function ActivityFormPage() {
                 <Select
                   value={formData.jenisTridharma}
                   onValueChange={(value) => {
-                    setFormData({ ...formData, jenisTridharma: value, kategori: '' });
-                    setErrors({ ...errors, jenisTridharma: '' });
+                    setFormData({
+                      ...formData,
+                      jenisTridharma: value,
+                      kategori: "",
+                    });
+                    setErrors({ ...errors, jenisTridharma: "" });
                   }}
                 >
-                  <SelectTrigger className={errors.jenisTridharma ? 'border-destructive' : ''}>
+                  <SelectTrigger
+                    className={
+                      errors.jenisTridharma ? "border-destructive" : ""
+                    }
+                  >
                     <SelectValue placeholder="Pilih jenis tridharma" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pengajaran">Pengajaran</SelectItem>
                     <SelectItem value="penelitian">Penelitian</SelectItem>
-                    <SelectItem value="pengabdian">Pengabdian kepada Masyarakat</SelectItem>
-                    <SelectItem value="tugas_tambahan">Tugas Tambahan</SelectItem>
+                    <SelectItem value="pengabdian">
+                      Pengabdian kepada Masyarakat
+                    </SelectItem>
+                    <SelectItem value="tugas_tambahan">
+                      Tugas Tambahan
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.jenisTridharma && (
-                  <p className="text-sm text-destructive">{errors.jenisTridharma}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.jenisTridharma}
+                  </p>
                 )}
               </div>
 
@@ -244,17 +346,28 @@ export function ActivityFormPage() {
                   value={formData.kategori}
                   onValueChange={(value) => {
                     setFormData({ ...formData, kategori: value });
-                    setErrors({ ...errors, kategori: '' });
+                    setErrors({ ...errors, kategori: "" });
                   }}
                   disabled={!formData.jenisTridharma}
                 >
-                  <SelectTrigger className={errors.kategori ? 'border-destructive' : ''}>
-                    <SelectValue placeholder={formData.jenisTridharma ? "Pilih kategori" : "Pilih jenis tridharma terlebih dahulu"} />
+                  <SelectTrigger
+                    className={errors.kategori ? "border-destructive" : ""}
+                  >
+                    <SelectValue
+                      placeholder={
+                        formData.jenisTridharma
+                          ? "Pilih kategori"
+                          : "Pilih jenis tridharma terlebih dahulu"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {formData.jenisTridharma && kategoriByJenis[formData.jenisTridharma].map((kat) => (
-                      <SelectItem key={kat} value={kat}>{kat}</SelectItem>
-                    ))}
+                    {formData.jenisTridharma &&
+                      kategoriByJenis[formData.jenisTridharma].map((kat) => (
+                        <SelectItem key={kat} value={kat}>
+                          {kat}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 {errors.kategori && (
@@ -277,7 +390,9 @@ export function ActivityFormPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.tanggalMulai ? format(formData.tanggalMulai, "dd MMMM yyyy") : "Pilih tanggal"}
+                      {formData.tanggalMulai
+                        ? format(formData.tanggalMulai, "dd MMMM yyyy")
+                        : "Pilih tanggal"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -286,14 +401,16 @@ export function ActivityFormPage() {
                       selected={formData.tanggalMulai}
                       onSelect={(date) => {
                         setFormData({ ...formData, tanggalMulai: date });
-                        setErrors({ ...errors, tanggalMulai: '' });
+                        setErrors({ ...errors, tanggalMulai: "" });
                       }}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
                 {errors.tanggalMulai && (
-                  <p className="text-sm text-destructive">{errors.tanggalMulai}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.tanggalMulai}
+                  </p>
                 )}
               </div>
 
@@ -310,7 +427,9 @@ export function ActivityFormPage() {
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.tanggalSelesai ? format(formData.tanggalSelesai, "dd MMMM yyyy") : "Pilih tanggal"}
+                      {formData.tanggalSelesai
+                        ? format(formData.tanggalSelesai, "dd MMMM yyyy")
+                        : "Pilih tanggal"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -319,14 +438,16 @@ export function ActivityFormPage() {
                       selected={formData.tanggalSelesai}
                       onSelect={(date) => {
                         setFormData({ ...formData, tanggalSelesai: date });
-                        setErrors({ ...errors, tanggalSelesai: '' });
+                        setErrors({ ...errors, tanggalSelesai: "" });
                       }}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
                 {errors.tanggalSelesai && (
-                  <p className="text-sm text-destructive">{errors.tanggalSelesai}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.tanggalSelesai}
+                  </p>
                 )}
               </div>
             </div>
@@ -338,10 +459,12 @@ export function ActivityFormPage() {
                   value={formData.tahunAkademik}
                   onValueChange={(value) => {
                     setFormData({ ...formData, tahunAkademik: value });
-                    setErrors({ ...errors, tahunAkademik: '' });
+                    setErrors({ ...errors, tahunAkademik: "" });
                   }}
                 >
-                  <SelectTrigger className={errors.tahunAkademik ? 'border-destructive' : ''}>
+                  <SelectTrigger
+                    className={errors.tahunAkademik ? "border-destructive" : ""}
+                  >
                     <SelectValue placeholder="Pilih tahun akademik" />
                   </SelectTrigger>
                   <SelectContent>
@@ -351,7 +474,9 @@ export function ActivityFormPage() {
                   </SelectContent>
                 </Select>
                 {errors.tahunAkademik && (
-                  <p className="text-sm text-destructive">{errors.tahunAkademik}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.tahunAkademik}
+                  </p>
                 )}
               </div>
 
@@ -361,10 +486,12 @@ export function ActivityFormPage() {
                   value={formData.semester}
                   onValueChange={(value) => {
                     setFormData({ ...formData, semester: value });
-                    setErrors({ ...errors, semester: '' });
+                    setErrors({ ...errors, semester: "" });
                   }}
                 >
-                  <SelectTrigger className={errors.semester ? 'border-destructive' : ''}>
+                  <SelectTrigger
+                    className={errors.semester ? "border-destructive" : ""}
+                  >
                     <SelectValue placeholder="Pilih semester" />
                   </SelectTrigger>
                   <SelectContent>
@@ -383,7 +510,9 @@ export function ActivityFormPage() {
                 <Label htmlFor="sumber-dana">Sumber Dana</Label>
                 <Select
                   value={formData.sumberDana}
-                  onValueChange={(value) => setFormData({ ...formData, sumberDana: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, sumberDana: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih sumber dana (opsional)" />
@@ -391,7 +520,9 @@ export function ActivityFormPage() {
                   <SelectContent>
                     <SelectItem value="DIPA POLBAN">DIPA POLBAN</SelectItem>
                     <SelectItem value="Mandiri">Mandiri</SelectItem>
-                    <SelectItem value="Hibah Eksternal">Hibah Eksternal</SelectItem>
+                    <SelectItem value="Hibah Eksternal">
+                      Hibah Eksternal
+                    </SelectItem>
                     <SelectItem value="Lainnya">Lainnya</SelectItem>
                   </SelectContent>
                 </Select>
@@ -405,7 +536,9 @@ export function ActivityFormPage() {
                   type="number"
                   placeholder="0"
                   value={formData.biaya}
-                  onChange={(e) => setFormData({ ...formData, biaya: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, biaya: e.target.value })
+                  }
                 />
                 <p className="text-xs text-muted-foreground">(opsional)</p>
               </div>
@@ -424,15 +557,19 @@ export function ActivityFormPage() {
               <div className="flex items-center gap-3">
                 <Avatar>
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user ? getInitials(user.name) : 'U'}
+                    {user ? getInitials(user.name) : "U"}
                   </AvatarFallback>
                 </Avatar>
                 <div>
                   <p className="font-medium">{user?.name}</p>
                   {user?.nidn && (
-                    <p className="text-xs text-muted-foreground font-mono">NIDN: {user.nidn}</p>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      NIDN: {user.nidn}
+                    </p>
                   )}
-                  <p className="text-sm text-muted-foreground">{user?.programStudi}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user?.programStudi}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -461,14 +598,20 @@ export function ActivityFormPage() {
                         className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
                       >
                         <Avatar>
-                          <AvatarFallback>{getInitials(dosen.name)}</AvatarFallback>
+                          <AvatarFallback>
+                            {getInitials(dosen.name)}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-medium text-sm">{dosen.name}</p>
                           {dosen.nidn && (
-                            <p className="text-xs text-muted-foreground font-mono">NIDN: {dosen.nidn}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              NIDN: {dosen.nidn}
+                            </p>
                           )}
-                          <p className="text-xs text-muted-foreground">{dosen.programStudi}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {dosen.programStudi}
+                          </p>
                         </div>
                       </button>
                     ))}
@@ -481,17 +624,26 @@ export function ActivityFormPage() {
             {anggota.length > 0 && (
               <div className="space-y-2">
                 {anggota.map((dosen) => (
-                  <div key={dosen.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div
+                    key={dosen.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarFallback>{getInitials(dosen.name)}</AvatarFallback>
+                        <AvatarFallback>
+                          {getInitials(dosen.name)}
+                        </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium">{dosen.name}</p>
                         {dosen.nidn && (
-                          <p className="text-xs text-muted-foreground font-mono">NIDN: {dosen.nidn}</p>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            NIDN: {dosen.nidn}
+                          </p>
                         )}
-                        <p className="text-sm text-muted-foreground">{dosen.programStudi}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {dosen.programStudi}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -516,7 +668,8 @@ export function ActivityFormPage() {
           <CardHeader>
             <CardTitle>Lampiran Bukti Kegiatan</CardTitle>
             <CardDescription>
-              Setiap dosen yang terlibat harus mengupload dokumen bukti masing-masing
+              Setiap dosen yang terlibat harus mengupload dokumen bukti
+              masing-masing
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -524,129 +677,183 @@ export function ActivityFormPage() {
             {lampiran.length > 0 ? (
               <div className="space-y-4">
                 {/* Group by dosen */}
-                {Array.from(new Set(lampiran.map(d => d.uploadedBy))).map((dosenId) => {
-                  const dosenDocs = lampiran.filter(d => d.uploadedBy === dosenId);
-                  const dosenName = dosenDocs[0]?.uploadedByName || 'Unknown';
-                  const isCurrentUser = user?.name === dosenName;
+                {Array.from(new Set(lampiran.map((d) => d.uploadedBy))).map(
+                  (dosenId) => {
+                    const dosenDocs = lampiran.filter(
+                      (d) => d.uploadedBy === dosenId
+                    );
+                    const dosenName = dosenDocs[0]?.uploadedByName || "Unknown";
+                    const isCurrentUser = user?.name === dosenName;
 
-                  return (
-                    <div key={dosenId} className="border rounded-lg p-4 space-y-3">
+                    return (
+                      <div
+                        key={dosenId}
+                        className="border rounded-lg p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Avatar>
+                              <AvatarFallback>
+                                {getInitials(dosenName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{dosenName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {dosenDocs.length} dokumen
+                              </p>
+                            </div>
+                          </div>
+                          {isCurrentUser && (
+                            <Badge className="bg-blue-500">Anda</Badge>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 pl-12">
+                          {dosenDocs.map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText className="w-5 h-5 text-muted-foreground" />
+                                <div>
+                                  <p className="font-medium text-sm">
+                                    {doc.name}
+                                  </p>
+                                  <div className="flex gap-2 mt-1">
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {doc.jenis}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">
+                                      {doc.tanggal}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    navigate(`/documents/${doc.id}/preview`, {
+                                      state: {
+                                        allowHighlight: true,
+                                        breadcrumbs: [
+                                          {
+                                            label: "Beranda",
+                                            path: "/dashboard",
+                                          },
+                                          {
+                                            label: "Kegiatan Tridharma",
+                                            path: "/activities",
+                                          },
+                                          {
+                                            label: isEdit
+                                              ? "Edit Kegiatan"
+                                              : "Tambah Kegiatan Baru",
+                                            path: isEdit
+                                              ? `/activities/${id}/edit`
+                                              : "/activities/new",
+                                          },
+                                          { label: doc.name },
+                                        ],
+                                      },
+                                    })
+                                  }
+                                >
+                                  <Highlighter className="w-4 h-4" />
+                                </Button>
+                                {isCurrentUser && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {isCurrentUser && (
+                          <div className="pl-12">
+                            <Button variant="outline" size="sm">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Tambah Dokumen
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                )}
+
+                {/* Dosen yang belum upload */}
+                {[user, ...anggota]
+                  .filter((dosen): dosen is Dosen => dosen !== null)
+                  .map((dosen) => (
+                    <div
+                      key={dosen.id}
+                      className="border rounded-lg p-4 space-y-3 border-red-200 bg-red-50/30"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <Avatar>
-                            <AvatarFallback>{getInitials(dosenName)}</AvatarFallback>
+                            <AvatarFallback>
+                              {getInitials(dosen.name)}
+                            </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium">{dosenName}</p>
-                            <p className="text-xs text-muted-foreground">{dosenDocs.length} dokumen</p>
+                            <p className="font-medium">{dosen.name}</p>
+                            <p className="text-xs text-red-600">
+                              Belum mengupload dokumen
+                            </p>
                           </div>
                         </div>
-                        {isCurrentUser && (
+                        {user?.name === dosen.name && (
                           <Badge className="bg-blue-500">Anda</Badge>
                         )}
                       </div>
 
-                      <div className="space-y-2 pl-12">
-                        {dosenDocs.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium text-sm">{doc.name}</p>
-                                <div className="flex gap-2 mt-1">
-                                  <Badge variant="secondary" className="text-xs">{doc.jenis}</Badge>
-                                  <span className="text-xs text-muted-foreground">{doc.tanggal}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/documents/${doc.id}/preview`, {
-                                  state: {
-                                    allowHighlight: true,
-                                    breadcrumbs: [
-                                      { label: 'Beranda', path: '/dashboard' },
-                                      { label: 'Kegiatan Tridharma', path: '/activities' },
-                                      { label: isEdit ? 'Edit Kegiatan' : 'Tambah Kegiatan Baru', path: isEdit ? `/activities/${id}/edit` : '/activities/new' },
-                                      { label: doc.name },
-                                    ],
-                                  }
-                                })}
-                              >
-                                <Highlighter className="w-4 h-4" />
-                              </Button>
-                              {isCurrentUser && (
-                                <Button variant="ghost" size="sm" className="text-destructive">
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {isCurrentUser && (
+                      {user?.name === dosen.name && (
                         <div className="pl-12">
                           <Button variant="outline" size="sm">
                             <Plus className="w-4 h-4 mr-2" />
-                            Tambah Dokumen
+                            Upload Dokumen Bukti
                           </Button>
                         </div>
                       )}
                     </div>
-                  );
-                })}
-
-                {/* Dosen yang belum upload */}
-                {[user, ...anggota].filter(d => d && !lampiran.some(doc => doc.uploadedByName === d.name)).map((dosen) => (
-                  <div key={dosen.id} className="border rounded-lg p-4 space-y-3 border-red-200 bg-red-50/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Avatar>
-                          <AvatarFallback>{getInitials(dosen.name)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{dosen.name}</p>
-                          <p className="text-xs text-red-600">Belum mengupload dokumen</p>
-                        </div>
-                      </div>
-                      {user?.name === dosen.name && (
-                        <Badge className="bg-blue-500">Anda</Badge>
-                      )}
-                    </div>
-
-                    {user?.name === dosen.name && (
-                      <div className="pl-12">
-                        <Button variant="outline" size="sm">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Upload Dokumen Bukti
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Belum ada dokumen bukti yang diupload</p>
-                <p className="text-sm mt-1">Setiap dosen yang terlibat harus mengupload dokumen bukti</p>
+                <p className="text-sm mt-1">
+                  Setiap dosen yang terlibat harus mengupload dokumen bukti
+                </p>
               </div>
             )}
 
             {/* Upload untuk user saat ini jika belum upload */}
-            {user && !lampiran.some(doc => doc.uploadedByName === user.name) && (
-              <div className="flex gap-2 pt-4 border-t">
-                <Button variant="outline" className="flex-1">
-                  Pilih dari Dokumen Saya
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  Unggah Dokumen Baru
-                </Button>
-              </div>
-            )}
+            {user &&
+              !lampiran.some((doc) => doc.uploadedByName === user.name) && (
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button variant="outline" className="flex-1">
+                    Pilih dari Dokumen Saya
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    Unggah Dokumen Baru
+                  </Button>
+                </div>
+              )}
           </CardContent>
         </Card>
 
@@ -663,12 +870,10 @@ export function ActivityFormPage() {
             )}
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigate('/activities')}>
+            <Button variant="outline" onClick={() => navigate("/activities")}>
               Batal
             </Button>
-            <Button onClick={handleSubmit}>
-              Simpan Kegiatan
-            </Button>
+            <Button onClick={handleSubmit}>Simpan Kegiatan</Button>
           </div>
         </div>
       </div>
@@ -679,14 +884,18 @@ export function ActivityFormPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
             <AlertDialogDescription>
-              Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh asosiasinya akan dihapus.
-              Dokumen bukti yang terlampir tidak akan terhapus, tetapi asosiasi dengan kegiatan ini akan hilang.
+              Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
+              asosiasinya akan dihapus. Dokumen bukti yang terlampir tidak akan
+              terhapus, tetapi asosiasi dengan kegiatan ini akan hilang.
               Tindakan ini dicatat permanen di blockchain.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
               Hapus
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,12 +1,23 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useState } from "react";
+import { Link, useLocation } from "react-router";
 import {
-  Home, FileText, Activity, FolderOpen, History,
-  Bell, Users, BarChart3, Menu, ChevronLeft,
-  BookOpen, FileCheck, Send
-} from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { cn } from '../../../lib/utils';
+  Home,
+  FileText,
+  Activity,
+  FolderOpen,
+  History,
+  Bell,
+  Users,
+  BarChart3,
+  Menu,
+  ChevronLeft,
+  BookOpen,
+  FileCheck,
+  Send,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import type { UserRole } from "../../contexts/AuthContext";
 
 interface NavItem {
   label: string;
@@ -16,13 +27,48 @@ interface NavItem {
 }
 
 const navigationItems: NavItem[] = [
-  { label: 'Beranda', icon: Home, path: '/dashboard', roles: ['admin_tu', 'dosen', 'kaprodi', 'kajur'] },
-  { label: 'Manajemen Akun', icon: Users, path: '/manage-accounts', roles: ['administrator'] },
-  { label: 'Distribusi Dokumen', icon: Send, path: '/document-distribution', roles: ['admin_tu'] },
-  { label: 'Kegiatan Tridharma', icon: Activity, path: '/activities', roles: ['dosen'] },
-  { label: 'Dokumen Saya', icon: FolderOpen, path: '/documents', roles: ['dosen'] },
-  { label: 'Rekap AMI', icon: BarChart3, path: '/ami-recap', roles: ['kaprodi', 'kajur'] },
-  { label: 'Notifikasi', icon: Bell, path: '/notifications', roles: ['admin_tu', 'dosen', 'kaprodi', 'kajur'] },
+  {
+    label: "Beranda",
+    icon: Home,
+    path: "/dashboard",
+    roles: ["admin_tu", "dosen", "kaprodi", "kajur"],
+  },
+  {
+    label: "Manajemen Akun",
+    icon: Users,
+    path: "/manage-accounts",
+    roles: ["administrator"],
+  },
+  {
+    label: "Distribusi Dokumen",
+    icon: Send,
+    path: "/document-distribution",
+    roles: ["admin_tu"],
+  },
+  {
+    label: "Kegiatan Tridharma",
+    icon: Activity,
+    path: "/activities",
+    roles: ["dosen"],
+  },
+  {
+    label: "Dokumen Saya",
+    icon: FolderOpen,
+    path: "/documents",
+    roles: ["dosen"],
+  },
+  {
+    label: "Rekap AMI",
+    icon: BarChart3,
+    path: "/ami-recap",
+    roles: ["kaprodi", "kajur"],
+  },
+  {
+    label: "Notifikasi",
+    icon: Bell,
+    path: "/notifications",
+    roles: ["admin_tu", "dosen", "kaprodi", "kajur"],
+  },
 ];
 
 export function Sidebar() {
@@ -30,15 +76,17 @@ export function Sidebar() {
   const { user } = useAuth();
   const location = useLocation();
 
-  const filteredItems = navigationItems.filter(item =>
-    user && item.roles.some(role => user.roles.includes(role))
+  const filteredItems = navigationItems.filter(
+    (item) => user?.roles?.some((r) => item.roles.includes(r)) ?? false
   );
 
   return (
-    <aside className={cn(
-      "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40",
-      isCollapsed ? "w-16" : "w-60"
-    )}>
+    <aside
+      className={cn(
+        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40",
+        isCollapsed ? "w-16" : "w-60"
+      )}
+    >
       <div className="flex flex-col h-full">
         {/* Logo Section */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
@@ -48,7 +96,9 @@ export function Sidebar() {
                 <FileCheck className="w-5 h-5 text-primary-foreground" />
               </div>
               <div className="flex flex-col">
-                <span className="font-semibold text-sm text-sidebar-foreground">Portofolio Dosen</span>
+                <span className="font-semibold text-sm text-sidebar-foreground">
+                  Portofolio Dosen
+                </span>
                 <span className="text-xs text-muted-foreground">POLBAN</span>
               </div>
             </div>
@@ -83,10 +133,12 @@ export function Sidebar() {
                         : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                     )}
                   >
-                    <Icon className={cn(
-                      "w-5 h-5 flex-shrink-0",
-                      isActive ? "text-sidebar-primary" : ""
-                    )} />
+                    <Icon
+                      className={cn(
+                        "w-5 h-5 flex-shrink-0",
+                        isActive ? "text-sidebar-primary" : ""
+                      )}
+                    />
                     {!isCollapsed && (
                       <span className="text-sm">{item.label}</span>
                     )}

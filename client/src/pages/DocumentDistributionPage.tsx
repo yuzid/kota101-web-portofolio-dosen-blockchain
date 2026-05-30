@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import { MainLayout } from '../components/layout/MainLayout';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent } from '../components/ui/card';
+import { useState } from "react";
+import { MainLayout } from "../components/layout/MainLayout";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import { Card, CardContent } from "../components/ui/card";
 import {
   Table,
   TableBody,
@@ -11,14 +11,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../components/ui/table';
+} from "../components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
+} from "../components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -26,25 +26,41 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
+} from "../components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
-import { Calendar } from '../components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Checkbox } from '../components/ui/checkbox';
-import { Label } from '../components/ui/label';
+} from "../components/ui/dropdown-menu";
+import { Calendar } from "../components/ui/calendar";
 import {
-  Upload, Users, CheckCircle, Clock, XCircle, Search,
-  FileText, CalendarIcon, Send, Eye, MoreVertical, X, Edit, Trash2
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { cn } from '../../lib/utils';
-import { toast } from 'sonner';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { Checkbox } from "../components/ui/checkbox";
+import { Label } from "../components/ui/label";
+import {
+  Upload,
+  Users,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Search,
+  FileText,
+  CalendarIcon,
+  Send,
+  Eye,
+  MoreVertical,
+  X,
+  Edit,
+  Trash2,
+} from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface DistributedDocument {
   id: string;
@@ -54,81 +70,114 @@ interface DistributedDocument {
   distributionDate?: string;
   recipients: string[];
   recipientNames: string[];
-  status: 'draft' | 'pending' | 'distributed';
+  status: "draft" | "pending" | "distributed";
   totalRecipients: number;
   receivedCount: number;
 }
 
 const mockDocuments: DistributedDocument[] = [
   {
-    id: '1',
-    name: 'SK Mengajar Semester Genap 2025/2026',
-    jenis: 'SK',
-    uploadDate: '2026-05-16',
-    distributionDate: '2026-05-16',
-    recipients: ['1', '2', '3', '4', '5'],
-    recipientNames: ['Dr. John Doe', 'Dr. Ahmad Fauzi', 'Dr. Siti Nurhaliza', 'Dr. Budi Santoso', 'Dr. Jane Smith'],
-    status: 'distributed',
+    id: "1",
+    name: "SK Mengajar Semester Genap 2025/2026",
+    jenis: "SK",
+    uploadDate: "2026-05-16",
+    distributionDate: "2026-05-16",
+    recipients: ["1", "2", "3", "4", "5"],
+    recipientNames: [
+      "Dr. John Doe",
+      "Dr. Ahmad Fauzi",
+      "Dr. Siti Nurhaliza",
+      "Dr. Budi Santoso",
+      "Dr. Jane Smith",
+    ],
+    status: "distributed",
     totalRecipients: 5,
     receivedCount: 5,
   },
   {
-    id: '2',
-    name: 'Surat Tugas Penelitian Q2 2026',
-    jenis: 'Surat Tugas',
-    uploadDate: '2026-05-15',
-    distributionDate: '2026-05-15',
-    recipients: ['1', '2'],
-    recipientNames: ['Dr. John Doe', 'Dr. Ahmad Fauzi'],
-    status: 'distributed',
+    id: "2",
+    name: "Surat Tugas Penelitian Q2 2026",
+    jenis: "Surat Tugas",
+    uploadDate: "2026-05-15",
+    distributionDate: "2026-05-15",
+    recipients: ["1", "2"],
+    recipientNames: ["Dr. John Doe", "Dr. Ahmad Fauzi"],
+    status: "distributed",
     totalRecipients: 2,
     receivedCount: 1,
   },
   {
-    id: '3',
-    name: 'SK Penugasan Koordinator Lab',
-    jenis: 'SK',
-    uploadDate: '2026-05-14',
-    recipients: ['3', '4'],
-    recipientNames: ['Dr. Siti Nurhaliza', 'Dr. Budi Santoso'],
-    status: 'pending',
+    id: "3",
+    name: "SK Penugasan Koordinator Lab",
+    jenis: "SK",
+    uploadDate: "2026-05-14",
+    recipients: ["3", "4"],
+    recipientNames: ["Dr. Siti Nurhaliza", "Dr. Budi Santoso"],
+    status: "pending",
     totalRecipients: 2,
     receivedCount: 0,
   },
   {
-    id: '4',
-    name: 'Jadwal Mengajar Semester Genap Draft',
-    jenis: 'Jadwal',
-    uploadDate: '2026-05-13',
+    id: "4",
+    name: "Jadwal Mengajar Semester Genap Draft",
+    jenis: "Jadwal",
+    uploadDate: "2026-05-13",
     recipients: [],
     recipientNames: [],
-    status: 'draft',
+    status: "draft",
     totalRecipients: 0,
     receivedCount: 0,
   },
 ];
 
 const allDosen = [
-  { id: '1', name: 'Dr. John Doe', nidn: '0412108901', programStudi: 'D4 Teknik Informatika' },
-  { id: '2', name: 'Dr. Ahmad Fauzi', nidn: '0420059102', programStudi: 'D4 Teknik Informatika' },
-  { id: '3', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', programStudi: 'D3 Teknik Informatika' },
-  { id: '4', name: 'Dr. Budi Santoso', nidn: '0408068901', programStudi: 'D4 Teknik Komputer' },
-  { id: '5', name: 'Dr. Jane Smith', nidn: '0415078801', programStudi: 'D4 Teknik Informatika' },
+  {
+    id: "1",
+    name: "Dr. John Doe",
+    nidn: "0412108901",
+    programStudi: "D4 Teknik Informatika",
+  },
+  {
+    id: "2",
+    name: "Dr. Ahmad Fauzi",
+    nidn: "0420059102",
+    programStudi: "D4 Teknik Informatika",
+  },
+  {
+    id: "3",
+    name: "Dr. Siti Nurhaliza",
+    nidn: "0405067801",
+    programStudi: "D3 Teknik Informatika",
+  },
+  {
+    id: "4",
+    name: "Dr. Budi Santoso",
+    nidn: "0408068901",
+    programStudi: "D4 Teknik Komputer",
+  },
+  {
+    id: "5",
+    name: "Dr. Jane Smith",
+    nidn: "0415078801",
+    programStudi: "D4 Teknik Informatika",
+  },
 ];
 
 export function DocumentDistributionPage() {
-  const [documents, setDocuments] = useState<DistributedDocument[]>(mockDocuments);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterRecipient, setFilterRecipient] = useState<string>('all');
+  const [documents, setDocuments] =
+    useState<DistributedDocument[]>(mockDocuments);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterRecipient, setFilterRecipient] = useState<string>("all");
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<DistributedDocument | null>(null);
+  const [selectedDocument, setSelectedDocument] =
+    useState<DistributedDocument | null>(null);
 
   const [uploadForm, setUploadForm] = useState({
-    name: '',
-    jenis: '',
+    name: "",
+    jenis: "",
     file: null as File | null,
     recipients: [] as string[],
     sendNow: true,
@@ -136,10 +185,12 @@ export function DocumentDistributionPage() {
 
   // Filter documents
   const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || doc.status === filterStatus;
+    const matchesSearch = doc.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
     const matchesRecipient =
-      filterRecipient === 'all' || doc.recipients.includes(filterRecipient);
+      filterRecipient === "all" || doc.recipients.includes(filterRecipient);
 
     let matchesDate = true;
     if (dateRange.from && dateRange.to) {
@@ -151,43 +202,43 @@ export function DocumentDistributionPage() {
   });
 
   const hasActiveFilters =
-    searchTerm !== '' ||
-    filterStatus !== 'all' ||
-    filterRecipient !== 'all' ||
+    searchTerm !== "" ||
+    filterStatus !== "all" ||
+    filterRecipient !== "all" ||
     dateRange.from ||
     dateRange.to;
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setFilterStatus('all');
-    setFilterRecipient('all');
+    setSearchTerm("");
+    setFilterStatus("all");
+    setFilterRecipient("all");
     setDateRange({});
   };
 
   const counts = {
     all: documents.length,
-    draft: documents.filter((d) => d.status === 'draft').length,
-    pending: documents.filter((d) => d.status === 'pending').length,
-    distributed: documents.filter((d) => d.status === 'distributed').length,
+    draft: documents.filter((d) => d.status === "draft").length,
+    pending: documents.filter((d) => d.status === "pending").length,
+    distributed: documents.filter((d) => d.status === "distributed").length,
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'distributed':
+      case "distributed":
         return (
           <Badge className="bg-green-500">
             <CheckCircle className="w-3 h-3 mr-1" />
             Terdistribusi
           </Badge>
         );
-      case 'pending':
+      case "pending":
         return (
           <Badge className="bg-orange-500">
             <Clock className="w-3 h-3 mr-1" />
             Pending
           </Badge>
         );
-      case 'draft':
+      case "draft":
         return (
           <Badge variant="secondary">
             <FileText className="w-3 h-3 mr-1" />
@@ -201,7 +252,7 @@ export function DocumentDistributionPage() {
 
   const handleUpload = () => {
     if (!uploadForm.name || !uploadForm.jenis) {
-      toast.error('Lengkapi semua field yang wajib');
+      toast.error("Lengkapi semua field yang wajib");
       return;
     }
 
@@ -209,25 +260,43 @@ export function DocumentDistributionPage() {
       id: `doc-${Date.now()}`,
       name: uploadForm.name,
       jenis: uploadForm.jenis,
-      uploadDate: new Date().toISOString().split('T')[0],
-      distributionDate: uploadForm.sendNow ? new Date().toISOString().split('T')[0] : undefined,
+      uploadDate: new Date().toISOString().split("T")[0],
+      distributionDate: uploadForm.sendNow
+        ? new Date().toISOString().split("T")[0]
+        : undefined,
       recipients: uploadForm.recipients,
       recipientNames: allDosen
         .filter((d) => uploadForm.recipients.includes(d.id))
         .map((d) => d.name),
-      status: uploadForm.sendNow ? 'distributed' : uploadForm.recipients.length > 0 ? 'pending' : 'draft',
+      status: uploadForm.sendNow
+        ? "distributed"
+        : uploadForm.recipients.length > 0
+        ? "pending"
+        : "draft",
       totalRecipients: uploadForm.recipients.length,
       receivedCount: 0,
     };
 
     setDocuments([newDoc, ...documents]);
     setShowUploadDialog(false);
-    setUploadForm({ name: '', jenis: '', file: null, recipients: [], sendNow: true });
+    setUploadForm({
+      name: "",
+      jenis: "",
+      file: null,
+      recipients: [],
+      sendNow: true,
+    });
 
     if (uploadForm.sendNow && uploadForm.recipients.length > 0) {
-      toast.success(`Dokumen "${uploadForm.name}" berhasil didistribusikan ke ${uploadForm.recipients.length} dosen`);
+      toast.success(
+        `Dokumen "${uploadForm.name}" berhasil didistribusikan ke ${uploadForm.recipients.length} dosen`
+      );
     } else {
-      toast.success(`Dokumen "${uploadForm.name}" disimpan sebagai ${uploadForm.recipients.length > 0 ? 'pending' : 'draft'}`);
+      toast.success(
+        `Dokumen "${uploadForm.name}" disimpan sebagai ${
+          uploadForm.recipients.length > 0 ? "pending" : "draft"
+        }`
+      );
     }
   };
 
@@ -253,7 +322,10 @@ export function DocumentDistributionPage() {
   const toggleAllRecipients = () => {
     setUploadForm((prev) => ({
       ...prev,
-      recipients: prev.recipients.length === allDosen.length ? [] : allDosen.map((d) => d.id),
+      recipients:
+        prev.recipients.length === allDosen.length
+          ? []
+          : allDosen.map((d) => d.id),
     }));
   };
 
@@ -261,8 +333,8 @@ export function DocumentDistributionPage() {
     <MainLayout
       title="Distribusi Dokumen"
       breadcrumbs={[
-        { label: 'Beranda', path: '/dashboard' },
-        { label: 'Distribusi Dokumen' },
+        { label: "Beranda", path: "/dashboard" },
+        { label: "Distribusi Dokumen" },
       ]}
     >
       <div className="space-y-4 max-w-7xl">
@@ -294,7 +366,9 @@ export function DocumentDistributionPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Terdistribusi</p>
-                <p className="text-3xl font-bold text-green-600">{counts.distributed}</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {counts.distributed}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -302,7 +376,9 @@ export function DocumentDistributionPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-3xl font-bold text-orange-600">{counts.pending}</p>
+                <p className="text-3xl font-bold text-orange-600">
+                  {counts.pending}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -310,7 +386,9 @@ export function DocumentDistributionPage() {
             <CardContent className="pt-6">
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Draft</p>
-                <p className="text-3xl font-bold text-gray-600">{counts.draft}</p>
+                <p className="text-3xl font-bold text-gray-600">
+                  {counts.draft}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -344,7 +422,10 @@ export function DocumentDistributionPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterRecipient} onValueChange={setFilterRecipient}>
+              <Select
+                value={filterRecipient}
+                onValueChange={setFilterRecipient}
+              >
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Penerima" />
                 </SelectTrigger>
@@ -363,14 +444,19 @@ export function DocumentDistributionPage() {
                   <Button
                     variant="outline"
                     className={cn(
-                      'w-[240px] justify-start text-left font-normal',
-                      !dateRange.from && !dateRange.to && 'text-muted-foreground'
+                      "w-[240px] justify-start text-left font-normal",
+                      !dateRange.from &&
+                        !dateRange.to &&
+                        "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {dateRange.from && dateRange.to
-                      ? `${format(dateRange.from, 'dd/MM/yy')} - ${format(dateRange.to, 'dd/MM/yy')}`
-                      : 'Pilih Tanggal'}
+                      ? `${format(dateRange.from, "dd/MM/yy")} - ${format(
+                          dateRange.to,
+                          "dd/MM/yy"
+                        )}`
+                      : "Pilih Tanggal"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -417,7 +503,11 @@ export function DocumentDistributionPage() {
                         <FileText className="w-8 h-8" />
                         <p>Tidak ada dokumen yang sesuai filter</p>
                         {hasActiveFilters && (
-                          <Button variant="outline" size="sm" onClick={resetFilters}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={resetFilters}
+                          >
                             Reset Filter
                           </Button>
                         )}
@@ -432,7 +522,7 @@ export function DocumentDistributionPage() {
                         <Badge variant="secondary">{doc.jenis}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {format(new Date(doc.uploadDate), 'dd MMM yyyy')}
+                        {format(new Date(doc.uploadDate), "dd MMM yyyy")}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -442,7 +532,7 @@ export function DocumentDistributionPage() {
                       </TableCell>
                       <TableCell>{getStatusBadge(doc.status)}</TableCell>
                       <TableCell>
-                        {doc.status !== 'draft' && (
+                        {doc.status !== "draft" && (
                           <span className="text-sm">
                             {doc.receivedCount}/{doc.totalRecipients}
                           </span>
@@ -456,11 +546,13 @@ export function DocumentDistributionPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetail(doc)}>
+                            <DropdownMenuItem
+                              onClick={() => handleViewDetail(doc)}
+                            >
                               <Eye className="w-4 h-4 mr-2" />
                               Lihat Detail
                             </DropdownMenuItem>
-                            {doc.status === 'draft' && (
+                            {doc.status === "draft" && (
                               <DropdownMenuItem>
                                 <Send className="w-4 h-4 mr-2" />
                                 Distribusikan Sekarang
@@ -509,7 +601,9 @@ export function DocumentDistributionPage() {
               <Label>Nama Dokumen *</Label>
               <Input
                 value={uploadForm.name}
-                onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
+                onChange={(e) =>
+                  setUploadForm({ ...uploadForm, name: e.target.value })
+                }
                 placeholder="Contoh: SK Mengajar Semester Genap 2025/2026"
               />
             </div>
@@ -518,7 +612,9 @@ export function DocumentDistributionPage() {
               <Label>Jenis Dokumen *</Label>
               <Select
                 value={uploadForm.jenis}
-                onValueChange={(value) => setUploadForm({ ...uploadForm, jenis: value })}
+                onValueChange={(value) =>
+                  setUploadForm({ ...uploadForm, jenis: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih jenis dokumen" />
@@ -537,17 +633,23 @@ export function DocumentDistributionPage() {
               <div className="border-2 border-dashed rounded-lg p-6 text-center">
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm">Drag & drop atau klik untuk upload</p>
-                <p className="text-xs text-muted-foreground mt-1">PDF, maksimal 10MB</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PDF, maksimal 10MB
+                </p>
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Pilih Penerima *</Label>
-                <Button variant="outline" size="sm" onClick={toggleAllRecipients}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleAllRecipients}
+                >
                   {uploadForm.recipients.length === allDosen.length
-                    ? 'Hapus Semua'
-                    : 'Pilih Semua'}
+                    ? "Hapus Semua"
+                    : "Pilih Semua"}
                 </Button>
               </div>
               <div className="border rounded-lg p-3 space-y-2 max-h-[200px] overflow-y-auto">
@@ -587,11 +689,16 @@ export function DocumentDistributionPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowUploadDialog(false)}
+            >
               Batal
             </Button>
             <Button onClick={handleUpload}>
-              {uploadForm.sendNow ? 'Upload & Distribusikan' : 'Simpan sebagai Draft'}
+              {uploadForm.sendNow
+                ? "Upload & Distribusikan"
+                : "Simpan sebagai Draft"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -607,24 +714,35 @@ export function DocumentDistributionPage() {
           {selectedDocument && (
             <div className="space-y-4">
               <div>
-                <Label className="text-sm text-muted-foreground">Nama Dokumen</Label>
+                <Label className="text-sm text-muted-foreground">
+                  Nama Dokumen
+                </Label>
                 <p className="font-medium">{selectedDocument.name}</p>
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground">Status</Label>
-                <div className="mt-1">{getStatusBadge(selectedDocument.status)}</div>
+                <div className="mt-1">
+                  {getStatusBadge(selectedDocument.status)}
+                </div>
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">Daftar Penerima</Label>
+                <Label className="text-sm text-muted-foreground">
+                  Daftar Penerima
+                </Label>
                 <div className="mt-2 border rounded-lg divide-y max-h-[300px] overflow-y-auto">
                   {selectedDocument.recipientNames.length === 0 ? (
-                    <p className="p-3 text-sm text-muted-foreground">Belum ada penerima</p>
+                    <p className="p-3 text-sm text-muted-foreground">
+                      Belum ada penerima
+                    </p>
                   ) : (
                     selectedDocument.recipientNames.map((name, index) => (
-                      <div key={index} className="p-3 flex items-center justify-between">
+                      <div
+                        key={index}
+                        className="p-3 flex items-center justify-between"
+                      >
                         <span className="text-sm">{name}</span>
                         <Badge variant="secondary">
-                          {index === 0 ? 'Diterima' : 'Belum'}
+                          {index === 0 ? "Diterima" : "Belum"}
                         </Badge>
                       </div>
                     ))
@@ -635,7 +753,10 @@ export function DocumentDistributionPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDetailDialog(false)}
+            >
               Tutup
             </Button>
           </DialogFooter>

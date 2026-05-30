@@ -1,11 +1,21 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
-import { MainLayout } from '../components/layout/MainLayout';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import { MainLayout } from "../components/layout/MainLayout";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -13,24 +23,38 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../components/ui/table';
+} from "../components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
-import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { Calendar } from '../components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+} from "../components/ui/select";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Calendar } from "../components/ui/calendar";
 import {
-  Search, Download, Eye, BarChart3, TrendingUp,
-  FileText, CheckCircle, AlertCircle, X, Users, Activity, CalendarIcon
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import {
+  Search,
+  Download,
+  Eye,
+  BarChart3,
+  TrendingUp,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  X,
+  Users,
+  Activity,
+  CalendarIcon,
+} from "lucide-react";
+import { format } from "date-fns";
+import { useAuth } from "../contexts/AuthContext";
+import { toast } from "sonner";
 
 interface DosenTerlibat {
   id: string;
@@ -44,7 +68,7 @@ interface DosenTerlibat {
 interface ActivityRecap {
   id: string;
   namaKegiatan: string;
-  jenisTridharma: 'pengajaran' | 'penelitian' | 'pengabdian' | 'tugas_tambahan';
+  jenisTridharma: "pengajaran" | "penelitian" | "pengabdian" | "tugas_tambahan";
   kategori: string;
   pencatat: string;
   nidn: string;
@@ -56,212 +80,316 @@ interface ActivityRecap {
   sumberDana: string;
   biaya: number;
   dosenTerlibat: DosenTerlibat[];
-  statusKelengkapan: 'lengkap' | 'tidak_lengkap';
+  statusKelengkapan: "lengkap" | "tidak_lengkap";
 }
 
 const mockActivities: ActivityRecap[] = [
   {
-    id: '1',
-    namaKegiatan: 'Mata Kuliah Pemrograman Web',
-    jenisTridharma: 'pengajaran',
-    kategori: 'Mengajar',
-    pencatat: 'Dr. John Doe',
-    nidn: '0412108901',
-    programStudi: 'D4 Teknik Informatika',
-    tanggalMulai: '2026-01-15',
-    tanggalSelesai: '2026-05-30',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'DIPA POLBAN',
+    id: "1",
+    namaKegiatan: "Mata Kuliah Pemrograman Web",
+    jenisTridharma: "pengajaran",
+    kategori: "Mengajar",
+    pencatat: "Dr. John Doe",
+    nidn: "0412108901",
+    programStudi: "D4 Teknik Informatika",
+    tanggalMulai: "2026-01-15",
+    tanggalSelesai: "2026-05-30",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "DIPA POLBAN",
     biaya: 5000000,
     dosenTerlibat: [
-      { id: '1', name: 'Dr. John Doe', nidn: '0412108901', isPencatat: true, isKetua: true, jumlahDokumen: 2 },
+      {
+        id: "1",
+        name: "Dr. John Doe",
+        nidn: "0412108901",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 2,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
   {
-    id: '2',
-    namaKegiatan: 'Penelitian Blockchain untuk E-Government',
-    jenisTridharma: 'penelitian',
-    kategori: 'Penelitian Kelompok',
-    pencatat: 'Dr. Ahmad Fauzi',
-    nidn: '0420059102',
-    programStudi: 'D4 Teknik Informatika',
-    tanggalMulai: '2026-02-01',
-    tanggalSelesai: '2026-07-31',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'Hibah Eksternal',
+    id: "2",
+    namaKegiatan: "Penelitian Blockchain untuk E-Government",
+    jenisTridharma: "penelitian",
+    kategori: "Penelitian Kelompok",
+    pencatat: "Dr. Ahmad Fauzi",
+    nidn: "0420059102",
+    programStudi: "D4 Teknik Informatika",
+    tanggalMulai: "2026-02-01",
+    tanggalSelesai: "2026-07-31",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "Hibah Eksternal",
     biaya: 50000000,
     dosenTerlibat: [
-      { id: '2', name: 'Dr. Ahmad Fauzi', nidn: '0420059102', isPencatat: true, isKetua: true, jumlahDokumen: 1 },
-      { id: '1', name: 'Dr. John Doe', nidn: '0412108901', isPencatat: false, isKetua: false, jumlahDokumen: 1 },
-      { id: '3', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', isPencatat: false, isKetua: false, jumlahDokumen: 0 },
+      {
+        id: "2",
+        name: "Dr. Ahmad Fauzi",
+        nidn: "0420059102",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
+      {
+        id: "1",
+        name: "Dr. John Doe",
+        nidn: "0412108901",
+        isPencatat: false,
+        isKetua: false,
+        jumlahDokumen: 1,
+      },
+      {
+        id: "3",
+        name: "Dr. Siti Nurhaliza",
+        nidn: "0405067801",
+        isPencatat: false,
+        isKetua: false,
+        jumlahDokumen: 0,
+      },
     ],
-    statusKelengkapan: 'tidak_lengkap',
+    statusKelengkapan: "tidak_lengkap",
   },
   {
-    id: '3',
-    namaKegiatan: 'Pelatihan Web Development untuk UMKM',
-    jenisTridharma: 'pengabdian',
-    kategori: 'Pelatihan Masyarakat',
-    pencatat: 'Dr. Siti Nurhaliza',
-    nidn: '0405067801',
-    programStudi: 'D3 Teknik Informatika',
-    tanggalMulai: '2026-03-10',
-    tanggalSelesai: '2026-03-12',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'Mandiri',
+    id: "3",
+    namaKegiatan: "Pelatihan Web Development untuk UMKM",
+    jenisTridharma: "pengabdian",
+    kategori: "Pelatihan Masyarakat",
+    pencatat: "Dr. Siti Nurhaliza",
+    nidn: "0405067801",
+    programStudi: "D3 Teknik Informatika",
+    tanggalMulai: "2026-03-10",
+    tanggalSelesai: "2026-03-12",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "Mandiri",
     biaya: 3000000,
     dosenTerlibat: [
-      { id: '3', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', isPencatat: true, isKetua: false, jumlahDokumen: 2 },
-      { id: '4', name: 'Prof. Budi Santoso', nidn: '0418088902', isPencatat: false, isKetua: true, jumlahDokumen: 1 },
+      {
+        id: "3",
+        name: "Dr. Siti Nurhaliza",
+        nidn: "0405067801",
+        isPencatat: true,
+        isKetua: false,
+        jumlahDokumen: 2,
+      },
+      {
+        id: "4",
+        name: "Prof. Budi Santoso",
+        nidn: "0418088902",
+        isPencatat: false,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
   {
-    id: '4',
-    namaKegiatan: 'Koordinator Laboratorium Pemrograman',
-    jenisTridharma: 'tugas_tambahan',
-    kategori: 'Koordinator Laboratorium',
-    pencatat: 'Prof. Budi Santoso',
-    nidn: '0418088902',
-    programStudi: 'D3 Teknik Informatika',
-    tanggalMulai: '2025-08-01',
-    tanggalSelesai: '2026-07-31',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'DIPA POLBAN',
+    id: "4",
+    namaKegiatan: "Koordinator Laboratorium Pemrograman",
+    jenisTridharma: "tugas_tambahan",
+    kategori: "Koordinator Laboratorium",
+    pencatat: "Prof. Budi Santoso",
+    nidn: "0418088902",
+    programStudi: "D3 Teknik Informatika",
+    tanggalMulai: "2025-08-01",
+    tanggalSelesai: "2026-07-31",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "DIPA POLBAN",
     biaya: 0,
     dosenTerlibat: [
-      { id: '4', name: 'Prof. Budi Santoso', nidn: '0418088902', isPencatat: true, isKetua: true, jumlahDokumen: 1 },
+      {
+        id: "4",
+        name: "Prof. Budi Santoso",
+        nidn: "0418088902",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
   {
-    id: '5',
-    namaKegiatan: 'Publikasi Jurnal Internasional IoT',
-    jenisTridharma: 'penelitian',
-    kategori: 'Publikasi Jurnal',
-    pencatat: 'Dr. John Doe',
-    nidn: '0412108901',
-    programStudi: 'D4 Teknik Informatika',
-    tanggalMulai: '2026-01-05',
-    tanggalSelesai: '2026-04-20',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'Hibah Eksternal',
+    id: "5",
+    namaKegiatan: "Publikasi Jurnal Internasional IoT",
+    jenisTridharma: "penelitian",
+    kategori: "Publikasi Jurnal",
+    pencatat: "Dr. John Doe",
+    nidn: "0412108901",
+    programStudi: "D4 Teknik Informatika",
+    tanggalMulai: "2026-01-05",
+    tanggalSelesai: "2026-04-20",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "Hibah Eksternal",
     biaya: 15000000,
     dosenTerlibat: [
-      { id: '1', name: 'Dr. John Doe', nidn: '0412108901', isPencatat: true, isKetua: false, jumlahDokumen: 1 },
-      { id: '2', name: 'Dr. Ahmad Fauzi', nidn: '0420059102', isPencatat: false, isKetua: true, jumlahDokumen: 1 },
+      {
+        id: "1",
+        name: "Dr. John Doe",
+        nidn: "0412108901",
+        isPencatat: true,
+        isKetua: false,
+        jumlahDokumen: 1,
+      },
+      {
+        id: "2",
+        name: "Dr. Ahmad Fauzi",
+        nidn: "0420059102",
+        isPencatat: false,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
   {
-    id: '6',
-    namaKegiatan: 'Mata Kuliah Basis Data',
-    jenisTridharma: 'pengajaran',
-    kategori: 'Mengajar',
-    pencatat: 'Dr. Ahmad Fauzi',
-    nidn: '0420059102',
-    programStudi: 'D4 Teknik Informatika',
-    tanggalMulai: '2026-01-15',
-    tanggalSelesai: '2026-05-30',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'DIPA POLBAN',
+    id: "6",
+    namaKegiatan: "Mata Kuliah Basis Data",
+    jenisTridharma: "pengajaran",
+    kategori: "Mengajar",
+    pencatat: "Dr. Ahmad Fauzi",
+    nidn: "0420059102",
+    programStudi: "D4 Teknik Informatika",
+    tanggalMulai: "2026-01-15",
+    tanggalSelesai: "2026-05-30",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "DIPA POLBAN",
     biaya: 4000000,
     dosenTerlibat: [
-      { id: '2', name: 'Dr. Ahmad Fauzi', nidn: '0420059102', isPencatat: true, isKetua: true, jumlahDokumen: 0 },
+      {
+        id: "2",
+        name: "Dr. Ahmad Fauzi",
+        nidn: "0420059102",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 0,
+      },
     ],
-    statusKelengkapan: 'tidak_lengkap',
+    statusKelengkapan: "tidak_lengkap",
   },
   {
-    id: '7',
-    namaKegiatan: 'Pembimbingan Tugas Akhir',
-    jenisTridharma: 'pengajaran',
-    kategori: 'Pembimbing TA',
-    pencatat: 'Dr. Siti Nurhaliza',
-    nidn: '0405067801',
-    programStudi: 'D3 Teknik Informatika',
-    tanggalMulai: '2026-02-01',
-    tanggalSelesai: '2026-06-30',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: '',
+    id: "7",
+    namaKegiatan: "Pembimbingan Tugas Akhir",
+    jenisTridharma: "pengajaran",
+    kategori: "Pembimbing TA",
+    pencatat: "Dr. Siti Nurhaliza",
+    nidn: "0405067801",
+    programStudi: "D3 Teknik Informatika",
+    tanggalMulai: "2026-02-01",
+    tanggalSelesai: "2026-06-30",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "",
     biaya: 0,
     dosenTerlibat: [
-      { id: '3', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', isPencatat: true, isKetua: true, jumlahDokumen: 1 },
+      {
+        id: "3",
+        name: "Dr. Siti Nurhaliza",
+        nidn: "0405067801",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
   {
-    id: '8',
-    namaKegiatan: 'Konsultasi IT untuk Desa Cibiru',
-    jenisTridharma: 'pengabdian',
-    kategori: 'Konsultasi Masyarakat',
-    pencatat: 'Prof. Budi Santoso',
-    nidn: '0418088902',
-    programStudi: 'D3 Teknik Informatika',
-    tanggalMulai: '2026-04-01',
-    tanggalSelesai: '2026-04-03',
-    tahunAkademik: '2025/2026',
-    semester: 'ganjil',
-    sumberDana: 'Mandiri',
+    id: "8",
+    namaKegiatan: "Konsultasi IT untuk Desa Cibiru",
+    jenisTridharma: "pengabdian",
+    kategori: "Konsultasi Masyarakat",
+    pencatat: "Prof. Budi Santoso",
+    nidn: "0418088902",
+    programStudi: "D3 Teknik Informatika",
+    tanggalMulai: "2026-04-01",
+    tanggalSelesai: "2026-04-03",
+    tahunAkademik: "2025/2026",
+    semester: "ganjil",
+    sumberDana: "Mandiri",
     biaya: 2000000,
     dosenTerlibat: [
-      { id: '4', name: 'Prof. Budi Santoso', nidn: '0418088902', isPencatat: true, isKetua: true, jumlahDokumen: 1 },
-      { id: '3', name: 'Dr. Siti Nurhaliza', nidn: '0405067801', isPencatat: false, isKetua: false, jumlahDokumen: 1 },
+      {
+        id: "4",
+        name: "Prof. Budi Santoso",
+        nidn: "0418088902",
+        isPencatat: true,
+        isKetua: true,
+        jumlahDokumen: 1,
+      },
+      {
+        id: "3",
+        name: "Dr. Siti Nurhaliza",
+        nidn: "0405067801",
+        isPencatat: false,
+        isKetua: false,
+        jumlahDokumen: 1,
+      },
     ],
-    statusKelengkapan: 'lengkap',
+    statusKelengkapan: "lengkap",
   },
 ];
 
 export function AMIRecapPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('semua');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterProdi, setFilterProdi] = useState('all');
-  const [filterDosen, setFilterDosen] = useState('all');
-  const [filterJenis, setFilterJenis] = useState('all');
-  const [filterKategori, setFilterKategori] = useState('all');
-  const [filterKelengkapan, setFilterKelengkapan] = useState('all');
-  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState("semua");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterProdi, setFilterProdi] = useState("all");
+  const [filterDosen, setFilterDosen] = useState("all");
+  const [filterJenis, setFilterJenis] = useState("all");
+  const [filterKategori, setFilterKategori] = useState("all");
+  const [filterKelengkapan, setFilterKelengkapan] = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(
+    undefined
+  );
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
 
   // Determine scope based on role
-  const isKaprodi = user?.role === 'kaprodi';
-  const isKajur = user?.role === 'kajur';
+  const isKaprodi = user?.roles?.includes("kaprodi");
+  const isKajur = user?.roles?.includes("kajur");
 
   // Filter activities based on role and filters
-  const filteredActivities = mockActivities.filter(activity => {
+  const filteredActivities = mockActivities.filter((activity) => {
     // Role-based filter
-    if (isKaprodi && user?.programStudi && activity.programStudi !== user.programStudi) {
+    if (
+      isKaprodi &&
+      user?.programStudi &&
+      activity.programStudi !== user.programStudi
+    ) {
       return false;
     }
 
     // Search filter
-    const matchesSearch = activity.namaKegiatan.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         activity.pencatat.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         activity.nidn.includes(searchTerm);
+    const matchesSearch =
+      activity.namaKegiatan.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.pencatat.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      activity.nidn.includes(searchTerm);
 
     // Prodi filter
-    const matchesProdi = filterProdi === 'all' || activity.programStudi === filterProdi;
+    const matchesProdi =
+      filterProdi === "all" || activity.programStudi === filterProdi;
 
     // Dosen filter
-    const matchesDosen = filterDosen === 'all' || activity.pencatat === filterDosen;
+    const matchesDosen =
+      filterDosen === "all" || activity.pencatat === filterDosen;
 
     // Jenis tridharma filter
-    const matchesJenis = filterJenis === 'all' || activity.jenisTridharma === filterJenis;
+    const matchesJenis =
+      filterJenis === "all" || activity.jenisTridharma === filterJenis;
 
     // Kategori filter
-    const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
+    const matchesKategori =
+      filterKategori === "all" || activity.kategori === filterKategori;
 
     // Kelengkapan filter
-    const matchesKelengkapan = filterKelengkapan === 'all' || activity.statusKelengkapan === filterKelengkapan;
+    const matchesKelengkapan =
+      filterKelengkapan === "all" ||
+      activity.statusKelengkapan === filterKelengkapan;
 
     // Date range filter
     let matchesDateRange = true;
@@ -271,7 +399,8 @@ export function AMIRecapPage() {
 
       if (filterDateFrom && filterDateTo) {
         // Both dates set: activity must overlap with the range
-        matchesDateRange = activityStart <= filterDateTo && activityEnd >= filterDateFrom;
+        matchesDateRange =
+          activityStart <= filterDateTo && activityEnd >= filterDateFrom;
       } else if (filterDateFrom) {
         // Only start date: activity must end after or on this date
         matchesDateRange = activityEnd >= filterDateFrom;
@@ -282,52 +411,101 @@ export function AMIRecapPage() {
     }
 
     // Tab filter
-    const matchesTab = activeTab === 'semua' || activity.jenisTridharma === activeTab;
+    const matchesTab =
+      activeTab === "semua" || activity.jenisTridharma === activeTab;
 
-    return matchesSearch && matchesProdi && matchesDosen && matchesJenis && matchesKategori &&
-           matchesKelengkapan && matchesDateRange && matchesTab;
+    return (
+      matchesSearch &&
+      matchesProdi &&
+      matchesDosen &&
+      matchesJenis &&
+      matchesKategori &&
+      matchesKelengkapan &&
+      matchesDateRange &&
+      matchesTab
+    );
   });
 
-  const programStudiList = Array.from(new Set(mockActivities.map(a => a.programStudi)));
-  const dosenList = Array.from(new Set(mockActivities.map(a => a.pencatat)));
-  const kategoriList = Array.from(new Set(mockActivities.map(a => a.kategori)));
+  const programStudiList = Array.from(
+    new Set(mockActivities.map((a) => a.programStudi))
+  );
+  const dosenList = Array.from(new Set(mockActivities.map((a) => a.pencatat)));
+  const kategoriList = Array.from(
+    new Set(mockActivities.map((a) => a.kategori))
+  );
 
   // Calculate stats
   const totalStats = {
     total: filteredActivities.length,
-    lengkap: filteredActivities.filter(a => a.statusKelengkapan === 'lengkap').length,
-    tidakLengkap: filteredActivities.filter(a => a.statusKelengkapan === 'tidak_lengkap').length,
-    pengajaran: filteredActivities.filter(a => a.jenisTridharma === 'pengajaran').length,
-    penelitian: filteredActivities.filter(a => a.jenisTridharma === 'penelitian').length,
-    pengabdian: filteredActivities.filter(a => a.jenisTridharma === 'pengabdian').length,
-    tugasTambahan: filteredActivities.filter(a => a.jenisTridharma === 'tugas_tambahan').length,
+    lengkap: filteredActivities.filter((a) => a.statusKelengkapan === "lengkap")
+      .length,
+    tidakLengkap: filteredActivities.filter(
+      (a) => a.statusKelengkapan === "tidak_lengkap"
+    ).length,
+    pengajaran: filteredActivities.filter(
+      (a) => a.jenisTridharma === "pengajaran"
+    ).length,
+    penelitian: filteredActivities.filter(
+      (a) => a.jenisTridharma === "penelitian"
+    ).length,
+    pengabdian: filteredActivities.filter(
+      (a) => a.jenisTridharma === "pengabdian"
+    ).length,
+    tugasTambahan: filteredActivities.filter(
+      (a) => a.jenisTridharma === "tugas_tambahan"
+    ).length,
   };
 
   const counts = {
-    semua: mockActivities.filter(a => {
-      if (isKaprodi && user?.programStudi && a.programStudi !== user.programStudi) return false;
+    semua: mockActivities.filter((a) => {
+      if (
+        isKaprodi &&
+        user?.programStudi &&
+        a.programStudi !== user.programStudi
+      )
+        return false;
       return true;
     }).length,
-    pengajaran: mockActivities.filter(a => {
-      if (isKaprodi && user?.programStudi && a.programStudi !== user.programStudi) return false;
-      return a.jenisTridharma === 'pengajaran';
+    pengajaran: mockActivities.filter((a) => {
+      if (
+        isKaprodi &&
+        user?.programStudi &&
+        a.programStudi !== user.programStudi
+      )
+        return false;
+      return a.jenisTridharma === "pengajaran";
     }).length,
-    penelitian: mockActivities.filter(a => {
-      if (isKaprodi && user?.programStudi && a.programStudi !== user.programStudi) return false;
-      return a.jenisTridharma === 'penelitian';
+    penelitian: mockActivities.filter((a) => {
+      if (
+        isKaprodi &&
+        user?.programStudi &&
+        a.programStudi !== user.programStudi
+      )
+        return false;
+      return a.jenisTridharma === "penelitian";
     }).length,
-    pengabdian: mockActivities.filter(a => {
-      if (isKaprodi && user?.programStudi && a.programStudi !== user.programStudi) return false;
-      return a.jenisTridharma === 'pengabdian';
+    pengabdian: mockActivities.filter((a) => {
+      if (
+        isKaprodi &&
+        user?.programStudi &&
+        a.programStudi !== user.programStudi
+      )
+        return false;
+      return a.jenisTridharma === "pengabdian";
     }).length,
-    tugas_tambahan: mockActivities.filter(a => {
-      if (isKaprodi && user?.programStudi && a.programStudi !== user.programStudi) return false;
-      return a.jenisTridharma === 'tugas_tambahan';
+    tugas_tambahan: mockActivities.filter((a) => {
+      if (
+        isKaprodi &&
+        user?.programStudi &&
+        a.programStudi !== user.programStudi
+      )
+        return false;
+      return a.jenisTridharma === "tugas_tambahan";
     }).length,
   };
 
   const handleExportRecap = () => {
-    toast.success('Export rekap AMI sedang diproses...');
+    toast.success("Export rekap AMI sedang diproses...");
   };
 
   const handleViewDetail = (activityId: string) => {
@@ -336,13 +514,13 @@ export function AMIRecapPage() {
 
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
-      case 'pengajaran':
+      case "pengajaran":
         return <Badge className="bg-blue-500">Pengajaran</Badge>;
-      case 'penelitian':
+      case "penelitian":
         return <Badge className="bg-green-500">Penelitian</Badge>;
-      case 'pengabdian':
+      case "pengabdian":
         return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case 'tugas_tambahan':
+      case "tugas_tambahan":
         return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
       default:
         return <Badge variant="secondary">{jenis}</Badge>;
@@ -350,7 +528,7 @@ export function AMIRecapPage() {
   };
 
   const getKelengkapanBadge = (status: string) => {
-    if (status === 'lengkap') {
+    if (status === "lengkap") {
       return (
         <Badge className="bg-green-500">
           <CheckCircle className="w-3 h-3 mr-1" />
@@ -366,17 +544,23 @@ export function AMIRecapPage() {
     );
   };
 
-  const hasActiveFilters = searchTerm !== '' || filterProdi !== 'all' || filterDosen !== 'all' ||
-                          filterJenis !== 'all' || filterKategori !== 'all' ||
-                          filterKelengkapan !== 'all' || filterDateFrom || filterDateTo;
+  const hasActiveFilters =
+    searchTerm !== "" ||
+    filterProdi !== "all" ||
+    filterDosen !== "all" ||
+    filterJenis !== "all" ||
+    filterKategori !== "all" ||
+    filterKelengkapan !== "all" ||
+    filterDateFrom ||
+    filterDateTo;
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setFilterProdi('all');
-    setFilterDosen('all');
-    setFilterJenis('all');
-    setFilterKategori('all');
-    setFilterKelengkapan('all');
+    setSearchTerm("");
+    setFilterProdi("all");
+    setFilterDosen("all");
+    setFilterJenis("all");
+    setFilterKategori("all");
+    setFilterKelengkapan("all");
     setFilterDateFrom(undefined);
     setFilterDateTo(undefined);
   };
@@ -385,8 +569,8 @@ export function AMIRecapPage() {
     <MainLayout
       title="Rekap AMI (Audit Mutu Internal)"
       breadcrumbs={[
-        { label: 'Beranda', path: '/dashboard' },
-        { label: 'Rekap AMI' },
+        { label: "Beranda", path: "/dashboard" },
+        { label: "Rekap AMI" },
       ]}
     >
       <div className="space-y-4">
@@ -396,7 +580,7 @@ export function AMIRecapPage() {
             <h2 className="text-2xl font-bold">Rekap AMI</h2>
             <p className="text-sm text-muted-foreground">
               {isKaprodi && `Program Studi: ${user?.programStudi}`}
-              {isKajur && 'Seluruh Jurusan'}
+              {isKajur && "Seluruh Jurusan"}
             </p>
           </div>
           <Button onClick={handleExportRecap}>
@@ -407,10 +591,14 @@ export function AMIRecapPage() {
 
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-          <p className="font-medium text-blue-900 mb-1">ℹ️ Tentang Status Kelengkapan:</p>
+          <p className="font-medium text-blue-900 mb-1">
+            ℹ️ Tentang Status Kelengkapan:
+          </p>
           <p className="text-blue-800">
-            Status <strong>"Lengkap"</strong> berarti semua dosen yang terlibat dalam kegiatan sudah mengupload minimal 1 dokumen bukti.
-            Status <strong>"Tidak Lengkap"</strong> berarti ada dosen yang belum mengupload dokumen bukti.
+            Status <strong>"Lengkap"</strong> berarti semua dosen yang terlibat
+            dalam kegiatan sudah mengupload minimal 1 dokumen bukti. Status{" "}
+            <strong>"Tidak Lengkap"</strong> berarti ada dosen yang belum
+            mengupload dokumen bukti.
           </p>
         </div>
 
@@ -418,7 +606,9 @@ export function AMIRecapPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Kegiatan</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Kegiatan
+              </CardTitle>
               <Activity className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -429,23 +619,35 @@ export function AMIRecapPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Dokumen Lengkap</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Dokumen Lengkap
+              </CardTitle>
               <CheckCircle className="w-4 h-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{totalStats.lengkap}</div>
-              <p className="text-xs text-muted-foreground">Semua dosen sudah upload</p>
+              <div className="text-2xl font-bold text-green-600">
+                {totalStats.lengkap}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Semua dosen sudah upload
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Perlu Dilengkapi</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Perlu Dilengkapi
+              </CardTitle>
               <AlertCircle className="w-4 h-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{totalStats.tidakLengkap}</div>
-              <p className="text-xs text-muted-foreground">Ada dosen belum upload</p>
+              <div className="text-2xl font-bold text-red-600">
+                {totalStats.tidakLengkap}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Ada dosen belum upload
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -454,19 +656,34 @@ export function AMIRecapPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="semua">
-              Semua <Badge variant="secondary" className="ml-2">{counts.semua}</Badge>
+              Semua{" "}
+              <Badge variant="secondary" className="ml-2">
+                {counts.semua}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="pengajaran">
-              Pengajaran <Badge variant="secondary" className="ml-2">{counts.pengajaran}</Badge>
+              Pengajaran{" "}
+              <Badge variant="secondary" className="ml-2">
+                {counts.pengajaran}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="penelitian">
-              Penelitian <Badge variant="secondary" className="ml-2">{counts.penelitian}</Badge>
+              Penelitian{" "}
+              <Badge variant="secondary" className="ml-2">
+                {counts.penelitian}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="pengabdian">
-              Pengabdian <Badge variant="secondary" className="ml-2">{counts.pengabdian}</Badge>
+              Pengabdian{" "}
+              <Badge variant="secondary" className="ml-2">
+                {counts.pengabdian}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="tugas_tambahan">
-              Tugas Tambahan <Badge variant="secondary" className="ml-2">{counts.tugas_tambahan}</Badge>
+              Tugas Tambahan{" "}
+              <Badge variant="secondary" className="ml-2">
+                {counts.tugas_tambahan}
+              </Badge>
             </TabsTrigger>
           </TabsList>
 
@@ -494,16 +711,23 @@ export function AMIRecapPage() {
                   <SelectContent>
                     <SelectItem value="all">Semua Dosen</SelectItem>
                     {dosenList.map((dosen) => (
-                      <SelectItem key={dosen} value={dosen}>{dosen}</SelectItem>
+                      <SelectItem key={dosen} value={dosen}>
+                        {dosen}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-[200px] justify-start text-left font-normal"
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateFrom ? format(filterDateFrom, 'dd MMM yyyy') : 'Dari tanggal'}
+                      {filterDateFrom
+                        ? format(filterDateFrom, "dd MMM yyyy")
+                        : "Dari tanggal"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -518,9 +742,14 @@ export function AMIRecapPage() {
 
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                    <Button
+                      variant="outline"
+                      className="w-[200px] justify-start text-left font-normal"
+                    >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateTo ? format(filterDateTo, 'dd MMM yyyy') : 'Sampai tanggal'}
+                      {filterDateTo
+                        ? format(filterDateTo, "dd MMM yyyy")
+                        : "Sampai tanggal"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -550,25 +779,35 @@ export function AMIRecapPage() {
                     <SelectContent>
                       <SelectItem value="all">Semua Prodi</SelectItem>
                       {programStudiList.map((prodi) => (
-                        <SelectItem key={prodi} value={prodi}>{prodi}</SelectItem>
+                        <SelectItem key={prodi} value={prodi}>
+                          {prodi}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
 
-                <Select value={filterKategori} onValueChange={setFilterKategori}>
+                <Select
+                  value={filterKategori}
+                  onValueChange={setFilterKategori}
+                >
                   <SelectTrigger className="w-[220px]">
                     <SelectValue placeholder="Kategori Kegiatan" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Kategori</SelectItem>
                     {kategoriList.map((kategori) => (
-                      <SelectItem key={kategori} value={kategori}>{kategori}</SelectItem>
+                      <SelectItem key={kategori} value={kategori}>
+                        {kategori}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
 
-                <Select value={filterKelengkapan} onValueChange={setFilterKelengkapan}>
+                <Select
+                  value={filterKelengkapan}
+                  onValueChange={setFilterKelengkapan}
+                >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Kelengkapan" />
                   </SelectTrigger>
@@ -600,12 +839,19 @@ export function AMIRecapPage() {
                 <TableBody>
                   {filteredActivities.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isKajur ? 9 : 8} className="text-center py-8">
+                      <TableCell
+                        colSpan={isKajur ? 9 : 8}
+                        className="text-center py-8"
+                      >
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <Activity className="w-8 h-8" />
                           <p>Tidak ada kegiatan yang sesuai dengan filter</p>
                           {hasActiveFilters && (
-                            <Button variant="outline" size="sm" onClick={resetFilters}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={resetFilters}
+                            >
                               Reset Filter
                             </Button>
                           )}
@@ -617,28 +863,51 @@ export function AMIRecapPage() {
                       <TableRow key={activity.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{activity.namaKegiatan}</p>
+                            <p className="font-medium">
+                              {activity.namaKegiatan}
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(activity.tanggalMulai), 'dd MMM yyyy')} - {format(new Date(activity.tanggalSelesai), 'dd MMM yyyy')}
+                              {format(
+                                new Date(activity.tanggalMulai),
+                                "dd MMM yyyy"
+                              )}{" "}
+                              -{" "}
+                              {format(
+                                new Date(activity.tanggalSelesai),
+                                "dd MMM yyyy"
+                              )}
                             </p>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="text-sm font-medium">{activity.pencatat}</p>
-                            <p className="text-xs text-muted-foreground font-mono">NIDN: {activity.nidn}</p>
+                            <p className="text-sm font-medium">
+                              {activity.pencatat}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              NIDN: {activity.nidn}
+                            </p>
                           </div>
                         </TableCell>
-                        {isKajur && <TableCell className="text-sm">{activity.programStudi}</TableCell>}
+                        {isKajur && (
+                          <TableCell className="text-sm">
+                            {activity.programStudi}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <div className="space-y-1">
                             {getJenisBadge(activity.jenisTridharma)}
-                            <p className="text-xs text-muted-foreground">{activity.kategori}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {activity.kategori}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm">
-                          {activity.tahunAkademik}<br/>
-                          <span className="text-xs text-muted-foreground capitalize">Sem. {activity.semester}</span>
+                          {activity.tahunAkademik}
+                          <br />
+                          <span className="text-xs text-muted-foreground capitalize">
+                            Sem. {activity.semester}
+                          </span>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline">
@@ -649,7 +918,10 @@ export function AMIRecapPage() {
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <FileText className="w-3 h-3 mr-1" />
-                            {activity.dosenTerlibat.reduce((sum, d) => sum + d.jumlahDokumen, 0)}
+                            {activity.dosenTerlibat.reduce(
+                              (sum, d) => sum + d.jumlahDokumen,
+                              0
+                            )}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">

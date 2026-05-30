@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Avatar, AvatarFallback } from "../ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,12 +11,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
-import { FileVersion } from '../../hooks/useFileManagement';
-import { History, RotateCcw, Trash2, CheckCircle, Download } from 'lucide-react';
-import { format } from 'date-fns';
-import { useState } from 'react';
-import { toast } from 'sonner';
+} from "../ui/alert-dialog";
+import type { FileVersion } from "../../hooks/useFileManagement";
+import {
+  History,
+  RotateCcw,
+  Trash2,
+  CheckCircle,
+  Download,
+} from "lucide-react";
+import { format } from "date-fns";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface FileVersionHistoryProps {
   versions: FileVersion[];
@@ -33,30 +39,34 @@ export function FileVersionHistory({
 }: FileVersionHistoryProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
-  const [selectedVersion, setSelectedVersion] = useState<FileVersion | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<FileVersion | null>(
+    null
+  );
 
-  const sortedVersions = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
+  const sortedVersions = [...versions].sort(
+    (a, b) => b.versionNumber - a.versionNumber
+  );
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .toUpperCase()
       .substring(0, 2);
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
   const handleRestoreClick = (version: FileVersion) => {
     if (version.isCurrent) {
-      toast.info('Versi ini sudah menjadi versi aktif');
+      toast.info("Versi ini sudah menjadi versi aktif");
       return;
     }
     setSelectedVersion(version);
@@ -65,7 +75,7 @@ export function FileVersionHistory({
 
   const handleDeleteClick = (version: FileVersion) => {
     if (version.isCurrent) {
-      toast.error('Tidak bisa hapus versi yang sedang aktif');
+      toast.error("Tidak bisa hapus versi yang sedang aktif");
       return;
     }
     setSelectedVersion(version);
@@ -104,7 +114,9 @@ export function FileVersionHistory({
               <div
                 key={version.id}
                 className={`flex items-start gap-3 p-3 border rounded-lg ${
-                  version.isCurrent ? 'bg-primary/5 border-primary' : 'bg-muted/30'
+                  version.isCurrent
+                    ? "bg-primary/5 border-primary"
+                    : "bg-muted/30"
                 }`}
               >
                 <Avatar className="w-8 h-8">
@@ -138,7 +150,12 @@ export function FileVersionHistory({
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span>{version.uploadedBy}</span>
                     <span>•</span>
-                    <span>{format(new Date(version.uploadedAt), 'dd MMM yyyy, HH:mm')}</span>
+                    <span>
+                      {format(
+                        new Date(version.uploadedAt),
+                        "dd MMM yyyy, HH:mm"
+                      )}
+                    </span>
                     <span>•</span>
                     <span>{formatFileSize(version.fileSize)}</span>
                   </div>
@@ -193,13 +210,16 @@ export function FileVersionHistory({
           <AlertDialogHeader>
             <AlertDialogTitle>Pulihkan Versi Ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              Versi <strong>{selectedVersion?.versionNumber}</strong> akan menjadi versi aktif.
-              Versi saat ini tidak akan dihapus dan masih bisa diakses dari riwayat.
+              Versi <strong>{selectedVersion?.versionNumber}</strong> akan
+              menjadi versi aktif. Versi saat ini tidak akan dihapus dan masih
+              bisa diakses dari riwayat.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestore}>Pulihkan</AlertDialogAction>
+            <AlertDialogAction onClick={handleRestore}>
+              Pulihkan
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -210,10 +230,12 @@ export function FileVersionHistory({
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Versi Ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              Versi <strong>{selectedVersion?.versionNumber}</strong> akan dihapus permanen.
-              Ini akan mengosongkan{' '}
-              <strong>{selectedVersion && formatFileSize(selectedVersion.fileSize)}</strong> dari
-              kuota penyimpanan Anda.
+              Versi <strong>{selectedVersion?.versionNumber}</strong> akan
+              dihapus permanen. Ini akan mengosongkan{" "}
+              <strong>
+                {selectedVersion && formatFileSize(selectedVersion.fileSize)}
+              </strong>{" "}
+              dari kuota penyimpanan Anda.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

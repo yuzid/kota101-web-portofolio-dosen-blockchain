@@ -1,14 +1,14 @@
-import { ReactNode } from 'react';
-import { Sidebar } from './Sidebar';
-import { TopBar } from './TopBar';
+import type { ReactNode } from "react";
+import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator
-} from '../ui/breadcrumb';
+  BreadcrumbSeparator,
+} from "../ui/breadcrumb";
 
 interface BreadcrumbItem {
   label: string;
@@ -39,7 +39,7 @@ export function MainLayout({ children, title, breadcrumbs }: MainLayoutProps) {
                       {index === breadcrumbs.length - 1 ? (
                         <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                       ) : (
-                        <BreadcrumbLink href={crumb.path || '#'}>
+                        <BreadcrumbLink href={crumb.path || "#"}>
                           {crumb.label}
                         </BreadcrumbLink>
                       )}
