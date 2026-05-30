@@ -39,8 +39,8 @@ jobs:
     # ---- INJECT AWS ACCOUNT ID KE MASING-MASING JSON ----
     - name: Inject AWS Account ID Placeholder
       run: |
-        sed -i 's/YOUR_AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's/YOUR_AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_CLIENT_TASK_DEFINITION }}
+        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
+        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_CLIENT_TASK_DEFINITION }}
 
     # ---- BUILD & PUSH BACKEND SERVER ----
     - name: Build, Tag, and Push Server Image to Amazon ECR
