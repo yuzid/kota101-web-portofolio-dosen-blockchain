@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 env:
-  AWS_REGION: us-east-1                  # Sesuaikan dengan region AWS Anda
+  AWS_REGION: ap-southeast-1                  # Sesuaikan dengan region AWS Anda
   ECR_REPOSITORY_SERVER: portfolio-server
   ECR_REPOSITORY_CLIENT: portfolio-client
   ECS_SERVICE: portfolio-service
