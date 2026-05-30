@@ -1,11 +1,8 @@
-# docker-compose.yml - DEVELOPMENT ENVIRONMENT
-# Untuk development lokal dengan database PostgreSQL lokal
-# Untuk production dengan Amazon RDS, gunakan docker-compose.prod.yml
+# docker-compose.yml - MONOLITHIC DEVELOPMENT ENVIRONMENT
 
 services:
-  # Database Off-Chain Relasional
   postgres_db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: jtk_portfolio_db
     environment:
       POSTGRES_USER: portfolio_user
@@ -15,42 +12,36 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # ← TAMBAHAN: healthcheck agar app tunggu DB siap
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portfolio_user -d portfolio_blockchain_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 
-  # Jaringan Blockchain Node (MultiChain Placeholder / Simulation Service)
-  multichain_node:
-    image: ubuntu:latest
-    container_name: jtk_blockchain_node
-    command: tail -f /dev/null # Placeholder agar kontainer tetap hidup menirukan node RPC
-    ports:
-      - "4242:4242"
 
-  # Backend Server API
-  server:
-    build: ./server
-    container_name: jtk_portfolio_server
+  app:
+    build: .
+    container_name: jtk_portfolio_app
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
+      - NODE_ENV=development
       - DB_HOST=postgres_db
       - DB_USER=portfolio_user
       - DB_PASSWORD=secretpassword
       - DB_NAME=portfolio_blockchain_db
+      # ← TAMBAHAN: DATABASE_URL untuk Prisma
+      - DATABASE_URL=postgresql://portfolio_user:secretpassword@postgres_db:5432/portfolio_blockchain_db
       - MULTICHAIN_RPC_URL=http://multichain_node:4242
       - AWS_S3_BUCKET=dosen-portfolio-bucket
     depends_on:
-      - postgres_db
-      - multichain_node
+      # ← DIUBAH: tunggu sampai postgres_db healthy
+      postgres_db:
+        condition: service_healthy
 
-  # Frontend Client Application
-  client:
-    build: ./client
-    container_name: jtk_portfolio_client
-    ports:
-      - "80:80"
-    depends_on:
-      - server
 
 volumes:
   pgdata:
