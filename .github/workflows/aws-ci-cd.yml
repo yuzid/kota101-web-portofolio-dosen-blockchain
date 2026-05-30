@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 env:
-  AWS_REGION: ap-southeast-1                  # Sesuaikan dengan region AWS Anda
+  AWS_REGION: ap-southeast-1                  
   ECR_REPOSITORY_SERVER: portofolio-server
   ECR_REPOSITORY_CLIENT: portofolio-client
   ECS_SERVICE: portofolio-service
@@ -33,7 +33,12 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-# ---- BUILD & PUSH BACKEND SERVER ----
+    # ---- INJECT AWS ACCOUNT ID KE TASK DEFINITION ----
+    - name: Inject AWS Account ID Placeholder
+      run: |
+        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_TASK_DEFINITION }}
+
+    # ---- BUILD & PUSH BACKEND SERVER ----
     - name: Build, Tag, and Push Server Image to Amazon ECR
       id: build-image-server
       env:
