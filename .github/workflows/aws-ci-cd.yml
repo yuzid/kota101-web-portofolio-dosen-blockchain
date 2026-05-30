@@ -9,7 +9,6 @@ env:
   ECR_REPOSITORY_SERVER: portofolio-server
   ECR_REPOSITORY_CLIENT: portofolio-client
   ECS_CLUSTER: portofolio-cluster
-  # ---- PERUBAHAN DI SINI (DIPECAH JADI 2) ----
   ECS_SERVER_SERVICE: portofolio-server-service
   ECS_CLIENT_SERVICE: portofolio-client-service
   ECS_SERVER_TASK_DEFINITION: .aws/server-task-definition.json 
