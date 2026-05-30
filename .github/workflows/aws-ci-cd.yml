@@ -8,9 +8,12 @@ env:
   AWS_REGION: ap-southeast-1                  
   ECR_REPOSITORY_SERVER: portofolio-server
   ECR_REPOSITORY_CLIENT: portofolio-client
-  ECS_SERVICE: portfolio-service
   ECS_CLUSTER: portofolio-cluster
-  ECS_TASK_DEFINITION: .aws/task-definition.json 
+  # ---- PERUBAHAN DI SINI (DIPECAH JADI 2) ----
+  ECS_SERVER_SERVICE: portofolio-server-service
+  ECS_CLIENT_SERVICE: portofolio-client-service
+  ECS_SERVER_TASK_DEFINITION: .aws/server-task-definition.json 
+  ECS_CLIENT_TASK_DEFINITION: .aws/client-task-definition.json 
 
 jobs:
   deploy:
@@ -33,10 +36,11 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # ---- INJECT AWS ACCOUNT ID KE TASK DEFINITION ----
+    # ---- INJECT AWS ACCOUNT ID KE MASING-MASING JSON ----
     - name: Inject AWS Account ID Placeholder
       run: |
-        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's/YOUR_AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
+        sed -i 's/YOUR_AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_CLIENT_TASK_DEFINITION }}
 
     # ---- BUILD & PUSH BACKEND SERVER ----
     - name: Build, Tag, and Push Server Image to Amazon ECR
@@ -60,30 +64,40 @@ jobs:
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG
         echo "client_image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # ---- DEPLOY TO AMAZON ECS ----
-    # Langkah 1: Render image untuk container SERVER
+    # ==========================================
+    # ---- ALUR DEPLOY BACKEND (SERVER) --------
+    # ==========================================
     - name: Fill in the new server image ID in the Amazon ECS task definition
       id: render-server
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        task-definition: ${{ env.ECS_SERVER_TASK_DEFINITION }}
         container-name: portfolio-server-container
         image: ${{ steps.build-image-server.outputs.server_image }}
 
-    # Langkah 2: Ambil output dari langkah 1, lalu render image untuk container CLIENT
+    - name: Deploy Amazon ECS Server Task Definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-server.outputs.task-definition }}
+        service: ${{ env.ECS_SERVER_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+
+    # ==========================================
+    # ---- ALUR DEPLOY FRONTEND (CLIENT) -------
+    # ==========================================
     - name: Fill in the new client image ID in the Amazon ECS task definition
       id: render-client
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
-        task-definition: ${{ steps.render-server.outputs.task-definition }}
+        task-definition: ${{ env.ECS_CLIENT_TASK_DEFINITION }}
         container-name: portfolio-client-container
         image: ${{ steps.build-image-client.outputs.client_image }}
 
-    # Langkah 3: Deploy task definition yang sudah berisi update kedua image
-    - name: Deploy Amazon ECS task definition
+    - name: Deploy Amazon ECS Client Task Definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
       with:
         task-definition: ${{ steps.render-client.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
+        service: ${{ env.ECS_CLIENT_SERVICE }}
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
