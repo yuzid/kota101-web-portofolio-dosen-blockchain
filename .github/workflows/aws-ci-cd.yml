@@ -63,7 +63,24 @@ jobs:
         docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG ./client
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG
         echo "client_image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+    # ==========================================
+    # ---- ALUR DEPLOY FRONTEND (CLIENT) -------
+    # ==========================================
+    - name: Fill in the new client image ID in the Amazon ECS task definition
+      id: render-client
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ env.ECS_CLIENT_TASK_DEFINITION }}
+        container-name: portfolio-client-container
+        image: ${{ steps.build-image-client.outputs.client_image }}
 
+    - name: Deploy Amazon ECS Client Task Definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.render-client.outputs.task-definition }}
+        service: ${{ env.ECS_CLIENT_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
     # ==========================================
     # ---- ALUR DEPLOY BACKEND (SERVER) --------
     # ==========================================
@@ -83,21 +100,3 @@ jobs:
         cluster: ${{ env.ECS_CLUSTER }}
         wait-for-service-stability: true
 
-    # ==========================================
-    # ---- ALUR DEPLOY FRONTEND (CLIENT) -------
-    # ==========================================
-    - name: Fill in the new client image ID in the Amazon ECS task definition
-      id: render-client
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ env.ECS_CLIENT_TASK_DEFINITION }}
-        container-name: portfolio-client-container
-        image: ${{ steps.build-image-client.outputs.client_image }}
-
-    - name: Deploy Amazon ECS Client Task Definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.render-client.outputs.task-definition }}
-        service: ${{ env.ECS_CLIENT_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
