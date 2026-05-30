@@ -22,7 +22,7 @@ function App() {
     const fetchServerStatus = async () => {
       try {
         setLoading(true)
-        const response = await fetch('http://localhost:3000/api/status')
+        const response = await fetch('/api/status')
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
