@@ -1,4 +1,4 @@
-name: Deploy to AWS ECS
+name: Deploy Monolith to AWS ECS
 
 on:
   push:
@@ -31,15 +31,21 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # ---- BUILD IMAGE MENGGUNAKAN DOCKERFILE ROOT ----
+    # ---- BUILD IMAGE (TAG GITHUB SHA & LATEST) ----
     - name: Build, Tag, and Push Monolith Image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+        # Build image dengan tag commit SHA dan latest
+        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
+                     -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+        
+        # Push kedua versi tag ke AWS ECR
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
 
-    # ---- PAKSA ECS RESTART DENGAN IMAGE LATEST BARU ----
+    # ---- PAKSA ECS RESTART DENGAN IMAGE BARU ----
     - name: Force New Deployment ECS Service
       run: |
         aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment --region ${{ env.AWS_REGION }}
