@@ -1,0 +1,247 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum JenisDokumen {
+  SURAT_KEPUTUSAN
+  SURAT_TUGAS
+  LEMBAR_PENGESAHAN
+  KONTRAK_PENELITIAN
+  SERTIFIKAT
+  FOTO
+  LAPORAN
+  BUKTI_PENDUKUNG_LAIN
+}
+
+enum SumberDokumen {
+  TATA_USAHA
+  UPLOAD_PRIBADI
+}
+
+enum PeranTridharma {
+  KETUA
+  ANGGOTA
+}
+
+enum KategoriTridharma {
+  PENDIDIKAN
+  PENELITIAN
+  PENGABDIAN
+  TUGAS_TAMBAHAN
+}
+
+enum JenisKegiatan {
+  PENGAJARAN
+  BAHAN_AJAR
+  BIMBINGAN_MAHASISWA
+  PEMBINAAN_MAHASISWA
+  PENGUJIAN_MAHASISWA
+  PENELITIAN
+  PUBLIKASI_KARYA
+  PATEN
+  PENGABDIAN
+  PEMBICARA
+  PENGELOLA_JURNAL
+  TUGAS_TAMBAHAN
+}
+
+model User {
+  id            String     @id @default(uuid()) @db.Uuid
+  email         String     @unique @db.VarChar(255)
+  password_hash String     @db.VarChar(255)
+  role          String     @db.VarChar(50)
+  tata_usaha    TataUsaha?
+  dosen         Dosen?
+  admin         Admin?
+
+  @@map("user")
+}
+
+model Admin {
+  id   String @id @db.Uuid
+  nama String @db.VarChar(255)
+  user User   @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("admin")
+}
+
+model TataUsaha {
+  id   String @id @db.Uuid
+  nip  String @unique @db.VarChar(50)
+  nama String @db.VarChar(255)
+  user User   @relation(fields: [id], references: [id], onDelete: Cascade)
+
+  @@map("tata_usaha")
+}
+
+model Dosen {
+  id                             String                           @id @db.Uuid
+  nip                            String                           @unique @db.VarChar(50)
+  nidn                           String                           @unique @db.VarChar(50)
+  nama                           String                           @db.VarChar(255)
+  program_studi_id               String                           @db.Uuid
+  user                           User                             @relation(fields: [id], references: [id], onDelete: Cascade)
+  program_studi                  ProgramStudi                     @relation(fields: [program_studi_id], references: [id])
+  jabatan_kajur                  JabatanKajur[]
+  jabatan_kaprodi                JabatanKaprodi[]
+  kepemilikan_dokumen            KepemilikanDokumen[]
+  dokumen_uploaded               Dokumen[]
+  partisipasi_kegiatan_tridharma PartisipasiKegiatanTridharma[]
+  kegiatan_tridharma             KegiatanTridharma[]
+
+  @@map("dosen")
+}
+
+model ProgramStudi {
+  id              String           @id @default(uuid()) @db.Uuid
+  kode_prodi      String           @unique @db.VarChar(50)
+  nama_prodi      String           @db.VarChar(255)
+  jurusan_id      String           @db.Uuid
+  jurusan         Jurusan          @relation(fields: [jurusan_id], references: [id])
+  dosen           Dosen[]
+  jabatan_kaprodi JabatanKaprodi[]
+
+  @@map("program_studi")
+}
+
+model Jurusan {
+  id            String         @id @default(uuid()) @db.Uuid
+  kode_jurusan  String         @unique @db.VarChar(50)
+  nama_jurusan  String         @db.VarChar(255)
+  program_studi ProgramStudi[]
+  jabatan_kajur JabatanKajur[]
+
+  @@map("jurusan")
+}
+
+model JabatanKajur {
+  id              String   @id @default(uuid()) @db.Uuid
+  dosen_id        String   @db.Uuid
+  jurusan_id      String   @db.Uuid
+  periode_mulai   DateTime @db.Date
+  periode_selesai DateTime @db.Date
+  dosen           Dosen    @relation(fields: [dosen_id], references: [id])
+  jurusan         Jurusan  @relation(fields: [jurusan_id], references: [id])
+
+  @@map("jabatan_kajur")
+}
+
+model JabatanKaprodi {
+  id               String       @id @default(uuid()) @db.Uuid
+  dosen_id         String       @db.Uuid
+  program_studi_id String       @db.Uuid
+  periode_mulai    DateTime     @db.Date
+  periode_selesai  DateTime     @db.Date
+  dosen            Dosen        @relation(fields: [dosen_id], references: [id])
+  program_studi    ProgramStudi @relation(fields: [program_studi_id], references: [id])
+
+  @@map("jabatan_kaprodi")
+}
+
+model KepemilikanDokumen {
+  id         String  @id @default(uuid()) @db.Uuid
+  dosen_id   String  @db.Uuid
+  dokumen_id String  @db.Uuid
+  dosen      Dosen   @relation(fields: [dosen_id], references: [id])
+  dokumen    Dokumen @relation(fields: [dokumen_id], references: [id])
+
+  @@map("kepemilikan_dokumen")
+}
+
+model Dokumen {
+  id                String               @id @default(uuid()) @db.Uuid
+  uploader_dosen_id String               @db.Uuid
+  nama              String               @db.VarChar(255)
+  jenis_dokumen     JenisDokumen
+  file_path         String               @db.VarChar(512)
+  hash_file         String               @db.VarChar(255)
+  sumber_dokumen    SumberDokumen
+  tanggal_upload    DateTime             @db.Date
+  uploader          Dosen                @relation(fields: [uploader_dosen_id], references: [id])
+  kepemilikan       KepemilikanDokumen[]
+  lampiran_bukti    LampiranBukti[]
+
+  @@map("dokumen")
+}
+
+model PartisipasiKegiatanTridharma {
+  id                    String            @id @default(uuid()) @db.Uuid
+  dosen_id              String            @db.Uuid
+  kegiatan_tridharma_id String            @db.Uuid
+  peran                 PeranTridharma
+  dosen                 Dosen             @relation(fields: [dosen_id], references: [id])
+  kegiatan_tridharma    KegiatanTridharma @relation(fields: [kegiatan_tridharma_id], references: [id])
+
+  @@map("partisipasi_kegiatan_tridharma")
+}
+
+model KegiatanTridharma {
+  id                 String                         @id @default(uuid()) @db.Uuid
+  dosen_id           String                         @db.Uuid
+  kategori_tridharma KategoriTridharma
+  jenis_kegiatan     JenisKegiatan
+  nama_kegiatan      String                         @db.VarChar(255)
+  tanggal_mulai      DateTime                       @db.Date
+  tanggal_selesai    DateTime                       @db.Date
+  periode            String                         @db.VarChar(50)
+  semester           String                         @db.VarChar(20)
+  tx_id              String                         @db.VarChar(255)
+  dosen              Dosen                          @relation(fields: [dosen_id], references: [id])
+  partisipasi        PartisipasiKegiatanTridharma[]
+  audit_trail        AuditTrail[]
+  lampiran_bukti     LampiranBukti[]
+
+  @@map("kegiatan_tridharma")
+}
+
+model AuditTrail {
+  id          String            @id @default(uuid()) @db.Uuid
+  kegiatan_id String            @db.Uuid
+  tx_id       String            @db.VarChar(255)
+  urutan      Int
+  kegiatan    KegiatanTridharma @relation(fields: [kegiatan_id], references: [id])
+
+  @@map("audit_trail")
+}
+
+model LampiranBukti {
+  id          String            @id @default(uuid()) @db.Uuid
+  kegiatan_id String            @db.Uuid
+  dokumen_id  String            @db.Uuid
+  highlighted Boolean
+  kegiatan    KegiatanTridharma @relation(fields: [kegiatan_id], references: [id])
+  dokumen     Dokumen           @relation(fields: [dokumen_id], references: [id])
+  highlight   Highlight[]
+
+  @@map("lampiran_bukti")
+}
+
+model Highlight {
+  id               String         @id @default(uuid()) @db.Uuid
+  lampiran_id      String         @db.Uuid
+  page_number      Int
+  highlighted_text String         @db.Text
+  lampiran         LampiranBukti  @relation(fields: [lampiran_id], references: [id])
+  highlight_rect   HighlightRect[]
+
+  @@map("highlight")
+}
+
+model HighlightRect {
+  id            String    @id @default(uuid()) @db.Uuid
+  highlight_id  String    @db.Uuid
+  x1            Float
+  x2            Float
+  y1            Float
+  y2            Float
+  width         Float
+  height        Float
+  boundary_rect Boolean
+  highlight     Highlight @relation(fields: [highlight_id], references: [id])
+
+  @@map("highlight_rect")
+}
