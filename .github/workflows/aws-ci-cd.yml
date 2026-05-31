@@ -8,7 +8,7 @@ env:
   AWS_REGION: ap-southeast-1                  
   ECR_REPOSITORY: portofolio-server
   ECS_CLUSTER: portofolio-cluster
-  ECS_SERVICE: portofolio-app-service
+  ECS_SERVICE: portofolio-server-service
   ECS_TASK_DEFINITION: .aws/server-task-definition.json
 
 jobs:
