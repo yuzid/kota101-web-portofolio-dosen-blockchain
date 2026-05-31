@@ -1,5 +1,5 @@
 # === STAGE 1: Build Frontend ===
-FROM node:18-alpine AS client-builder
+FROM node:20-alpine AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm install
@@ -7,7 +7,7 @@ COPY client/ ./
 RUN npm run build
 
 # === STAGE 2: Build & Run Backend Server ===
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Install dependency backend
