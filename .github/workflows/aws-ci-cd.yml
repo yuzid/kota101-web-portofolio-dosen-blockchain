@@ -6,19 +6,14 @@ on:
 
 env:
   AWS_REGION: ap-southeast-1                  
-  ECR_REPOSITORY_SERVER: portofolio-server
-  ECR_REPOSITORY_CLIENT: portofolio-client
+  ECR_REPOSITORY: portofolio-server
   ECS_CLUSTER: portofolio-cluster
-  ECS_SERVER_SERVICE: portofolio-server-service
-  ECS_CLIENT_SERVICE: portofolio-client-service
-  ECS_SERVER_TASK_DEFINITION: .aws/server-task-definition.json 
-  ECS_CLIENT_TASK_DEFINITION: .aws/client-task-definition.json 
+  ECS_SERVICE: portofolio-server-service
 
 jobs:
   deploy:
-    name: Build & Deploy to AWS
+    name: Build & Deploy Monolith
     runs-on: ubuntu-latest
-    environment: AWS
 
     steps:
     - name: Checkout Code
@@ -35,77 +30,15 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # ---- INJECT AWS ACCOUNT ID & DATABASE SECRETS KE TASK DEFINITION ----
-    - name: Inject AWS Account ID & Database Secrets into Task Definitions
-      run: |
-        # Server task definition
-        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|DB_HOST_PLACEHOLDER|${{ secrets.DB_HOST }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|DB_USER_PLACEHOLDER|${{ secrets.DB_USER }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|DB_PASSWORD_PLACEHOLDER|${{ secrets.DB_PASSWORD }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|DB_NAME_PLACEHOLDER|${{ secrets.DB_NAME }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|MULTICHAIN_RPC_URL_PLACEHOLDER|${{ secrets.MULTICHAIN_RPC_URL }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        sed -i 's|AWS_S3_BUCKET_PLACEHOLDER|${{ secrets.AWS_S3_BUCKET }}|g' ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        
-        # Client task definition
-        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_CLIENT_TASK_DEFINITION }}
-        sed -i 's|API_URL_PLACEHOLDER|${{ secrets.API_URL }}|g' ${{ env.ECS_CLIENT_TASK_DEFINITION }}
-
-    # ---- BUILD & PUSH BACKEND SERVER ----
-    - name: Build, Tag, and Push Server Image to Amazon ECR
-      id: build-image-server
+    # ---- BUILD IMAGE MENGGUNAKAN DOCKERFILE ROOT ----
+    - name: Build, Tag, and Push Monolith Image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY_SERVER }}:$IMAGE_TAG ./server
-        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY_SERVER }}:$IMAGE_TAG
-        echo "server_image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY_SERVER }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
 
-    # ---- BUILD & PUSH FRONTEND CLIENT ----
-    - name: Build, Tag, and Push Client Image to Amazon ECR
-      id: build-image-client
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
+    # ---- PAKSA ECS RESTART DENGAN IMAGE LATEST BARU ----
+    - name: Force New Deployment ECS Service
       run: |
-        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG ./client
-        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG
-        echo "client_image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY_CLIENT }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
-    # ==========================================
-    # ---- ALUR DEPLOY FRONTEND (CLIENT) -------
-    # ==========================================
-    - name: Fill in the new client image ID in the Amazon ECS task definition
-      id: render-client
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ env.ECS_CLIENT_TASK_DEFINITION }}
-        container-name: portfolio-client-container
-        image: ${{ steps.build-image-client.outputs.client_image }}
-
-    - name: Deploy Amazon ECS Client Task Definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.render-client.outputs.task-definition }}
-        service: ${{ env.ECS_CLIENT_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
-    # ==========================================
-    # ---- ALUR DEPLOY BACKEND (SERVER) --------
-    # ==========================================
-    - name: Fill in the new server image ID in the Amazon ECS task definition
-      id: render-server
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ env.ECS_SERVER_TASK_DEFINITION }}
-        container-name: portfolio-server-container
-        image: ${{ steps.build-image-server.outputs.server_image }}
-
-    - name: Deploy Amazon ECS Server Task Definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.render-server.outputs.task-definition }}
-        service: ${{ env.ECS_SERVER_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
-
+        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment --region ${{ env.AWS_REGION }}
