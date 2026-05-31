@@ -33,8 +33,11 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Inject Secrets into Task Definition
+      env:
+        IMAGE_TAG: ${{ github.sha }}
       run: |
         sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's/IMAGE_TAG_PLACEHOLDER/$IMAGE_TAG/g' ${{ env.ECS_TASK_DEFINITION }}
         sed -i 's|DB_HOST_PLACEHOLDER|${{ secrets.DB_HOST }}|g' ${{ env.ECS_TASK_DEFINITION }}
         sed -i 's|DB_USER_PLACEHOLDER|${{ secrets.DB_USER }}|g' ${{ env.ECS_TASK_DEFINITION }}
         sed -i 's|DB_PASSWORD_PLACEHOLDER|${{ secrets.DB_PASSWORD }}|g' ${{ env.ECS_TASK_DEFINITION }}
@@ -42,19 +45,17 @@ jobs:
         sed -i 's|MULTICHAIN_RPC_URL_PLACEHOLDER|${{ secrets.MULTICHAIN_RPC_URL }}|g' ${{ env.ECS_TASK_DEFINITION }}
         sed -i 's|AWS_S3_BUCKET_PLACEHOLDER|${{ secrets.AWS_S3_BUCKET }}|g' ${{ env.ECS_TASK_DEFINITION }}
 
-    # ---- BUILD IMAGE (TAG GITHUB SHA & LATEST) ----
+    # ---- BUILD IMAGE (TAG GITHUB SHA ONLY) ----
     - name: Build, Tag, and Push Monolith Image to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build image dengan tag commit SHA dan latest
-        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
-                     -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest .
+        # Build image dengan tag commit SHA
+        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
         
-        # Push kedua versi tag ke AWS ECR
+        # Push image ke AWS ECR
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
-        docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:latest
 
     # ---- PAKSA ECS RESTART DENGAN IMAGE BARU ----
     - name: Force New Deployment ECS Service
