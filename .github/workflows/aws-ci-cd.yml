@@ -1,28 +1,29 @@
-name: Deploy Monolith to AWS ECS
+name: CI/CD Pipeline Monolith Portal
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 env:
-  AWS_REGION: ap-southeast-1                  
+  AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: portofolio-server
   ECS_CLUSTER: portofolio-cluster
-  ECS_SERVICE: portofolio-server-service
-  ECS_TASK_DEFINITION: .aws/server-task-definition.json
+  ECS_SERVICE: portfolio-monolith-service
+  ECS_TASK_DEFINITION_NAME: portfolio-server-task
+  CONTAINER_NAME: portfolio-server-container
 
 jobs:
-  deploy:
-    name: Build & Deploy Monolith
+  build-and-deploy:
     runs-on: ubuntu-latest
     environment: AWS
-
+    
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -32,32 +33,37 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Inject Secrets into Task Definition
-      env:
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's/IMAGE_TAG_PLACEHOLDER/$IMAGE_TAG/g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|DB_HOST_PLACEHOLDER|${{ secrets.DB_HOST }}|g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|DB_USER_PLACEHOLDER|${{ secrets.DB_USER }}|g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|DB_PASSWORD_PLACEHOLDER|${{ secrets.DB_PASSWORD }}|g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|DB_NAME_PLACEHOLDER|${{ secrets.DB_NAME }}|g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|MULTICHAIN_RPC_URL_PLACEHOLDER|${{ secrets.MULTICHAIN_RPC_URL }}|g' ${{ env.ECS_TASK_DEFINITION }}
-        sed -i 's|AWS_S3_BUCKET_PLACEHOLDER|${{ secrets.AWS_S3_BUCKET }}|g' ${{ env.ECS_TASK_DEFINITION }}
-
-    # ---- BUILD IMAGE (TAG GITHUB SHA ONLY) ----
-    - name: Build, Tag, and Push Monolith Image to Amazon ECR
+    # ---- BUILD, TAG MENGGUNAKAN GITHUB SHA, DAN PUSH ----
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Build image dengan tag commit SHA
         docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
-        
-        # Push image ke AWS ECR
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # ---- PAKSA ECS RESTART DENGAN IMAGE BARU ----
-    - name: Force New Deployment ECS Service
+    # ---- DOWNLOAD & CLEAN TASK DEFINITION LANGSUNG DARI AWS ----
+    - name: Download task definition from AWS
       run: |
-        aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service ${{ env.ECS_SERVICE }} --force-new-deployment --region ${{ env.AWS_REGION }}
+        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} --query taskDefinition > task-definition.json
+        jq 'del(.enableFaultInjection)' task-definition.json > clean-task-def.json && mv clean-task-def.json task-definition.json
+
+    # ---- SUNTIK IMAGE SHA BARU KE DALAM JSON ----
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: task-definition.json
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.build-image.outputs.image }}
+
+    # ---- DEPLOY REVISI BARU KE ECS SERVICE ----
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
