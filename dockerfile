@@ -18,8 +18,13 @@ RUN cd server && npm install
 COPY server/ ./server/
 COPY --from=client-builder /app/client/dist ./client/dist
 
-# Compile TypeScript backend ke JavaScript
 WORKDIR /app/server
+
+# Generate Prisma Client sebelum compile TypeScript
+# DATABASE_URL dummy diperlukan agar prisma.config.ts tidak error saat generate
+RUN DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy npx prisma generate
+
+# Compile TypeScript backend ke JavaScript
 RUN npm run build
 
 EXPOSE 3000
