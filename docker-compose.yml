@@ -19,12 +19,7 @@ services:
       timeout: 5s
       retries: 10
 
-  multichain_node:
-    image: ubuntu:latest
-    container_name: jtk_blockchain_node
-    command: tail -f /dev/null
-    ports:
-      - "4242:4242"
+
 
   app:
     build: .
@@ -46,8 +41,7 @@ services:
       # ← DIUBAH: tunggu sampai postgres_db healthy
       postgres_db:
         condition: service_healthy
-      multichain_node:
-        condition: service_started
+
 
 volumes:
   pgdata:
