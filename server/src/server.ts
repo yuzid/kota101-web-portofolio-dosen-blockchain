@@ -39,7 +39,8 @@ const clientBuildPath = path.join(__dirname, '../../client/dist');
 app.use(express.static(clientBuildPath));
 
 // Catch-all route untuk menangani client-side routing (React Router)
-app.get('*', (req: Request, res: Response) => {
+// Gunakan regex pattern karena '*' tidak support di path-to-regexp
+app.all(/^\/(?!api).*/, (req: Request, res: Response) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));
 });
 

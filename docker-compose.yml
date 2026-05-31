@@ -1,5 +1,5 @@
-# docker-compose.yml - DEVELOPMENT ENVIRONMENT
-# Untuk development lokal dengan database PostgreSQL lokal
+# docker-compose.yml - MONOLITHIC DEVELOPMENT ENVIRONMENT
+# Single application container (server + client integrated)
 # Untuk production dengan Amazon RDS, gunakan docker-compose.prod.yml
 
 services:
@@ -16,23 +16,23 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-
   # Jaringan Blockchain Node (MultiChain Placeholder / Simulation Service)
   multichain_node:
     image: ubuntu:latest
     container_name: jtk_blockchain_node
-    command: tail -f /dev/null # Placeholder agar kontainer tetap hidup menirukan node RPC
+    command: tail -f /dev/null
     ports:
       - "4242:4242"
 
-  # Backend Server API
-  server:
-    build: ./server
-    container_name: jtk_portfolio_server
+  # Monolithic Application (Server + Client)
+  app:
+    build: .
+    container_name: jtk_portfolio_app
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
+      - NODE_ENV=development
       - DB_HOST=postgres_db
       - DB_USER=portfolio_user
       - DB_PASSWORD=secretpassword
@@ -42,15 +42,6 @@ services:
     depends_on:
       - postgres_db
       - multichain_node
-
-  # Frontend Client Application
-  client:
-    build: ./client
-    container_name: jtk_portfolio_client
-    ports:
-      - "80:80"
-    depends_on:
-      - server
 
 volumes:
   pgdata:

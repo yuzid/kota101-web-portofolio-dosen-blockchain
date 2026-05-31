@@ -8,7 +8,8 @@ env:
   AWS_REGION: ap-southeast-1                  
   ECR_REPOSITORY: portofolio-server
   ECS_CLUSTER: portofolio-cluster
-  ECS_SERVICE: portofolio-server-service
+  ECS_SERVICE: portofolio-app-service
+  ECS_TASK_DEFINITION: .aws/server-task-definition.json
 
 jobs:
   deploy:
@@ -30,6 +31,16 @@ jobs:
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Inject Secrets into Task Definition
+      run: |
+        sed -i 's/AWS_ACCOUNT_ID/${{ secrets.AWS_ACCOUNT_ID }}/g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|DB_HOST_PLACEHOLDER|${{ secrets.DB_HOST }}|g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|DB_USER_PLACEHOLDER|${{ secrets.DB_USER }}|g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|DB_PASSWORD_PLACEHOLDER|${{ secrets.DB_PASSWORD }}|g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|DB_NAME_PLACEHOLDER|${{ secrets.DB_NAME }}|g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|MULTICHAIN_RPC_URL_PLACEHOLDER|${{ secrets.MULTICHAIN_RPC_URL }}|g' ${{ env.ECS_TASK_DEFINITION }}
+        sed -i 's|AWS_S3_BUCKET_PLACEHOLDER|${{ secrets.AWS_S3_BUCKET }}|g' ${{ env.ECS_TASK_DEFINITION }}
 
     # ---- BUILD IMAGE (TAG GITHUB SHA & LATEST) ----
     - name: Build, Tag, and Push Monolith Image to Amazon ECR
