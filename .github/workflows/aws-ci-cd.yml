@@ -1,10 +1,8 @@
 name: CI/CD Pipeline Monolith Portal
-
 on:
   push:
     branches:
       - main
-
 env:
   AWS_REGION: ap-southeast-1
   ECR_REPOSITORY: portofolio-server
@@ -17,7 +15,6 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     environment: AWS
-
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
@@ -33,7 +30,6 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # ---- BUILD, TAG MENGGUNAKAN GITHUB SHA, DAN PUSH ----
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
@@ -44,13 +40,36 @@ jobs:
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    # ---- DOWNLOAD & CLEAN TASK DEFINITION LANGSUNG DARI AWS ----
     - name: Download task definition from AWS
       run: |
-        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} --query taskDefinition > task-definition.json
-        jq 'del(.enableFaultInjection)' task-definition.json > clean-task-def.json && mv clean-task-def.json task-definition.json
+        aws ecs describe-task-definition \
+          --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} \
+          --query taskDefinition > task-definition.json
+        jq 'del(.enableFaultInjection)' task-definition.json > clean-task-def.json
+        mv clean-task-def.json task-definition.json
 
-    # ---- SUNTIK IMAGE SHA BARU KE DALAM JSON ----
+    # ← TAMBAHAN: inject env vars seed ke container di task definition
+    - name: Inject seed environment variables into task definition
+      env:
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+        CONTAINER: ${{ env.CONTAINER_NAME }}
+      run: |
+        jq --arg container "$CONTAINER" \
+           --arg jwt "$JWT_SECRET" \
+           --arg email "$ADMIN_EMAIL" \
+           --arg password "$ADMIN_PASSWORD" \
+           --arg name "$ADMIN_NAME" \
+           '(.containerDefinitions[] | select(.name == $container) | .environment) += [
+             {"name": "JWT_SECRET",      "value": $jwt},
+             {"name": "ADMIN_EMAIL",     "value": $email},
+             {"name": "ADMIN_PASSWORD",  "value": $password},
+             {"name": "ADMIN_NAME",      "value": $name}
+           ]' task-definition.json > updated-task-def.json
+        mv updated-task-def.json task-definition.json
+
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -59,7 +78,6 @@ jobs:
         container-name: ${{ env.CONTAINER_NAME }}
         image: ${{ steps.build-image.outputs.image }}
 
-    # ---- DEPLOY REVISI BARU KE ECS SERVICE ----
     - name: Deploy Amazon ECS task definition
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:

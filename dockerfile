@@ -10,25 +10,20 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 
-# Install dependency backend
 COPY server/package*.json ./server/
 RUN cd server && npm install
 
-# Copy source code backend & hasil build frontend
 COPY server/ ./server/
 COPY --from=client-builder /app/client/dist ./client/dist
 
 WORKDIR /app/server
 
-# Generate Prisma Client sebelum compile TypeScript
-# DATABASE_URL dummy diperlukan agar prisma.config.ts tidak error saat generate
 RUN DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy npx prisma generate
-
-# Compile TypeScript backend ke JavaScript
 RUN npm run build
 
 EXPOSE 3000
 ENV NODE_ENV=production
 ENV PORT=3000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+# ← DIUBAH: tambahkan prisma db seed setelah migrate
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/server.js"]
