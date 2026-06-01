@@ -35,8 +35,14 @@ jobs:
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
+        VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        VITE_API_URL: ${{ secrets.VITE_API_URL }}
       run: |
-        docker build -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
+        # Inject environment variables ke frontend menggunakan --build-arg saat build-time
+        docker build \
+          --build-arg VITE_GOOGLE_CLIENT_ID="$VITE_GOOGLE_CLIENT_ID" \
+          --build-arg VITE_API_URL="$VITE_API_URL" \
+          -t $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG .
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -46,6 +52,7 @@ jobs:
         ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
         ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
+        GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
         CONTAINER: ${{ env.CONTAINER_NAME }}
       run: |
         # 1. Unduh task definition asli dari AWS ECS
@@ -53,19 +60,21 @@ jobs:
           --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} \
           --query taskDefinition > raw-task-def.json
 
-        # 2. Hapus semua metadata read-only AWS AND bersihkan nilai variabel lama sebelum melakukan append
+        # 2. Hapus metadata read-only AWS dan injeksikan variabel runtime (termasuk GOOGLE_CLIENT_ID untuk backend)
         jq --arg container "$CONTAINER" \
            --arg jwt "$JWT_SECRET" \
            --arg email "$ADMIN_EMAIL" \
            --arg password "$ADMIN_PASSWORD" \
            --arg name "$ADMIN_NAME" \
+           --arg google_id "$GOOGLE_CLIENT_ID" \
            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
             (.containerDefinitions[] | select(.name == $container) | .environment) |= 
-            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME")) + [
-              {"name": "JWT_SECRET",      "value": $jwt},
-              {"name": "ADMIN_EMAIL",     "value": $email},
-              {"name": "ADMIN_PASSWORD",  "value": $password},
-              {"name": "ADMIN_NAME",      "value": $name}
+            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID")) + [
+              {"name": "JWT_SECRET",       "value": $jwt},
+              {"name": "ADMIN_EMAIL",      "value": $email},
+              {"name": "ADMIN_PASSWORD",   "value": $password},
+              {"name": "ADMIN_NAME",       "value": $name},
+              {"name": "GOOGLE_CLIENT_ID", "value": $google_id}
             ])' raw-task-def.json > task-definition.json
 
     - name: Fill in the new image ID in the Amazon ECS task definition

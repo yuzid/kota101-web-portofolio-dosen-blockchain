@@ -6,23 +6,23 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Eye, EyeOff, FileCheck, Loader2 } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 export function LoginPage() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Client-side validation
-    if (!username.trim()) {
-      setError('Username tidak boleh kosong');
+    if (!email.trim()) {
+      setError('Email tidak boleh kosong');
       return;
     }
     if (!password) {
@@ -33,12 +33,28 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(username, password);
-      // Navigation will be handled by the router based on user role
+      await login(email, password);
       navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan. Silakan coba lagi.');
       setPassword('');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setError('');
+    setIsLoading(true);
+    try {
+      if (credentialResponse.credential) {
+        await loginWithGoogle(credentialResponse.credential);
+        navigate('/dashboard');
+      } else {
+        throw new Error('ID Token tidak ditemukan dari Google.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal masuk dengan Google.');
     } finally {
       setIsLoading(false);
     }
@@ -86,18 +102,36 @@ export function LoginPage() {
             </p>
           </div>
 
+          {/* Google Sign In Button */}
+          <div className="w-full flex flex-col items-center justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError('Otentikasi Google gagal digagalkan.')}
+              useOneTap
+              theme="outline"
+              size="large"
+              width="100%"
+            />
+          </div>
+
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-muted"></div>
+            <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase">Atau masuk dengan email</span>
+            <div className="flex-grow border-t border-muted"></div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Masukkan username Anda"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="nama@polban.ac.id"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
-                autoComplete="username"
+                autoComplete="email"
                 className="h-11"
               />
             </div>
@@ -122,11 +156,7 @@ export function LoginPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   disabled={isLoading}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -154,21 +184,9 @@ export function LoginPage() {
               )}
             </Button>
 
-            {/* Info Text */}
             <p className="text-center text-sm text-muted-foreground">
               Belum punya akun? Hubungi administrator sistem.
             </p>
-
-            {/* Demo Credentials */}
-            <div className="mt-8 p-4 bg-muted rounded-lg">
-              <p className="text-xs font-semibold mb-2">Demo Credentials:</p>
-              <div className="space-y-1 text-xs text-muted-foreground font-mono">
-                <p>admin / admin • tu / tu</p>
-                <p>dosen / dosen • kaprodi / kaprodi</p>
-                <p className="text-primary font-semibold">dosen-kaprodi / 123 (Multiple Roles)</p>
-                <p className="text-primary font-semibold">dosen-kajur / 123 (Multiple Roles)</p>
-              </div>
-            </div>
           </form>
         </div>
       </div>

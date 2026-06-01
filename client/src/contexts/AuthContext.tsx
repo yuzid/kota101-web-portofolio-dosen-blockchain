@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+
 export type UserRole =
   | "administrator"
   | "admin_tu"
@@ -9,29 +10,51 @@ export type UserRole =
 
 export interface User {
   id: string;
-  username: string;
+  email: string;
   name: string;
-  nidn?: string;
-  roles: UserRole[]; // Changed from single role to array of roles
-  programStudi?: string;
+  roles: UserRole[];
+  token: string;
   lastLogin?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper untuk memetakan response backend ke struktur User Frontend
+const mapBackendUserToFrontend = (backendData: any): User => {
+  const roles: UserRole[] = [];
+  
+  // Mapping base role dari database
+  if (backendData.role === 'ADMIN') roles.push('administrator');
+  if (backendData.role === 'TATA_USAHA') roles.push('admin_tu');
+  if (backendData.role === 'DOSEN') roles.push('dosen');
+
+  // Tambahkan role struktural aktif hasil pengecekan periode di backend
+  if (backendData.jabatan?.is_kajur) roles.push('kajur');
+  if (backendData.jabatan?.is_kaprodi) roles.push('kaprodi');
+
+  return {
+    id: backendData.email, // Atur sesuai dengan ID unik unik dari backend jika ada
+    email: backendData.email,
+    name: backendData.email.split('@')[0], // Fallback nama dari email sebelum sinkronisasi profil penuh
+    roles: roles,
+    token: backendData.token,
+    lastLogin: new Date().toISOString()
+  };
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -39,80 +62,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    // Simulate API call - in production this would call the backend
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  // 1. Login Manual (Form)
+  const login = async (email: string, password: string) => {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-    // Mock authentication - replace with real API
-    const mockUsers: Record<string, User> = {
-      admin: {
-        id: "1",
-        username: "admin",
-        name: "Administrator Sistem",
-        roles: ["administrator"],
-      },
-      tu: {
-        id: "2",
-        username: "tu",
-        name: "Admin Tata Usaha",
-        roles: ["admin_tu"],
-      },
-      dosen: {
-        id: "3",
-        username: "dosen",
-        name: "Dr. John Doe",
-        nidn: "0412108901",
-        roles: ["dosen"],
-        programStudi: "D4 Teknik Informatika",
-      },
-      kaprodi: {
-        id: "4",
-        username: "kaprodi",
-        name: "Dr. Jane Smith",
-        nidn: "0415078801",
-        roles: ["kaprodi"],
-        programStudi: "D4 Teknik Informatika",
-      },
-      "dosen-kaprodi": {
-        id: "5",
-        username: "dosen-kaprodi",
-        name: "Dr. Ahmad Fauzi",
-        nidn: "0420059102",
-        roles: ["dosen", "kaprodi"],
-        programStudi: "D4 Teknik Informatika",
-      },
-      "dosen-kajur": {
-        id: "6",
-        username: "dosen-kajur",
-        name: "Prof. Dr. Budi Santoso",
-        nidn: "0405067801",
-        roles: ["dosen", "kajur"],
-        programStudi: "Jurusan Teknik Elektro",
-      },
-    };
+    const result = await response.json();
 
-    const foundUser = mockUsers[username];
-    if (foundUser && password) {
-      const userWithLogin = {
-        ...foundUser,
-        lastLogin: new Date().toISOString(),
-      };
-      setUser(userWithLogin);
-      localStorage.setItem("user", JSON.stringify(userWithLogin));
-    } else {
-      throw new Error(
-        "Username atau password yang Anda masukkan tidak valid. Silakan coba lagi."
-      );
+    if (!response.ok || result.status === 'error') {
+      throw new Error(result.error || 'Gagal login. Silakan coba lagi.');
     }
+
+    const authenticatedUser = mapBackendUserToFrontend(result.data);
+    setUser(authenticatedUser);
+    localStorage.setItem("user", JSON.stringify(authenticatedUser));
+    localStorage.setItem("token", result.data.token);
+  };
+
+  // 2. Login Menggunakan Google OAuth
+  const loginWithGoogle = async (idToken: string) => {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.status === 'error') {
+      throw new Error(result.error || 'Otentikasi Google gagal.');
+    }
+
+    const authenticatedUser = mapBackendUserToFrontend(result.data);
+    setUser(authenticatedUser);
+    localStorage.setItem("user", JSON.stringify(authenticatedUser));
+    localStorage.setItem("token", result.data.token);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
