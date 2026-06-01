@@ -17,10 +17,10 @@ jobs:
     environment: AWS
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -28,7 +28,7 @@ jobs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
@@ -40,16 +40,7 @@ jobs:
         docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Download task definition from AWS
-      run: |
-        aws ecs describe-task-definition \
-          --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} \
-          --query taskDefinition > task-definition.json
-        jq 'del(.enableFaultInjection)' task-definition.json > clean-task-def.json
-        mv clean-task-def.json task-definition.json
-
-    # ← TAMBAHAN: inject env vars seed ke container di task definition
-    - name: Inject seed environment variables into task definition
+    - name: Download, Clean, and Inject Environment Variables into Task Definition
       env:
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
@@ -57,18 +48,25 @@ jobs:
         ADMIN_NAME: ${{ secrets.ADMIN_NAME }}
         CONTAINER: ${{ env.CONTAINER_NAME }}
       run: |
+        # 1. Unduh task definition asli dari AWS ECS
+        aws ecs describe-task-definition \
+          --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} \
+          --query taskDefinition > raw-task-def.json
+
+        # 2. Hapus semua metadata read-only AWS AND bersihkan nilai variabel lama sebelum melakukan append
         jq --arg container "$CONTAINER" \
            --arg jwt "$JWT_SECRET" \
            --arg email "$ADMIN_EMAIL" \
            --arg password "$ADMIN_PASSWORD" \
            --arg name "$ADMIN_NAME" \
-           '(.containerDefinitions[] | select(.name == $container) | .environment) += [
-             {"name": "JWT_SECRET",      "value": $jwt},
-             {"name": "ADMIN_EMAIL",     "value": $email},
-             {"name": "ADMIN_PASSWORD",  "value": $password},
-             {"name": "ADMIN_NAME",      "value": $name}
-           ]' task-definition.json > updated-task-def.json
-        mv updated-task-def.json task-definition.json
+           'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
+            (.containerDefinitions[] | select(.name == $container) | .environment) |= 
+            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME")) + [
+              {"name": "JWT_SECRET",      "value": $jwt},
+              {"name": "ADMIN_EMAIL",     "value": $email},
+              {"name": "ADMIN_PASSWORD",  "value": $password},
+              {"name": "ADMIN_NAME",      "value": $name}
+            ])' raw-task-def.json > task-definition.json
 
     - name: Fill in the new image ID in the Amazon ECS task definition
       id: task-def
