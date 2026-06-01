@@ -1,0 +1,16 @@
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dev dependencies
+**/node_modules
+**/.git
+**/.github
+
+# Build artifacts
+**/dist
+client/.next
+
+# Logs
+**/*.log
+**/npm-debug.log*
