@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
@@ -38,8 +38,10 @@ import {
   Trash2,
   Share2,
   History as HistoryIcon,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -82,94 +84,91 @@ interface ActivityLog {
   details: string;
 }
 
-// Mock data
-const mockActivityDetail: ActivityDetail = {
-  id: "1",
-  namaKegiatan: "Mata Kuliah Pemrograman Web",
-  jenisTridharma: "pengajaran",
-  kategori: "Mengajar",
-  tanggalMulai: "2026-01-15",
-  tanggalSelesai: "2026-05-30",
-  tahunAkademik: "2025/2026",
-  semester: "ganjil",
-  sumberDana: "DIPA POLBAN",
-  biaya: 5000000,
-  programStudi: "D4 Teknik Informatika",
-  dosenTerlibat: [
-    {
-      id: "1",
-      name: "Dr. John Doe",
-      nidn: "0412108901",
-      isPencatat: true,
-      isKetua: true,
-      dokumen: [
-        {
-          id: "doc1",
-          name: "SK Mengajar Semester Ganjil 2025.pdf",
-          jenis: "SK",
-          tanggalUpload: "2026-01-15",
-          hasHighlight: true,
-        },
-        {
-          id: "doc2",
-          name: "Silabus Pemrograman Web.pdf",
-          jenis: "Silabus",
-          tanggalUpload: "2026-01-16",
-          hasHighlight: false,
-        },
-      ],
-    },
-  ],
-  statusKelengkapan: "lengkap",
-};
-
-const mockActivityLogs: ActivityLog[] = [
-  {
-    id: "1",
-    action: "Kegiatan dibuat",
-    actor: "Dr. John Doe",
-    timestamp: "2026-01-15 09:00:00",
-    details: 'Kegiatan "Mata Kuliah Pemrograman Web" dibuat',
-  },
-  {
-    id: "2",
-    action: "Dokumen ditambahkan",
-    actor: "Dr. John Doe",
-    timestamp: "2026-01-15 09:15:00",
-    details: 'Dokumen "SK Mengajar Semester Ganjil 2025.pdf" ditambahkan',
-  },
-  {
-    id: "3",
-    action: "Dokumen ditambahkan",
-    actor: "Dr. John Doe",
-    timestamp: "2026-01-16 10:30:00",
-    details: 'Dokumen "Silabus Pemrograman Web.pdf" ditambahkan',
-  },
-];
-
 export function ActivityDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("detail");
+  const [activity, setActivity] = useState<ActivityDetail | null>(null);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check if this is read-only view (from AMI recap or Kaprodi/Kajur)
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    if (id) {
+      fetchActivityDetail();
+    }
+  }, [id]);
+
+  const fetchActivityDetail = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setActivity(result.data);
+        // Backend hasn't implemented logs yet, but we'll leave it empty for now
+        setLogs([]);
+      } else {
+        toast.error(result.error || 'Gagal mengambil detail kegiatan');
+        navigate('/activities');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan koneksi ke server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <MainLayout title="Memuat Detail..." breadcrumbs={[{ label: "Kegiatan Tridharma", path: "/activities" }, { label: "Detail" }]}>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground">Mengambil data kegiatan...</p>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!activity) return null;
+
+  // Check if current user is the pencatat
+  const isPencatat = activity.dosenTerlibat.find(d => d.isPencatat)?.id === user?.id;
+
+  // Check if this is read-only view
   const isReadOnlyView =
+    !isPencatat ||
     user?.roles?.includes("kaprodi") ||
     user?.roles?.includes("kajur") ||
     location.pathname.includes("/ami-recap/");
-
-  const activity = mockActivityDetail;
-  const logs = mockActivityLogs;
 
   const handleEdit = () => {
     navigate(`/activities/${id}/edit`);
   };
 
-  const handleDelete = () => {
-    toast.success("Kegiatan berhasil dihapus");
-    navigate("/activities");
+  const handleDelete = async () => {
+    if (!confirm(`Hapus kegiatan "${activity.namaKegiatan}"?`)) return;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success("Kegiatan berhasil dihapus");
+        navigate("/activities");
+      } else {
+        toast.error(result.error || 'Gagal menghapus kegiatan');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat menghapus kegiatan');
+    }
   };
 
   const handleShare = () => {
@@ -181,7 +180,7 @@ export function ActivityDetailPage() {
   };
 
   const getJenisBadge = (jenis: string) => {
-    switch (jenis) {
+    switch (jenis.toLowerCase()) {
       case "pengajaran":
         return <Badge className="bg-blue-500">Pengajaran</Badge>;
       case "penelitian":
@@ -312,10 +311,7 @@ export function ActivityDetailPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span>
-                        {format(
-                          new Date(activity.tanggalMulai),
-                          "dd MMMM yyyy"
-                        )}
+                        {format(new Date(activity.tanggalMulai), "dd MMMM yyyy", { locale: localeId })}
                       </span>
                     </div>
                   </div>
@@ -327,10 +323,7 @@ export function ActivityDetailPage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span>
-                        {format(
-                          new Date(activity.tanggalSelesai),
-                          "dd MMMM yyyy"
-                        )}
+                        {format(new Date(activity.tanggalSelesai), "dd MMMM yyyy", { locale: localeId })}
                       </span>
                     </div>
                   </div>
@@ -416,7 +409,7 @@ export function ActivityDetailPage() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground font-mono">
-                            NIDN: {dosen.nidn}
+                            {dosen.nidn ? `NIDN/NIP: ${dosen.nidn}` : 'Data identitas tidak tersedia'}
                           </p>
                         </div>
                       </div>
@@ -461,10 +454,7 @@ export function ActivityDetailPage() {
                                   </Badge>
                                   <span className="text-xs text-muted-foreground">
                                     Upload:{" "}
-                                    {format(
-                                      new Date(doc.tanggalUpload),
-                                      "dd MMM yyyy"
-                                    )}
+                                    {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
                                   </span>
                                 </div>
                               </div>
@@ -561,37 +551,41 @@ export function ActivityDetailPage() {
                 <CardTitle>Riwayat Aktivitas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="border rounded-lg">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Waktu</TableHead>
-                        <TableHead>Aksi</TableHead>
-                        <TableHead>Pelaku</TableHead>
-                        <TableHead>Detail</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {logs.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell className="text-sm">
-                            {format(
-                              new Date(log.timestamp),
-                              "dd MMM yyyy HH:mm"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{log.action}</Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">{log.actor}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {log.details}
-                          </TableCell>
+                {logs.length > 0 ? (
+                  <div className="border rounded-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Waktu</TableHead>
+                          <TableHead>Aksi</TableHead>
+                          <TableHead>Pelaku</TableHead>
+                          <TableHead>Detail</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {logs.map((log) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="text-sm">
+                              {format(new Date(log.timestamp), "dd MMM yyyy HH:mm", { locale: localeId })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{log.action}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{log.actor}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {log.details}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <HistoryIcon className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                    <p>Belum ada riwayat tercatat untuk kegiatan ini.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
