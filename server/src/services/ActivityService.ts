@@ -201,16 +201,6 @@ export class ActivityService {
       tx_id: crypto.randomBytes(16).toString('hex'),
     };
 
-    // Domain Logic: Validation using a temporary domain object
-    const tempActivity = new TugasTambahan(
-        activityData.nama_kegiatan,
-        activityData.tanggal_mulai,
-        activityData.tanggal_selesai,
-        activityData.periode
-    );
-    tempActivity.validateDates();
-    
-
     const partisipasiData: any[] = [];
     if (anggota_ids && Array.isArray(anggota_ids)) {
       anggota_ids.forEach((id: string) => {

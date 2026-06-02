@@ -19,17 +19,9 @@ export abstract class KegiatanTridharma {
     this.periode = periode;
   }
 
-  public validateDates(): void {
-    if (this.tanggalMulaiKegiatan >= this.tanggalSelesaiKegiatan) {
-      throw new Error('Tanggal mulai kegiatan harus sebelum tanggal selesai.');
-    }
-  }
-
   public tambahDokumen(dokumen: Dokumen): void {
-    // Logic: Ensure document is valid and not already attached
-    this.catatAuditTrail();
+    // Logic to add document
   }
-  
 
   public hapusDokumen(dokumen: Dokumen): void {
     // Logic to remove document

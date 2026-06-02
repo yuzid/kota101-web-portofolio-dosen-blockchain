@@ -24,6 +24,4 @@ export class Dokumen {
     this.sumber = sumber;
     this.tanggalUpload = tanggalUpload;
   }
-
-  public getNama(): string { return this.nama; }
 }
