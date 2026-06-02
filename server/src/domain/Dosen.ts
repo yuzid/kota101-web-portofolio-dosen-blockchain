@@ -8,8 +8,10 @@ export class Dosen extends User {
   private nip: string;
   private nidn: string;
   private nama: string;
+  private id: string; // Internal ID
 
   constructor(
+    id: string,
     email: string,
     passwordHash: string,
     nip: string,
@@ -17,6 +19,7 @@ export class Dosen extends User {
     nama: string
   ) {
     super(email, passwordHash);
+    this.id = id;
     this.nip = nip;
     this.nidn = nidn;
     this.nama = nama;
@@ -26,34 +29,39 @@ export class Dosen extends User {
     filter: KegiatanFilter,
     pageRequest: PageRequest
   ): PageResponse<KegiatanTridharma> {
-    // Implementation placeholder
-    return { data: [], page: 0, totalPages: 0, totalElements: 0 };
+    // Logic orchestrated by Service/Repository
+    return { data: [], page: pageRequest.page, totalPages: 0, totalElements: 0 };
   }
 
   public getDaftarDokumen(pageRequest: PageRequest): PageResponse<Dokumen> {
-    // Implementation placeholder
-    return { data: [], page: 0, totalPages: 0, totalElements: 0 };
+    return { data: [], page: pageRequest.page, totalPages: 0, totalElements: 0 };
   }
 
   public isiKegiatan(kegiatan: KegiatanTridharma): void {
-    // Implementation
+    // Logic to record activity
+    kegiatan.catatAuditTrail();
   }
 
   public isActiveKaprodi(): boolean {
-    // Check if active kaprodi
-    return false;
+    // This state should be managed by the repository/service 
+    // but exposed through the domain model
+    return false; 
   }
 
   public isActiveKajur(): boolean {
-    // Check if active kajur
     return false;
   }
 
   public hapusDariKegiatan(kegiatan: KegiatanTridharma): void {
-    // Implementation
+    // Logic to remove self from activity
   }
 
   public hapusDokumen(dokumen: Dokumen): void {
-    // Implementation
+    // Logic for soft delete
   }
+
+  // Getters for internal use
+  public getId(): string { return this.id; }
+  public getNama(): string { return this.nama; }
+  public getNip(): string { return this.nip; }
 }

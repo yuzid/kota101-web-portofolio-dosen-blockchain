@@ -21,7 +21,7 @@ export class JabatanController {
 
   createKajur = async (req: AuthRequest, res: Response) => {
     try {
-      const jabatan = await this.jabatanService.createKajur(req.body);
+      const jabatan = await this.jabatanService.createKajur(req.body, req.user);
       res.status(201).json({ status: 'success', data: jabatan });
     } catch (error: any) {
       const status = error.message.includes('sudah memiliki') ? 409 : 
@@ -62,7 +62,7 @@ export class JabatanController {
 
   createKaprodi = async (req: AuthRequest, res: Response) => {
     try {
-      const jabatan = await this.jabatanService.createKaprodi(req.body);
+      const jabatan = await this.jabatanService.createKaprodi(req.body, req.user);
       res.status(201).json({ status: 'success', data: jabatan });
     } catch (error: any) {
       const status = error.message.includes('sudah memiliki') ? 409 : 

@@ -12,14 +12,23 @@ export class AuthService {
     this.userRepository = userRepository;
   }
 
-  async login(email: string, password_hash: string) {
-    const user = await this.userRepository.findByEmail(email);
-    if (!user) return null;
+  async login(email: string, password_raw: string) {
+    const dosen = await this.userRepository.findDosenByEmail(email);
+    if (!dosen) {
+      // Fallback for non-dosen (Admin, TU) using existing logic
+      const userRaw = await this.userRepository.findByEmail(email);
+      if (!userRaw) return null;
+      const isValid = await bcrypt.compare(password_raw, userRaw.password_hash);
+      if (!isValid) return null;
+      return this.generateAuthData(userRaw);
+    }
 
-    const isValid = await bcrypt.compare(password_hash, user.password_hash);
+    const isValid = await bcrypt.compare(password_raw, dosen.getPasswordHash());
     if (!isValid) return null;
 
-    return this.generateAuthData(user);
+    // We still need full raw data for generateAuthData until all roles are mapped
+    const userRaw = await this.userRepository.findByEmail(email);
+    return this.generateAuthData(userRaw);
   }
 
   async googleLogin(idToken: string) {

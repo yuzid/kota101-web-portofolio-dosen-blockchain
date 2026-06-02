@@ -1,6 +1,20 @@
 import { prisma } from '../lib/prisma';
+import { Dokumen } from '../domain/Dokumen';
+import { JenisDokumen as DomainJenisDokumen, SumberDokumen as DomainSumberDokumen } from '../domain/types';
 
 export class DocumentRepository {
+  async findAllDomain(where: any): Promise<Dokumen[]> {
+    const data = await prisma.dokumen.findMany({ where });
+    return data.map(d => new Dokumen(
+      d.nama,
+      d.jenis_dokumen as unknown as DomainJenisDokumen,
+      d.file_path,
+      d.hash_file,
+      d.sumber_dokumen as unknown as DomainSumberDokumen,
+      d.tanggal_upload
+    ));
+  }
+
   async findAll(where: any) {
     return await prisma.dokumen.findMany({
       where,

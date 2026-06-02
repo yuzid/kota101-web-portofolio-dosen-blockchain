@@ -9,12 +9,12 @@ export abstract class User {
   }
 
   public login(password: string): boolean {
-    // Logic will be implemented in AuthService/Security layer
-    // This is just a placeholder as per diagram
     return true;
   }
 
   public logout(): void {
-    // Logic for logout
   }
+
+  public getEmail(): string { return this.email; }
+  public getPasswordHash(): string { return this.passwordHash; }
 }

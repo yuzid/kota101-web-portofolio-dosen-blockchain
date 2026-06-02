@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { DocumentService } from '../services/DocumentService';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { UserRepository } from '../repositories/UserRepository';
 
 export class DocumentController {
   private documentService: DocumentService;
@@ -59,7 +60,8 @@ export class DocumentController {
         res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
         return;
       }
-      const result = await this.documentService.uploadTUDocument(req.body, req.file!);
+      const userRepository = new UserRepository();
+      const result = await this.documentService.uploadTUDocument(req.user.id, req.body, req.file!, userRepository);
       res.status(201).json({
         status: 'success',
         message: 'Dokumen berhasil diunggah ke S3 dan disimpan di database.',

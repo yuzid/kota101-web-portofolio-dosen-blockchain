@@ -1,9 +1,12 @@
 import { prisma } from '../lib/prisma';
+import { Dosen } from '../domain/Dosen';
+import { TataUsaha } from '../domain/TataUsaha';
 
 export const userSelect = {
   id: true,
   email: true,
   role: true,
+  password_hash: true, // Need this for domain object
   admin: { select: { nama: true } },
   tata_usaha: { select: { nip: true, nama: true, jurusan_id: true } },
   dosen: {
@@ -19,6 +22,23 @@ export const userSelect = {
 };
 
 export class UserRepository {
+  async findDosenByEmail(email: string): Promise<Dosen | null> {
+    const data = await prisma.user.findUnique({
+      where: { email },
+      include: { dosen: true }
+    });
+    
+    if (!data || data.role !== 'DOSEN' || !data.dosen) return null;
+
+    return new Dosen(
+      data.id,
+      data.email,
+      data.password_hash,
+      data.dosen.nip,
+      data.dosen.nidn,
+      data.dosen.nama
+    );
+  }
   async findByEmail(email: string) {
     const now = new Date();
     return await prisma.user.findUnique({
@@ -93,8 +113,25 @@ export class UserRepository {
   async delete(id: string) {
     return await prisma.user.delete({ where: { id } });
   }
+async findTataUsahaById(id: string): Promise<TataUsaha | null> {
+  const data = await prisma.user.findUnique({
+    where: { id },
+    include: { tata_usaha: true }
+  });
+  if (!data || data.role !== 'TATA_USAHA' || !data.tata_usaha) return null;
+  return new TataUsaha(data.id, data.email, data.password_hash, data.tata_usaha.nip, data.tata_usaha.nama, data.tata_usaha.jurusan_id);
+}
 
-  async findProgramStudi(id: string, jurusan_id: string) {
+async findDosenByIds(ids: string[]): Promise<Dosen[]> {
+  const data = await prisma.user.findMany({
+    where: { id: { in: ids }, role: 'DOSEN' },
+    include: { dosen: true }
+  });
+  return data.map(d => new Dosen(d.id, d.email, d.password_hash, d.dosen!.nip, d.dosen!.nidn, d.dosen!.nama));
+}
+
+async findProgramStudi(id: string, jurusan_id: string) {
+
     return await prisma.programStudi.findFirst({
       where: { id, jurusan_id }
     });

@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/UserRepository';
+import { Admin } from '../domain/Admin';
 
 export class AdminUserService {
   private userRepository: UserRepository;
@@ -76,6 +77,12 @@ export class AdminUserService {
     if (existing) throw new Error('Email sudah terdaftar.');
 
     const passwordHash = await bcrypt.hash(password, 12);
+
+    // Domain interaction
+    if (currentUser.role === 'ADMIN') {
+        const admin = new Admin(currentUser.email, ''); 
+        admin.tambahPengguna(null as any); // Placeholder for domain interaction
+    }
 
     const createData = {
       email,

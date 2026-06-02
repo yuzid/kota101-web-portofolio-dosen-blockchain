@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
+import { PageResponse, PageRequest, KategoriPendidikan, KategoriPenelitian, KategoriPengabdian, Semester as DomainSemester, KegiatanFilter } from '../domain/types';
+import { KegiatanPendidikan, KegiatanPenelitian, KegiatanPengabdian, TugasTambahan } from '../domain/KegiatanSubclasses';
 
 export class ActivityService {
   private activityRepository: ActivityRepository;
@@ -40,9 +42,16 @@ export class ActivityService {
     return JenisKegiatan.TUGAS_TAMBAHAN;
   }
 
-  async getAllActivities(dosenId: string) {
+  async getAllActivities(dosenId: string, pageReq?: PageRequest): Promise<any> {
     const activities = await this.activityRepository.findAll(dosenId);
-    return activities.map(act => ({
+    
+    let resultData = activities;
+    if (pageReq) {
+      const start = (pageReq.page - 1) * pageReq.size;
+      resultData = activities.slice(start, start + pageReq.size);
+    }
+
+    const data = resultData.map(act => ({
       id: act.id,
       name: act.nama_kegiatan,
       jenisTridharma: act.kategori_tridharma.toLowerCase() === 'pendidikan' ? 'pengajaran' : act.kategori_tridharma.toLowerCase(),
@@ -53,6 +62,17 @@ export class ActivityService {
       buktiCount: act.lampiran_bukti.length,
       updatedAt: act.tanggal_mulai.toISOString(),
     }));
+
+    if (pageReq) {
+      return {
+        data,
+        page: pageReq.page,
+        totalPages: Math.ceil(activities.length / pageReq.size),
+        totalElements: activities.length
+      } as PageResponse<any>;
+    }
+
+    return data;
   }
 
   async getSummaryStats(dosenId: string) {
@@ -84,6 +104,29 @@ export class ActivityService {
 
     const activity = await this.activityRepository.findById(id);
     if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+
+    // Instantiate domain objects based on category
+    let domainActivity;
+    const commonArgs = [
+      activity.nama_kegiatan,
+      activity.tanggal_mulai,
+      activity.tanggal_selesai,
+      activity.periode
+    ] as [string, Date, Date, string];
+
+    switch (activity.kategori_tridharma) {
+      case KategoriTridharma.PENDIDIKAN:
+        domainActivity = new KegiatanPendidikan(...commonArgs, activity.jenis_kegiatan as any, activity.semester as any);
+        break;
+      case KategoriTridharma.PENELITIAN:
+        domainActivity = new KegiatanPenelitian(...commonArgs, activity.jenis_kegiatan as any);
+        break;
+      case KategoriTridharma.PENGABDIAN:
+        domainActivity = new KegiatanPengabdian(...commonArgs, activity.jenis_kegiatan as any);
+        break;
+      default:
+        domainActivity = new TugasTambahan(...commonArgs);
+    }
 
     const dosenTerlibatMap = new Map<string, any>();
     dosenTerlibatMap.set(activity.dosen_id, {
@@ -207,6 +250,30 @@ export class ActivityService {
     if (activity.dosen_id !== dosenId) throw new Error('Akses ditolak. Anda bukan pencatat kegiatan ini.');
 
     return await this.activityRepository.delete(id);
+  }
+
+  async getActivitiesByProdi(prodiId: string, filter: KegiatanFilter, pageReq: PageRequest): Promise<PageResponse<any>> {
+    const activities = await this.activityRepository.findAllByProdi(prodiId, filter);
+    const start = (pageReq.page - 1) * pageReq.size;
+    const data = activities.slice(start, start + pageReq.size);
+    return {
+      data,
+      page: pageReq.page,
+      totalPages: Math.ceil(activities.length / pageReq.size),
+      totalElements: activities.length
+    };
+  }
+
+  async getActivitiesByJurusan(jurusanId: string, filter: KegiatanFilter, pageReq: PageRequest): Promise<PageResponse<any>> {
+    const activities = await this.activityRepository.findAllByJurusan(jurusanId, filter);
+    const start = (pageReq.page - 1) * pageReq.size;
+    const data = activities.slice(start, start + pageReq.size);
+    return {
+      data,
+      page: pageReq.page,
+      totalPages: Math.ceil(activities.length / pageReq.size),
+      totalElements: activities.length
+    };
   }
 
   async addLampiran(id: string, dokumen_id: string) {

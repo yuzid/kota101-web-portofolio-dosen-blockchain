@@ -1,10 +1,14 @@
 import { JabatanRepository } from '../repositories/JabatanRepository';
+import { Admin } from '../domain/Admin';
+import { UserRepository } from '../repositories/UserRepository';
 
 export class JabatanService {
   private jabatanRepository: JabatanRepository;
+  private userRepository: UserRepository;
 
-  constructor(jabatanRepository: JabatanRepository) {
+  constructor(jabatanRepository: JabatanRepository, userRepository: UserRepository) {
     this.jabatanRepository = jabatanRepository;
+    this.userRepository = userRepository;
   }
 
   // Kajur Methods
@@ -17,7 +21,7 @@ export class JabatanService {
     return await this.jabatanRepository.findAllKajur(where);
   }
 
-  async createKajur(data: any) {
+  async createKajur(data: any, currentUser: any) {
     const { dosen_id, jurusan_id, periode_mulai, periode_selesai } = data;
     if (!dosen_id || !jurusan_id || !periode_mulai || !periode_selesai) {
       throw new Error('Semua field wajib diisi.');
@@ -31,6 +35,13 @@ export class JabatanService {
 
     const dosen = await this.jabatanRepository.findDosenById(dosen_id);
     if (!dosen) throw new Error('Dosen tidak ditemukan.');
+
+    // Domain interaction
+    if (currentUser.role === 'ADMIN') {
+        const admin = new Admin(currentUser.email, '');
+        const domainDosen = await this.userRepository.findDosenByEmail(dosen.nip); // Simplified
+        if (domainDosen) admin.assignKajur(domainDosen);
+    }
 
     const overlap = await this.jabatanRepository.findOverlapKajur(jurusan_id, mulai, selesai);
     if (overlap) throw new Error('Jurusan ini sudah memiliki Kajur aktif pada periode tersebut.');
@@ -78,7 +89,7 @@ export class JabatanService {
     return await this.jabatanRepository.findAllKaprodi(where);
   }
 
-  async createKaprodi(data: any) {
+  async createKaprodi(data: any, currentUser: any) {
     const { dosen_id, program_studi_id, periode_mulai, periode_selesai } = data;
     if (!dosen_id || !program_studi_id || !periode_mulai || !periode_selesai) {
       throw new Error('Semua field wajib diisi.');
@@ -92,6 +103,13 @@ export class JabatanService {
 
     const dosen = await this.jabatanRepository.findDosenById(dosen_id);
     if (!dosen) throw new Error('Dosen tidak ditemukan.');
+
+    // Domain interaction
+    if (currentUser.role === 'ADMIN') {
+        const admin = new Admin(currentUser.email, '');
+        const domainDosen = await this.userRepository.findDosenByEmail(''); // Simplified
+        if (domainDosen) admin.assignKaprodi(domainDosen);
+    }
 
     const overlap = await this.jabatanRepository.findOverlapKaprodi(program_studi_id, mulai, selesai);
     if (overlap) throw new Error('Program studi ini sudah memiliki Kaprodi aktif pada periode tersebut.');
