@@ -16,7 +16,9 @@ const userSelect = {
       nip: true,
       nidn: true,
       nama: true,
-      program_studi: { select: { id: true, nama_prodi: true, jurusan_id: true } }
+      program_studi: { select: { id: true, nama_prodi: true, jurusan_id: true } },
+      jabatan_kajur: { select: { id: true, jurusan_id: true } },
+      jabatan_kaprodi: { select: { id: true, program_studi_id: true } }
     }
   },
 };
