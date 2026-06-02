@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -37,34 +37,30 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { Label } from '../components/ui/label';
-import { Plus, Search, Edit, Power, Eye, EyeOff, X } from 'lucide-react';
+import { Plus, Search, Edit, Power, Eye, EyeOff, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Account {
   id: string;
   name: string;
-  username: string;
+  username: string; // Will map from email
   nidn?: string;
-  role: string;
+  nip?: string;
+  roles: string[]; // List of roles for display
+  mainRole: string; // Primary role for filtering/editing
   programStudi: string;
+  programStudiId?: string;
+  jurusanId?: string;
   status: 'active' | 'inactive';
   lastLogin?: string;
 }
-
-const mockAccounts: Account[] = [
-  { id: '1', name: 'Dr. John Doe', username: 'john.doe', nidn: '0412108901', role: 'dosen', programStudi: 'D4 Teknik Informatika', status: 'active', lastLogin: '2026-05-15 14:30' },
-  { id: '2', name: 'Dr. Jane Smith', username: 'jane.smith', nidn: '0415078801', role: 'kaprodi', programStudi: 'D4 Teknik Informatika', status: 'active', lastLogin: '2026-05-16 08:15' },
-  { id: '3', name: 'Admin TU 1', username: 'admin.tu', role: 'admin_tu', programStudi: 'Jurusan TKI', status: 'active', lastLogin: '2026-05-16 09:00' },
-  { id: '4', name: 'Dr. Ahmad Fauzi', username: 'ahmad.f', nidn: '0420059102', role: 'dosen', programStudi: 'D3 Teknik Informatika', status: 'active', lastLogin: 'Belum pernah' },
-  { id: '5', name: 'Prof. Siti Nurhaliza', username: 'siti.n', nidn: '0405067801', role: 'kajur', programStudi: 'Jurusan TKI', status: 'active', lastLogin: '2026-05-14 16:45' },
-  { id: '6', name: 'Dr. Budi Santoso', username: 'budi.s', nidn: '0418088902', role: 'dosen', programStudi: 'D4 Teknik Informatika', status: 'inactive', lastLogin: '2026-04-20 10:30' },
-];
 
 const roleLabels: Record<string, string> = {
   dosen: 'Dosen',
   admin_tu: 'Admin TU',
   kaprodi: 'Kaprodi',
   kajur: 'Kajur',
+  administrator: 'Administrator'
 };
 
 const roleBadgeColors: Record<string, string> = {
@@ -72,14 +68,41 @@ const roleBadgeColors: Record<string, string> = {
   admin_tu: 'bg-blue-500',
   kaprodi: 'bg-purple-500',
   kajur: 'bg-orange-500',
+  administrator: 'bg-red-500'
+};
+
+// Internal mapping helper
+const mapRolesFromBackend = (u: any): string[] => {
+  const roles: string[] = [];
+  const dbRole = u.role?.toUpperCase();
+  
+  if (dbRole === 'ADMIN') roles.push('administrator');
+  if (dbRole === 'TATA_USAHA') roles.push('admin_tu');
+  if (dbRole === 'DOSEN') roles.push('dosen');
+
+  if (u.dosen?.jabatan_kajur && u.dosen.jabatan_kajur.length > 0) roles.push('kajur');
+  if (u.dosen?.jabatan_kaprodi && u.dosen.jabatan_kaprodi.length > 0) roles.push('kaprodi');
+
+  return roles;
+};
+
+const mapRoleToBackend = (frontendRole: string): string => {
+  if (frontendRole === 'admin_tu') return 'TATA_USAHA';
+  if (frontendRole === 'administrator') return 'ADMIN';
+  return frontendRole.toUpperCase();
 };
 
 export function ManageAccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterJurusan, setFilterJurusan] = useState('all');
   const [filterProdi, setFilterProdi] = useState('all');
+
+  const [prodis, setProdis] = useState<any[]>([]);
+  const [jurusans, setJurusans] = useState<any[]>([]);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -91,35 +114,99 @@ export function ManageAccountsPage() {
     name: '',
     username: '',
     nidn: '',
+    nip: '',
     password: '',
     role: '',
     programStudi: '',
+    programStudiId: '',
+    jurusanId: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    fetchUsers();
+    fetchMetadata();
+  }, []);
+
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const mapped = result.data.map((u: any) => {
+          const userRoles = mapRolesFromBackend(u);
+          return {
+            id: u.id,
+            name: u.dosen?.nama || u.tata_usaha?.nama || u.admin?.nama || u.email,
+            username: u.email,
+            nip: u.dosen?.nip || u.tata_usaha?.nip,
+            nidn: u.dosen?.nidn,
+            roles: userRoles,
+            mainRole: u.role.toLowerCase(), // Store original role for filtering/editing
+            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'Jurusan TKI' : 'Sistem'),
+            programStudiId: u.dosen?.program_studi?.id,
+            jurusanId: u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
+            status: 'active' as const,
+            lastLogin: 'Belum pernah',
+          };
+        });
+        setAccounts(mapped);
+      }
+    } catch (error) {
+      toast.error('Gagal memuat data pengguna');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchMetadata = async () => {
+    try {
+      const [prodiRes, jurusanRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/jurusan`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const pData = await prodiRes.json();
+      const jData = await jurusanRes.json();
+      if (pData.status === 'success') setProdis(pData.data);
+      if (jData.status === 'success') setJurusans(jData.data);
+    } catch (error) {
+      console.error('Gagal memuat metadata');
+    }
+  };
 
   // Filter logic
   const filteredAccounts = accounts.filter(account => {
     const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           account.username.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || account.role === filterRole;
+    
+    // Filter can match any of the roles
+    const matchesRole = filterRole === 'all' || account.roles.includes(filterRole);
     const matchesStatus = filterStatus === 'all' || account.status === filterStatus;
-    const matchesProdi = filterProdi === 'all' || account.programStudi === filterProdi;
+    const matchesJurusan = filterJurusan === 'all' || account.jurusanId === filterJurusan;
+    const matchesProdi = filterProdi === 'all' || account.programStudiId === filterProdi;
 
-    return matchesSearch && matchesRole && matchesStatus && matchesProdi;
+    return matchesSearch && matchesRole && matchesStatus && matchesJurusan && matchesProdi;
   });
 
-  const hasActiveFilters = filterRole !== 'all' || filterStatus !== 'all' || filterProdi !== 'all' || searchTerm !== '';
+  const hasActiveFilters = filterRole !== 'all' || filterStatus !== 'all' || filterJurusan !== 'all' || filterProdi !== 'all' || searchTerm !== '';
 
   const resetFilters = () => {
     setSearchTerm('');
     setFilterRole('all');
     setFilterStatus('all');
+    setFilterJurusan('all');
     setFilterProdi('all');
   };
 
   const openAddDialog = () => {
-    setFormData({ name: '', username: '', nidn: '', password: '', role: '', programStudi: '' });
+    setFormData({ name: '', username: '', nidn: '', nip: '', password: '', role: '', programStudi: '', programStudiId: '', jurusanId: '' });
     setUsernameError('');
     setShowPassword(false);
     setShowAddDialog(true);
@@ -131,9 +218,12 @@ export function ManageAccountsPage() {
       name: account.name,
       username: account.username,
       nidn: account.nidn || '',
+      nip: account.nip || '',
       password: '',
-      role: account.role,
+      role: account.mainRole === 'tata_usaha' ? 'admin_tu' : account.mainRole === 'admin' ? 'administrator' : account.mainRole,
       programStudi: account.programStudi,
+      programStudiId: account.programStudiId || '',
+      jurusanId: account.jurusanId || '',
     });
     setUsernameError('');
     setShowPassword(false);
@@ -150,73 +240,81 @@ export function ManageAccountsPage() {
     return true;
   };
 
-  const handleSubmitAdd = () => {
-    if (!formData.name || !formData.username || !formData.password || !formData.role || !formData.programStudi) {
+  const handleSubmitAdd = async () => {
+    if (!formData.name || !formData.username || !formData.password || !formData.role) {
       toast.error('Semua field wajib diisi');
       return;
     }
-
-    if (formData.password.length < 8) {
-      toast.error('Password minimal 8 karakter');
-      return;
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        email: formData.username,
+        password: formData.password,
+        role: mapRoleToBackend(formData.role),
+        nama: formData.name,
+        nip: formData.nip || undefined,
+        nidn: formData.nidn || undefined,
+        program_studi_id: formData.programStudiId || undefined,
+        jurusan_id: formData.jurusanId || undefined,
+      };
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(`Akun ${formData.name} berhasil dibuat.`);
+        setShowAddDialog(false);
+        fetchUsers();
+      } else {
+        toast.error(result.error || 'Gagal membuat akun');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (!checkUsernameAvailability(formData.username)) {
-      return;
-    }
-
-    const newAccount: Account = {
-      id: String(Date.now()),
-      name: formData.name,
-      username: formData.username,
-      nidn: formData.nidn || undefined,
-      role: formData.role,
-      programStudi: formData.programStudi,
-      status: 'active',
-      lastLogin: 'Belum pernah',
-    };
-
-    setAccounts([...accounts, newAccount]);
-    setShowAddDialog(false);
-    toast.success(`Akun ${formData.name} berhasil dibuat.`);
   };
 
-  const handleSubmitEdit = () => {
-    if (!selectedAccount || !formData.name || !formData.role || !formData.programStudi) {
+  const handleSubmitEdit = async () => {
+    if (!selectedAccount || !formData.name || !formData.role) {
       toast.error('Field yang wajib tidak boleh kosong');
       return;
     }
-
-    if (formData.password && formData.password.length < 8) {
-      toast.error('Password minimal 8 karakter');
-      return;
+    setIsSubmitting(true);
+    try {
+      const payload: any = {
+        nama: formData.name,
+        nip: formData.nip || undefined,
+        nidn: formData.nidn || undefined,
+        program_studi_id: formData.programStudiId || undefined,
+        jurusan_id: formData.jurusanId || undefined,
+      };
+      if (formData.password) payload.password = formData.password;
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${selectedAccount.id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(`Akun ${formData.name} berhasil diperbarui.`);
+        setShowEditDialog(false);
+        fetchUsers();
+      } else {
+        toast.error(result.error || 'Gagal memperbarui akun');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const updatedAccounts = accounts.map(acc =>
-      acc.id === selectedAccount.id
-        ? { ...acc, name: formData.name, nidn: formData.nidn || undefined, role: formData.role, programStudi: formData.programStudi }
-        : acc
-    );
-
-    setAccounts(updatedAccounts);
-    setShowEditDialog(false);
-    toast.success(`Akun ${formData.name} berhasil diperbarui.`);
   };
 
   const handleToggleStatus = () => {
-    if (!selectedAccount) return;
-
-    const updatedAccounts = accounts.map(acc =>
-      acc.id === selectedAccount.id
-        ? { ...acc, status: acc.status === 'active' ? 'inactive' as const : 'active' as const }
-        : acc
-    );
-
-    setAccounts(updatedAccounts);
     setShowDeactivateDialog(false);
-
-    const newStatus = selectedAccount.status === 'active' ? 'nonaktif' : 'aktif';
-    toast.success(`Akun ${selectedAccount.name} berhasil ${newStatus === 'nonaktif' ? 'dinonaktifkan' : 'diaktifkan'}.`);
+    toast.info('Fitur kelola status akun akan segera hadir.');
   };
 
   return (
@@ -277,15 +375,29 @@ export function ManageAccountsPage() {
             </SelectContent>
           </Select>
 
+          <Select value={filterJurusan} onValueChange={(val) => { setFilterJurusan(val); setFilterProdi('all'); }}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Jurusan" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Jurusan</SelectItem>
+              {jurusans.map(j => (
+                <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Select value={filterProdi} onValueChange={setFilterProdi}>
             <SelectTrigger className="w-[220px]">
               <SelectValue placeholder="Program Studi" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Program Studi</SelectItem>
-              <SelectItem value="D3 Teknik Informatika">D3 Teknik Informatika</SelectItem>
-              <SelectItem value="D4 Teknik Informatika">D4 Teknik Informatika</SelectItem>
-              <SelectItem value="Jurusan TKI">Jurusan TKI</SelectItem>
+              {prodis
+                .filter(p => filterJurusan === 'all' || p.jurusan_id === filterJurusan)
+                .map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
 
@@ -298,7 +410,7 @@ export function ManageAccountsPage() {
         </div>
 
         {/* Table */}
-        <div className="border rounded-lg">
+        <div className="border rounded-lg bg-background">
           <Table>
             <TableHeader>
               <TableRow>
@@ -313,7 +425,14 @@ export function ManageAccountsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAccounts.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                    <p className="mt-2 text-muted-foreground">Memuat data pengguna...</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredAccounts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Tidak ada data yang sesuai dengan filter
@@ -328,9 +447,13 @@ export function ManageAccountsPage() {
                       <code className="text-xs bg-muted px-2 py-1 rounded">{account.username}</code>
                     </TableCell>
                     <TableCell>
-                      <Badge className={roleBadgeColors[account.role]}>
-                        {roleLabels[account.role]}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {account.roles.map(r => (
+                          <Badge key={r} className={roleBadgeColors[r]}>
+                            {roleLabels[r] || r}
+                          </Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>{account.programStudi}</TableCell>
                     <TableCell>
@@ -369,9 +492,11 @@ export function ManageAccountsPage() {
           </Table>
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          Menampilkan {filteredAccounts.length} dari {accounts.length} akun
-        </div>
+        {!isLoading && (
+          <div className="text-sm text-muted-foreground">
+            Menampilkan {filteredAccounts.length} dari {accounts.length} akun
+          </div>
+        )}
       </div>
 
       {/* Add Account Dialog */}
@@ -384,7 +509,7 @@ export function ManageAccountsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-2">
               <Label htmlFor="add-name">Nama Lengkap *</Label>
               <Input
@@ -405,11 +530,21 @@ export function ManageAccountsPage() {
                   setUsernameError('');
                 }}
                 onBlur={() => formData.username && checkUsernameAvailability(formData.username)}
-                placeholder="Masukkan username"
+                placeholder="Masukkan username (email)"
               />
               {usernameError && (
                 <p className="text-sm text-destructive">{usernameError}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="add-nip">NIP</Label>
+              <Input
+                id="add-nip"
+                value={formData.nip}
+                onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
+                placeholder="Masukkan NIP"
+              />
             </div>
 
             <div className="space-y-2">
@@ -420,9 +555,6 @@ export function ManageAccountsPage() {
                 onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
                 placeholder="Masukkan NIDN (opsional untuk dosen)"
               />
-              <p className="text-xs text-muted-foreground">
-                (opsional, khusus untuk dosen)
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -443,14 +575,11 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Password ini akan digunakan pengguna untuk login pertama kali.
-              </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih role" />
                 </SelectTrigger>
@@ -463,26 +592,47 @@ export function ManageAccountsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="add-prodi">Program Studi / Unit *</Label>
-              <Select value={formData.programStudi} onValueChange={(value) => setFormData({ ...formData, programStudi: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih program studi" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="D3 Teknik Informatika">D3 Teknik Informatika</SelectItem>
-                  <SelectItem value="D4 Teknik Informatika">D4 Teknik Informatika</SelectItem>
-                  <SelectItem value="Jurusan TKI">Jurusan TKI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih program studi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.role === 'admin_tu' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-jurusan">Jurusan *</Label>
+                <Select value={formData.jurusanId} onValueChange={(value) => setFormData({ ...formData, jurusanId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurusans.map(j => (
+                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isSubmitting}>
               Batal
             </Button>
-            <Button onClick={handleSubmitAdd}>Simpan</Button>
+            <Button onClick={handleSubmitAdd} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -494,7 +644,7 @@ export function ManageAccountsPage() {
             <DialogTitle>Edit Akun — {selectedAccount?.name}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Nama Lengkap *</Label>
               <Input
@@ -513,6 +663,15 @@ export function ManageAccountsPage() {
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground">Username tidak dapat diubah</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-nip">NIP</Label>
+              <Input
+                id="edit-nip"
+                value={formData.nip}
+                onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
@@ -546,9 +705,6 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Kosongkan jika tidak ingin mengubah password.
-              </p>
             </div>
 
             <div className="space-y-2">
@@ -566,26 +722,31 @@ export function ManageAccountsPage() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-prodi">Program Studi / Unit *</Label>
-              <Select value={formData.programStudi} onValueChange={(value) => setFormData({ ...formData, programStudi: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="D3 Teknik Informatika">D3 Teknik Informatika</SelectItem>
-                  <SelectItem value="D4 Teknik Informatika">D4 Teknik Informatika</SelectItem>
-                  <SelectItem value="Jurusan TKI">Jurusan TKI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSubmitting}>
               Batal
             </Button>
-            <Button onClick={handleSubmitEdit}>Simpan</Button>
+            <Button onClick={handleSubmitEdit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
