@@ -144,7 +144,6 @@ router.post('/upload',
           hash_file: hashFile,
           sumber_dokumen: 'TATA_USAHA',
           tanggal_upload: new Date(tanggal_upload),
-          uploader_dosen_id: targetDosenIds[0],
         }
       });
 

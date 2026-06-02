@@ -92,7 +92,6 @@ model Dosen {
   jabatan_kajur                  JabatanKajur[]
   jabatan_kaprodi                JabatanKaprodi[]
   kepemilikan_dokumen            KepemilikanDokumen[]
-  dokumen_uploaded               Dokumen[]
   partisipasi_kegiatan_tridharma PartisipasiKegiatanTridharma[]
   kegiatan_tridharma             KegiatanTridharma[]
 
@@ -158,7 +157,6 @@ model KepemilikanDokumen {
 
 model Dokumen {
   id                String               @id @default(uuid()) @db.Uuid
-  uploader_dosen_id String               @db.Uuid
   nama              String               @db.VarChar(255)
   jenis_dokumen     JenisDokumen
   file_path         String               @db.VarChar(512)
@@ -166,7 +164,6 @@ model Dokumen {
   sumber_dokumen    SumberDokumen
   tanggal_upload    DateTime             @db.Date
   deleted_at        DateTime?            @db.Timestamp
-  uploader          Dosen                @relation(fields: [uploader_dosen_id], references: [id])
   kepemilikan       KepemilikanDokumen[]
   lampiran_bukti    LampiranBukti[]
 
