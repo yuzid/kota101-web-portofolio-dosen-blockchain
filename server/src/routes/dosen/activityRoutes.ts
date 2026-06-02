@@ -164,7 +164,11 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
       },
       lampiran_bukti: {
         include: {
-          dokumen: true
+          dokumen: {
+            include: {
+              kepemilikan: true
+            }
+          }
         }
       }
     }
@@ -202,18 +206,22 @@ router.get('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
     }
   });
 
-  // Attach documents
+  // Attach documents to their owners within this activity
   activity.lampiran_bukti.forEach((lb: any) => {
-    const owner = dosenTerlibatMap.get(lb.dokumen.uploader_dosen_id);
-    if (owner) {
-      owner.dokumen.push({
-        id: lb.dokumen.id,
-        name: lb.dokumen.nama,
-        jenis: lb.dokumen.jenis_dokumen,
-        tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
-        hasHighlight: lb.highlighted
-      });
-    }
+    const docData = {
+      id: lb.dokumen.id,
+      name: lb.dokumen.nama,
+      jenis: lb.dokumen.jenis_dokumen,
+      tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
+      hasHighlight: lb.highlighted
+    };
+
+    lb.dokumen.kepemilikan.forEach((k: any) => {
+      const ownerInActivity = dosenTerlibatMap.get(k.dosen_id);
+      if (ownerInActivity) {
+        ownerInActivity.dokumen.push(docData);
+      }
+    });
   });
 
   const formattedDetail = {

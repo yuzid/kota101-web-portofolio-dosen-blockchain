@@ -155,7 +155,6 @@ router.post('/upload', upload.single('file'), asyncHandler(async (req: AuthReque
         hash_file: hashFile,
         sumber_dokumen: 'UPLOAD_PRIBADI',
         tanggal_upload: new Date(tanggal_dokumen),
-        uploader_dosen_id: dosenId, // Uploader adalah dosen itu sendiri
       }
     });
 
@@ -188,7 +187,10 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const targetDoc = await prisma.dokumen.findUnique({ where: { id } });
+  const targetDoc = await prisma.dokumen.findUnique({ 
+    where: { id },
+    include: { kepemilikan: true }
+  });
 
   if (!targetDoc) {
     res.status(404).json({ status: 'error', error: 'Dokumen tidak ditemukan.' });
@@ -204,8 +206,9 @@ router.delete('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  // Proteksi Keamanan: Pastikan berkas tersebut memang diunggah oleh dosen yang sedang login
-  if (targetDoc.uploader_dosen_id !== dosenId) {
+  // Proteksi Keamanan: Pastikan berkas tersebut memang dimiliki oleh dosen yang sedang login
+  const isOwner = targetDoc.kepemilikan.some(k => k.dosen_id === dosenId);
+  if (!isOwner) {
     res.status(403).json({ status: 'error', error: 'Akses ilegal. Anda bukan pemilik dokumen ini.' });
     return;
   }
