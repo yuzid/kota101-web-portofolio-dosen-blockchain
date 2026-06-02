@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -34,280 +34,169 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { Calendar } from "../components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../components/ui/popover";
 import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
 import {
   Upload,
-  Users,
-  CheckCircle,
-  Clock,
-  XCircle,
   Search,
   FileText,
-  CalendarIcon,
-  Send,
   Eye,
   MoreVertical,
-  X,
-  Edit,
   Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface DistributedDocument {
   id: string;
-  name: string;
-  jenis: string;
-  uploadDate: string;
-  distributionDate?: string;
-  recipients: string[];
-  recipientNames: string[];
-  status: "draft" | "pending" | "distributed";
-  totalRecipients: number;
-  receivedCount: number;
+  nama: string;
+  jenis_dokumen: string;
+  tanggal_upload: string;
+  file_path: string;
 }
 
-const mockDocuments: DistributedDocument[] = [
-  {
-    id: "1",
-    name: "SK Mengajar Semester Genap 2025/2026",
-    jenis: "SK",
-    uploadDate: "2026-05-16",
-    distributionDate: "2026-05-16",
-    recipients: ["1", "2", "3", "4", "5"],
-    recipientNames: [
-      "Dr. John Doe",
-      "Dr. Ahmad Fauzi",
-      "Dr. Siti Nurhaliza",
-      "Dr. Budi Santoso",
-      "Dr. Jane Smith",
-    ],
-    status: "distributed",
-    totalRecipients: 5,
-    receivedCount: 5,
-  },
-  {
-    id: "2",
-    name: "Surat Tugas Penelitian Q2 2026",
-    jenis: "Surat Tugas",
-    uploadDate: "2026-05-15",
-    distributionDate: "2026-05-15",
-    recipients: ["1", "2"],
-    recipientNames: ["Dr. John Doe", "Dr. Ahmad Fauzi"],
-    status: "distributed",
-    totalRecipients: 2,
-    receivedCount: 1,
-  },
-  {
-    id: "3",
-    name: "SK Penugasan Koordinator Lab",
-    jenis: "SK",
-    uploadDate: "2026-05-14",
-    recipients: ["3", "4"],
-    recipientNames: ["Dr. Siti Nurhaliza", "Dr. Budi Santoso"],
-    status: "pending",
-    totalRecipients: 2,
-    receivedCount: 0,
-  },
-  {
-    id: "4",
-    name: "Jadwal Mengajar Semester Genap Draft",
-    jenis: "Jadwal",
-    uploadDate: "2026-05-13",
-    recipients: [],
-    recipientNames: [],
-    status: "draft",
-    totalRecipients: 0,
-    receivedCount: 0,
-  },
-];
-
-const allDosen = [
-  {
-    id: "1",
-    name: "Dr. John Doe",
-    nidn: "0412108901",
-    programStudi: "D4 Teknik Informatika",
-  },
-  {
-    id: "2",
-    name: "Dr. Ahmad Fauzi",
-    nidn: "0420059102",
-    programStudi: "D4 Teknik Informatika",
-  },
-  {
-    id: "3",
-    name: "Dr. Siti Nurhaliza",
-    nidn: "0405067801",
-    programStudi: "D3 Teknik Informatika",
-  },
-  {
-    id: "4",
-    name: "Dr. Budi Santoso",
-    nidn: "0408068901",
-    programStudi: "D4 Teknik Komputer",
-  },
-  {
-    id: "5",
-    name: "Dr. Jane Smith",
-    nidn: "0415078801",
-    programStudi: "D4 Teknik Informatika",
-  },
-];
+interface Dosen {
+  id: string; // ID User / ID Dosen murni
+  nama: string;
+  nip: string;
+  program_studi?: {
+    id: string;
+    nama_prodi: string;
+  };
+}
 
 export function DocumentDistributionPage() {
-  const [documents, setDocuments] =
-    useState<DistributedDocument[]>(mockDocuments);
+  const [documents, setDocuments] = useState<DistributedDocument[]>([]);
+  const [allDosen, setAllDosen] = useState<Dosen[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterRecipient, setFilterRecipient] = useState<string>("all");
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [selectedDocument, setSelectedDocument] =
-    useState<DistributedDocument | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DistributedDocument | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // State baru untuk memfilter list dosen berdasarkan prodi di dalam modal
+  const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploadForm, setUploadForm] = useState({
     name: "",
     jenis: "",
     file: null as File | null,
     recipients: [] as string[],
-    sendNow: true,
   });
 
-  // Filter documents
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesSearch = doc.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === "all" || doc.status === filterStatus;
-    const matchesRecipient =
-      filterRecipient === "all" || doc.recipients.includes(filterRecipient);
+  const token = localStorage.getItem("token");
 
-    let matchesDate = true;
-    if (dateRange.from && dateRange.to) {
-      const docDate = new Date(doc.uploadDate);
-      matchesDate = docDate >= dateRange.from && docDate <= dateRange.to;
-    }
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    return matchesSearch && matchesStatus && matchesRecipient && matchesDate;
-  });
+  const fetchData = async () => {
+    try {
+      const resDosen = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const dataDosen = await resDosen.json();
+      
+      if (dataDosen.status === "success") {
+        const listDosen = dataDosen.data
+          .filter((u: any) => u.dosen !== null)
+          .map((u: any) => ({
+            id: u.id, // FIX: Menggunakan u.id (Top-Level ID User) agar ID tidak undefined dan tidak bug klik semua
+            nama: u.dosen.nama,
+            nip: u.dosen.nip,
+            program_studi: u.dosen.program_studi, 
+          }));
+        setAllDosen(listDosen);
+      }
 
-  const hasActiveFilters =
-    searchTerm !== "" ||
-    filterStatus !== "all" ||
-    filterRecipient !== "all" ||
-    dateRange.from ||
-    dateRange.to;
-
-  const resetFilters = () => {
-    setSearchTerm("");
-    setFilterStatus("all");
-    setFilterRecipient("all");
-    setDateRange({});
-  };
-
-  const counts = {
-    all: documents.length,
-    draft: documents.filter((d) => d.status === "draft").length,
-    pending: documents.filter((d) => d.status === "pending").length,
-    distributed: documents.filter((d) => d.status === "distributed").length,
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "distributed":
-        return (
-          <Badge className="bg-green-500">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Terdistribusi
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge className="bg-orange-500">
-            <Clock className="w-3 h-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case "draft":
-        return (
-          <Badge variant="secondary">
-            <FileText className="w-3 h-3 mr-1" />
-            Draft
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
+      const resDocs = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const dataDocs = await resDocs.json();
+      if (dataDocs.status === "success") {
+        setDocuments(dataDocs.data);
+      }
+    } catch (err) {
+      toast.error("Gagal memuat data dari server.");
     }
   };
 
-  const handleUpload = () => {
-    if (!uploadForm.name || !uploadForm.jenis) {
-      toast.error("Lengkapi semua field yang wajib");
+  // Mendapatkan daftar prodi unik dari data dosen yang ada untuk dropdown filter
+  const uniqueProdis = Array.from(
+    new Map(
+      allDosen
+        .filter((d) => d.program_studi)
+        .map((d) => [d.program_studi!.id, d.program_studi])
+    ).values()
+  );
+
+  // Memfilter dosen yang akan ditampilkan di checkbox berdasarkan prodi yang dipilih
+  const filteredDosenForUpload = allDosen.filter((dosen) => {
+    if (selectedProdiId === "all") return true;
+    return dosen.program_studi?.id === selectedProdiId;
+  });
+
+  const filteredDocuments = documents.filter((doc) =>
+    doc.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleUpload = async () => {
+    if (!uploadForm.name || !uploadForm.jenis || !uploadForm.file) {
+      toast.error("Nama, Jenis, dan File dokumen wajib diisi!");
+      return;
+    }
+    if (uploadForm.recipients.length === 0) {
+      toast.error("Pilih minimal satu dosen penerima!");
       return;
     }
 
-    const newDoc: DistributedDocument = {
-      id: `doc-${Date.now()}`,
-      name: uploadForm.name,
-      jenis: uploadForm.jenis,
-      uploadDate: new Date().toISOString().split("T")[0],
-      distributionDate: uploadForm.sendNow
-        ? new Date().toISOString().split("T")[0]
-        : undefined,
-      recipients: uploadForm.recipients,
-      recipientNames: allDosen
-        .filter((d) => uploadForm.recipients.includes(d.id))
-        .map((d) => d.name),
-      status: uploadForm.sendNow
-        ? "distributed"
-        : uploadForm.recipients.length > 0
-        ? "pending"
-        : "draft",
-      totalRecipients: uploadForm.recipients.length,
-      receivedCount: 0,
-    };
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append("nama", uploadForm.name);
+    formData.append("jenis_dokumen", uploadForm.jenis); 
+    formData.append("tanggal_upload", new Date().toISOString());
+    formData.append("file", uploadForm.file);
+    formData.append("dosen_penerima_ids", JSON.stringify(uploadForm.recipients));
 
-    setDocuments([newDoc, ...documents]);
-    setShowUploadDialog(false);
-    setUploadForm({
-      name: "",
-      jenis: "",
-      file: null,
-      recipients: [],
-      sendNow: true,
-    });
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
 
-    if (uploadForm.sendNow && uploadForm.recipients.length > 0) {
-      toast.success(
-        `Dokumen "${uploadForm.name}" berhasil didistribusikan ke ${uploadForm.recipients.length} dosen`
-      );
-    } else {
-      toast.success(
-        `Dokumen "${uploadForm.name}" disimpan sebagai ${
-          uploadForm.recipients.length > 0 ? "pending" : "draft"
-        }`
-      );
+      const result = await response.json();
+      if (!response.ok || result.status === "error") throw new Error(result.error);
+
+      toast.success("Dokumen administratif berhasil didistribusikan!");
+      setShowUploadDialog(false);
+      setUploadForm({ name: "", jenis: "", file: null, recipients: [] });
+      setSelectedProdiId("all");
+      fetchData(); 
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan sistem.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleViewDetail = (doc: DistributedDocument) => {
-    setSelectedDocument(doc);
-    setShowDetailDialog(true);
-  };
+  const handleDelete = async (doc: DistributedDocument) => {
+    if (!window.confirm(`Hapus dokumen "${doc.nama}"?`)) return;
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${doc.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await response.json();
+      if (!response.ok || result.status === "error") throw new Error(result.error);
 
-  const handleDelete = (doc: DistributedDocument) => {
-    setDocuments(documents.filter((d) => d.id !== doc.id));
-    toast.success(`Dokumen "${doc.name}" berhasil dihapus`);
+      toast.success("Dokumen berhasil dihapus.");
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus.");
+    }
   };
 
   const toggleRecipient = (dosenId: string) => {
@@ -319,14 +208,21 @@ export function DocumentDistributionPage() {
     }));
   };
 
-  const toggleAllRecipients = () => {
-    setUploadForm((prev) => ({
-      ...prev,
-      recipients:
-        prev.recipients.length === allDosen.length
-          ? []
-          : allDosen.map((d) => d.id),
-    }));
+  const toggleAllFilteredRecipients = () => {
+    const filteredIds = filteredDosenForUpload.map((d) => d.id);
+    const allSelected = filteredIds.every((id) => uploadForm.recipients.includes(id));
+
+    if (allSelected) {
+      setUploadForm((prev) => ({
+        ...prev,
+        recipients: prev.recipients.filter((id) => !filteredIds.includes(id)),
+      }));
+    } else {
+      setUploadForm((prev) => ({
+        ...prev,
+        recipients: Array.from(new Set([...prev.recipients, ...filteredIds])),
+      }));
+    }
   };
 
   return (
@@ -338,13 +234,10 @@ export function DocumentDistributionPage() {
       ]}
     >
       <div className="space-y-4 max-w-7xl">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Distribusi Dokumen</h2>
-            <p className="text-sm text-muted-foreground">
-              Kelola dan distribusikan dokumen ke dosen
-            </p>
+            <p className="text-sm text-muted-foreground">Kelola dan distribusikan dokumen ke dosen</p>
           </div>
           <Button onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
@@ -352,135 +245,20 @@ export function DocumentDistributionPage() {
           </Button>
         </div>
 
-        {/* Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Total Dokumen</p>
-                <p className="text-3xl font-bold">{counts.all}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Terdistribusi</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {counts.distributed}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-3xl font-bold text-orange-600">
-                  {counts.pending}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground">Draft</p>
-                <p className="text-3xl font-bold text-gray-600">
-                  {counts.draft}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-3">
-              <div className="flex-1 min-w-[250px]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari berdasarkan nama dokumen..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-              </div>
-
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="distributed">Terdistribusi</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={filterRecipient}
-                onValueChange={setFilterRecipient}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Penerima" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Penerima</SelectItem>
-                  {allDosen.map((dosen) => (
-                    <SelectItem key={dosen.id} value={dosen.id}>
-                      {dosen.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !dateRange.from &&
-                        !dateRange.to &&
-                        "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from && dateRange.to
-                      ? `${format(dateRange.from, "dd/MM/yy")} - ${format(
-                          dateRange.to,
-                          "dd/MM/yy"
-                        )}`
-                      : "Pilih Tanggal"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    selected={{ from: dateRange.from, to: dateRange.to }}
-                    onSelect={(range) => setDateRange(range || {})}
-                    numberOfMonths={2}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              {hasActiveFilters && (
-                <Button variant="outline" onClick={resetFilters}>
-                  <X className="w-4 h-4 mr-2" />
-                  Reset
-                </Button>
-              )}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari berdasarkan nama dokumen..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Documents Table */}
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -489,86 +267,34 @@ export function DocumentDistributionPage() {
                   <TableHead>Nama Dokumen</TableHead>
                   <TableHead>Jenis</TableHead>
                   <TableHead>Tanggal Upload</TableHead>
-                  <TableHead>Penerima</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Diterima</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDocuments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <FileText className="w-8 h-8" />
-                        <p>Tidak ada dokumen yang sesuai filter</p>
-                        {hasActiveFilters && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={resetFilters}
-                          >
-                            Reset Filter
-                          </Button>
-                        )}
-                      </div>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      Tidak ada dokumen administratif.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredDocuments.map((doc) => (
                     <TableRow key={doc.id}>
-                      <TableCell className="font-medium">{doc.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{doc.jenis}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {format(new Date(doc.uploadDate), "dd MMM yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">{doc.totalRecipients}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(doc.status)}</TableCell>
-                      <TableCell>
-                        {doc.status !== "draft" && (
-                          <span className="text-sm">
-                            {doc.receivedCount}/{doc.totalRecipients}
-                          </span>
-                        )}
-                      </TableCell>
+                      <TableCell className="font-medium">{doc.nama}</TableCell>
+                      <TableCell><Badge variant="secondary">{doc.jenis_dokumen}</Badge></TableCell>
+                      <TableCell className="text-sm">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
+                            <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleViewDetail(doc)}
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              Lihat Detail
+                            <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDetailDialog(true); }}>
+                              <Eye className="w-4 h-4 mr-2" /> Lihat Detail
                             </DropdownMenuItem>
-                            {doc.status === "draft" && (
-                              <DropdownMenuItem>
-                                <Send className="w-4 h-4 mr-2" />
-                                Distribusikan Sekarang
-                              </DropdownMenuItem>
-                            )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(doc)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Hapus
+                            <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-destructive">
+                              <Trash2 className="w-4 h-4 mr-2" /> Hapus
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -580,10 +306,6 @@ export function DocumentDistributionPage() {
             </Table>
           </CardContent>
         </Card>
-
-        <div className="text-sm text-muted-foreground">
-          Menampilkan {filteredDocuments.length} dari {documents.length} dokumen
-        </div>
       </div>
 
       {/* Upload Dialog */}
@@ -591,9 +313,6 @@ export function DocumentDistributionPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Upload Dokumen Baru</DialogTitle>
-            <DialogDescription>
-              Upload dan distribusikan dokumen ke dosen
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -601,104 +320,106 @@ export function DocumentDistributionPage() {
               <Label>Nama Dokumen *</Label>
               <Input
                 value={uploadForm.name}
-                onChange={(e) =>
-                  setUploadForm({ ...uploadForm, name: e.target.value })
-                }
-                placeholder="Contoh: SK Mengajar Semester Genap 2025/2026"
+                onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
+                placeholder="Contoh: SK Mengajar Semester Genap"
               />
             </div>
 
             <div className="space-y-2">
               <Label>Jenis Dokumen *</Label>
-              <Select
-                value={uploadForm.jenis}
-                onValueChange={(value) =>
-                  setUploadForm({ ...uploadForm, jenis: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih jenis dokumen" />
-                </SelectTrigger>
+              <Select value={uploadForm.jenis} onValueChange={(val) => setUploadForm({ ...uploadForm, jenis: val })}>
+                <SelectTrigger><SelectValue placeholder="Pilih jenis dokumen" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SK">SK</SelectItem>
-                  <SelectItem value="Surat Tugas">Surat Tugas</SelectItem>
-                  <SelectItem value="Jadwal">Jadwal</SelectItem>
-                  <SelectItem value="Pengumuman">Pengumuman</SelectItem>
+                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
+                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
+                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
+                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
+                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
+                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
+                  <SelectItem value="FOTO">FOTO</SelectItem>
+                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+
+
+               
+
             <div className="space-y-2">
-              <Label>File Dokumen *</Label>
-              <div className="border-2 border-dashed rounded-lg p-6 text-center">
+              <Label>File Dokumen (PDF/DOCX) *</Label>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".pdf,.docx"
+                onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
+              />
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent/50 transition-colors"
+              >
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm">Drag & drop atau klik untuk upload</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  PDF, maksimal 10MB
+                <p className="text-sm font-medium">
+                  {uploadForm.file ? uploadForm.file.name : "Klik untuk memilih file dokumen"}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Pilih Penerima *</Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleAllRecipients}
-                >
-                  {uploadForm.recipients.length === allDosen.length
-                    ? "Hapus Semua"
-                    : "Pilih Semua"}
-                </Button>
-              </div>
-              <div className="border rounded-lg p-3 space-y-2 max-h-[200px] overflow-y-auto">
-                {allDosen.map((dosen) => (
-                  <div key={dosen.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`dosen-${dosen.id}`}
-                      checked={uploadForm.recipients.includes(dosen.id)}
-                      onCheckedChange={() => toggleRecipient(dosen.id)}
-                    />
-                    <Label
-                      htmlFor={`dosen-${dosen.id}`}
-                      className="flex-1 cursor-pointer text-sm"
-                    >
-                      {dosen.name} ({dosen.programStudi})
-                    </Label>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {uploadForm.recipients.length} dosen dipilih
-              </p>
+            {/* BARU: Dropdown Filter Program Studi Sebelum Checkbox List */}
+            <div className="space-y-2 bg-muted p-3 rounded-lg border">
+              <Label className="text-xs font-semibold uppercase tracking-wider">Filter Program Studi Dosen</Label>
+              <Select value={selectedProdiId} onValueChange={setSelectedProdiId}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Pilih Program Studi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Program Studi</SelectItem>
+                  {uniqueProdis.map((prodi) => (
+                    <SelectItem key={prodi.id} value={prodi.id}>
+                      {prodi.nama_prodi}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="send-now"
-                checked={uploadForm.sendNow}
-                onCheckedChange={(checked) =>
-                  setUploadForm({ ...uploadForm, sendNow: !!checked })
-                }
-              />
-              <Label htmlFor="send-now" className="cursor-pointer">
-                Distribusikan sekarang
-              </Label>
+            {/* Checkbox List Dosen Terfilter */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Pilih Penerima Dokumen *</Label>
+                <Button variant="outline" size="sm" onClick={toggleAllFilteredRecipients}>
+                  Pilih / Hapus Semua Terfilter
+                </Button>
+              </div>
+              <div className="border rounded-lg p-3 space-y-2 max-h-[200px] overflow-y-auto bg-background">
+                {filteredDosenForUpload.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Tidak ada dosen di prodi ini.</p>
+                ) : (
+                  filteredDosenForUpload.map((dosen) => (
+                    <div key={dosen.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`dosen-${dosen.id}`}
+                        checked={uploadForm.recipients.includes(dosen.id)}
+                        onCheckedChange={() => toggleRecipient(dosen.id)}
+                      />
+                      <Label htmlFor={`dosen-${dosen.id}`} className="flex-1 cursor-pointer text-sm">
+                        {dosen.nama} (NIP: {dosen.nip}) {selectedProdiId === "all" && dosen.program_studi ? `[${dosen.program_studi.nama_prodi}]` : ""}
+                      </Label>
+                    </div>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {uploadForm.recipients.length} dosen total dipilih dari seluruh prodi.
+              </p>
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowUploadDialog(false)}
-            >
-              Batal
-            </Button>
-            <Button onClick={handleUpload}>
-              {uploadForm.sendNow
-                ? "Upload & Distribusikan"
-                : "Simpan sebagai Draft"}
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>Batal</Button>
+            <Button onClick={handleUpload} disabled={isSubmitting}>
+              {isSubmitting ? "Mengunggah..." : "Upload & Distribusikan"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -707,58 +428,23 @@ export function DocumentDistributionPage() {
       {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detail Dokumen</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>Detail Dokumen Administratif</DialogTitle></DialogHeader>
           {selectedDocument && (
             <div className="space-y-4">
               <div>
-                <Label className="text-sm text-muted-foreground">
-                  Nama Dokumen
-                </Label>
-                <p className="font-medium">{selectedDocument.name}</p>
+                <Label className="text-sm text-muted-foreground">Nama Dokumen</Label>
+                <p className="font-semibold text-base">{selectedDocument.nama}</p>
               </div>
               <div>
-                <Label className="text-sm text-muted-foreground">Status</Label>
-                <div className="mt-1">
-                  {getStatusBadge(selectedDocument.status)}
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">
-                  Daftar Penerima
-                </Label>
-                <div className="mt-2 border rounded-lg divide-y max-h-[300px] overflow-y-auto">
-                  {selectedDocument.recipientNames.length === 0 ? (
-                    <p className="p-3 text-sm text-muted-foreground">
-                      Belum ada penerima
-                    </p>
-                  ) : (
-                    selectedDocument.recipientNames.map((name, index) => (
-                      <div
-                        key={index}
-                        className="p-3 flex items-center justify-between"
-                      >
-                        <span className="text-sm">{name}</span>
-                        <Badge variant="secondary">
-                          {index === 0 ? "Diterima" : "Belum"}
-                        </Badge>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <Label className="text-sm text-muted-foreground">Lokasi S3 Storage</Label>
+                <p className="text-xs break-all text-blue-600 underline">
+                  <a href={selectedDocument.file_path} target="_blank" rel="noreferrer">{selectedDocument.file_path}</a>
+                </p>
               </div>
             </div>
           )}
-
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDetailDialog(false)}
-            >
-              Tutup
-            </Button>
+            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>Tutup</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

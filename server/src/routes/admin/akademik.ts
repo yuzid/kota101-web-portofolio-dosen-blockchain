@@ -9,7 +9,9 @@ const router = Router();
 // JURUSAN
 // ═══════════════════════════════════════════════════════
 
+// ───────────────────────────────────────────
 // GET /api/admin/akademik/jurusan
+// ───────────────────────────────────────────
 router.get('/jurusan', asyncHandler(async (req: AuthRequest, res: Response) => {
   const data = await prisma.jurusan.findMany({
     include: {
@@ -22,7 +24,9 @@ router.get('/jurusan', asyncHandler(async (req: AuthRequest, res: Response) => {
   res.json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // GET /api/admin/akademik/jurusan/:id
+// ───────────────────────────────────────────
 router.get('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
 
@@ -43,8 +47,10 @@ router.get('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Response) 
   res.json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // POST /api/admin/akademik/jurusan
 // Body: { kode_jurusan, nama_jurusan }
+// ───────────────────────────────────────────
 router.post('/jurusan', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { kode_jurusan, nama_jurusan } = req.body;
 
@@ -69,8 +75,10 @@ router.post('/jurusan', asyncHandler(async (req: AuthRequest, res: Response) => 
   res.status(201).json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // PATCH /api/admin/akademik/jurusan/:id
 // Body: { kode_jurusan?, nama_jurusan? }
+// ───────────────────────────────────────────
 router.patch('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
   const { kode_jurusan, nama_jurusan } = req.body;
@@ -104,7 +112,9 @@ router.patch('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Response
   res.json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // DELETE /api/admin/akademik/jurusan/:id
+// ───────────────────────────────────────────
 router.delete('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
 
@@ -135,7 +145,9 @@ router.delete('/jurusan/:id', asyncHandler(async (req: AuthRequest, res: Respons
 // PROGRAM STUDI
 // ═══════════════════════════════════════════════════════
 
+// ───────────────────────────────────────────
 // GET /api/admin/akademik/prodi?jurusan_id=...
+// ───────────────────────────────────────────
 router.get('/prodi', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { jurusan_id } = req.query;
 
@@ -169,8 +181,10 @@ router.get('/prodi/:id', asyncHandler(async (req: AuthRequest, res: Response) =>
   res.json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // POST /api/admin/akademik/prodi
 // Body: { kode_prodi, nama_prodi, jurusan_id }
+// ───────────────────────────────────────────
 router.post('/prodi', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { kode_prodi, nama_prodi, jurusan_id } = req.body;
 
@@ -203,8 +217,10 @@ router.post('/prodi', asyncHandler(async (req: AuthRequest, res: Response) => {
   res.status(201).json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // PATCH /api/admin/akademik/prodi/:id
 // Body: { kode_prodi?, nama_prodi?, jurusan_id? }
+// ───────────────────────────────────────────
 router.patch('/prodi/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
   const { kode_prodi, nama_prodi, jurusan_id } = req.body;
@@ -248,7 +264,9 @@ router.patch('/prodi/:id', asyncHandler(async (req: AuthRequest, res: Response) 
   res.json({ status: 'success', data });
 }));
 
+// ───────────────────────────────────────────
 // DELETE /api/admin/akademik/prodi/:id
+// ───────────────────────────────────────────
 router.delete('/prodi/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
 

@@ -71,10 +71,12 @@ model Admin {
 }
 
 model TataUsaha {
-  id   String @id @db.Uuid
-  nip  String @unique @db.VarChar(50)
-  nama String @db.VarChar(255)
-  user User   @relation(fields: [id], references: [id], onDelete: Cascade)
+  id         String  @id @db.Uuid
+  nip        String  @unique @db.VarChar(50)
+  nama       String  @db.VarChar(255)
+  jurusan_id String  @db.Uuid
+  user       User    @relation(fields: [id], references: [id], onDelete: Cascade)
+  jurusan    Jurusan @relation(fields: [jurusan_id], references: [id])
 
   @@map("tata_usaha")
 }
@@ -115,7 +117,8 @@ model Jurusan {
   nama_jurusan  String         @db.VarChar(255)
   program_studi ProgramStudi[]
   jabatan_kajur JabatanKajur[]
-
+  tata_usaha    TataUsaha[]    // Tambahkan ini agar sinkron
+  
   @@map("jurusan")
 }
 
@@ -162,6 +165,7 @@ model Dokumen {
   hash_file         String               @db.VarChar(255)
   sumber_dokumen    SumberDokumen
   tanggal_upload    DateTime             @db.Date
+  deleted_at        DateTime?            @db.Timestamp
   uploader          Dosen                @relation(fields: [uploader_dosen_id], references: [id])
   kepemilikan       KepemilikanDokumen[]
   lampiran_bukti    LampiranBukti[]

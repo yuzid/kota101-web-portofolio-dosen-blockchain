@@ -28,14 +28,17 @@ services:
     environment:
       - PORT=3000
       - NODE_ENV=development
+      - AWS_REGION=ap-southeast-1
       - DATABASE_URL=postgresql://portfolio_user:secretpassword@postgres_db:5432/portfolio_blockchain_db
       - MULTICHAIN_RPC_URL=http://multichain_node:4242
-      - AWS_S3_BUCKET=dosen-portfolio-bucket
+      - AWS_S3_BUCKET=kota101-ta
       - JWT_SECRET=your-super-secret-key-change-this-in-production
       - ADMIN_EMAIL=admin@university.ac.id
       - ADMIN_PASSWORD=AdminPassword123
       - ADMIN_NAME=Administrator
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     depends_on:
       postgres_db:
         condition: service_healthy
