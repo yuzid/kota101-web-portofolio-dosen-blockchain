@@ -39,6 +39,15 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - CHAIN_NAME=${CHAIN_NAME}
+      - D3_IP=${D3_IP}
+      - D3_RPC_PORT=${D3_RPC_PORT}
+      - D3_RPC_USERNAME=${D3_RPC_USERNAME}
+      - D3_RPC_PASSWORD=${D3_RPC_PASSWORD}
+      - D4_IP=${D4_IP}
+      - D4_RPC_PORT=${D4_RPC_PORT}
+      - D4_RPC_USERNAME=${D4_RPC_USERNAME}
+      - D4_RPC_PASSWORD=${D4_RPC_PASSWORD}
     depends_on:
       postgres_db:
         condition: service_healthy
