@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -6,13 +7,50 @@ import { Badge } from '../components/ui/badge';
 import {
   FileText, Activity, FolderOpen, Bell, Users, Send,
   TrendingUp, BookOpen, AlertCircle, Plus, Eye, CheckCircle2,
-  Clock, FileCheck, BarChart3
+  Clock, FileCheck, BarChart3, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [stats, setStats] = useState<any>(null);
+  const [incompleteActivities, setIncompleteActivities] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    if (user?.roles?.includes('dosen')) {
+      fetchDosenDashboardData();
+    }
+  }, [user]);
+
+  const fetchDosenDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const [statsRes, incompleteRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/stats/summary`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/filter/tanpa-bukti`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      const statsData = await statsRes.json();
+      const incompleteData = await incompleteRes.json();
+
+      if (statsData.status === 'success') setStats(statsData.data);
+      if (incompleteData.status === 'success') setIncompleteActivities(incompleteData.data);
+    } catch (error) {
+      console.error('Gagal memuat data dashboard:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -22,7 +60,7 @@ export function DashboardPage() {
   };
 
   // Dashboard for Admin TU
-  if (user?.roles.includes('admin_tu')) {
+  if (user?.roles?.includes('admin_tu')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -155,7 +193,7 @@ export function DashboardPage() {
   }
 
   // Dashboard for Dosen (includes dosen+kaprodi, dosen+kajur)
-  if (user?.roles.includes('dosen')) {
+  if (user?.roles?.includes('dosen')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -176,21 +214,21 @@ export function DashboardPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Kegiatan Tridharma</CardDescription>
-                <CardTitle className="text-3xl">24</CardTitle>
+                <CardTitle className="text-3xl">{stats?.total || 0}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
                     <span>Pengajaran</span>
-                    <span className="font-medium">12</span>
+                    <span className="font-medium">{stats?.pengajaran || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Penelitian</span>
-                    <span className="font-medium">7</span>
+                    <span className="font-medium">{stats?.penelitian || 0}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Pengabdian</span>
-                    <span className="font-medium">5</span>
+                    <span className="font-medium">{stats?.pengabdian || 0}</span>
                   </div>
                 </div>
               </CardContent>
@@ -199,7 +237,7 @@ export function DashboardPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Kegiatan Tanpa Bukti</CardDescription>
-                <CardTitle className="text-3xl text-orange-500">5</CardTitle>
+                <CardTitle className="text-3xl text-orange-500">{stats?.tanpa_bukti || 0}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Button
@@ -216,7 +254,7 @@ export function DashboardPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Dokumen Bukti</CardDescription>
-                <CardTitle className="text-3xl">42</CardTitle>
+                <CardTitle className="text-3xl">{stats?.total_dokumen || 0}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">Terverifikasi integritas</p>
@@ -226,7 +264,7 @@ export function DashboardPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Notifikasi Belum Dibaca</CardDescription>
-                <CardTitle className="text-3xl">3</CardTitle>
+                <CardTitle className="text-3xl">0</CardTitle>
               </CardHeader>
               <CardContent>
                 <Button
@@ -253,26 +291,26 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { name: 'Mata Kuliah Pemrograman Web', type: 'Pengajaran', date: '15 Jan 2026' },
-                  { name: 'Penelitian Blockchain dalam Pendidikan', type: 'Penelitian', date: '12 Jan 2026' },
-                  { name: 'Pengabdian Masyarakat Desa Cikoneng', type: 'Pengabdian', date: '10 Jan 2026' },
-                  { name: 'Koordinator Lab Komputer', type: 'Tugas Tambahan', date: '8 Jan 2026' },
-                  { name: 'Seminar Nasional AI 2026', type: 'Penelitian', date: '5 Jan 2026' },
-                ].map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border border-orange-200 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-orange-500" />
-                      <div>
-                        <p className="font-medium text-sm">{activity.name}</p>
-                        <p className="text-xs text-muted-foreground">{activity.type} • {activity.date}</p>
+                {isLoading ? (
+                  <div className="flex justify-center py-4"><Loader2 className="w-6 h-6 animate-spin" /></div>
+                ) : incompleteActivities.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground text-sm">Semua kegiatan sudah memiliki bukti. Luar biasa!</div>
+                ) : (
+                  incompleteActivities.map((activity, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border border-orange-200 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5 text-orange-500" />
+                        <div>
+                          <p className="font-medium text-sm">{activity.name}</p>
+                          <p className="text-xs text-muted-foreground">{activity.type} • {format(new Date(activity.date), "dd MMM yyyy", { locale: localeId })}</p>
+                        </div>
                       </div>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/activities/${activity.id}/edit`)}>
+                        Tambah Bukti
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/activities')}>
-                      Tambah Bukti
-                    </Button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
               <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/activities')}>
                 Lihat Semua Kegiatan
@@ -311,7 +349,7 @@ export function DashboardPage() {
   }
 
   // Dashboard for Kaprodi (who is not also dosen)
-  if (user?.roles.includes('kaprodi') && !user?.roles.includes('dosen')) {
+  if (user?.roles?.includes('kaprodi') && !user?.roles?.includes('dosen')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -433,7 +471,7 @@ export function DashboardPage() {
   }
 
   // Dashboard for Kajur (who is not also dosen)
-  if (user?.roles.includes('kajur') && !user?.roles.includes('dosen')) {
+  if (user?.roles?.includes('kajur') && !user?.roles?.includes('dosen')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -556,7 +594,7 @@ export function DashboardPage() {
   }
 
   // Dashboard for Administrator
-  if (user?.roles.includes('administrator')) {
+  if (user?.roles?.includes('administrator')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">

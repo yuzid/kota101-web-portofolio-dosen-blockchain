@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -26,6 +26,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import {
   Dialog,
@@ -34,7 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Plus, Search, Eye, Edit, Trash2, Share2, X, MoreVertical, Copy, Link as LinkIcon } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, Share2, X, MoreVertical, Copy, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 
@@ -45,74 +46,10 @@ interface Activity {
   kategori: string;
   periode: string;
   semester: 'ganjil' | 'genap';
-  tahunAkademik: string;
   role: 'pencatat' | 'anggota';
   buktiCount: number;
   updatedAt: string;
 }
-
-const mockActivities: Activity[] = [
-  {
-    id: '1',
-    name: 'Mata Kuliah Pemrograman Web',
-    jenisTridharma: 'pengajaran',
-    kategori: 'Mengajar',
-    periode: 'Ganjil 2025/2026',
-    semester: 'ganjil',
-    tahunAkademik: '2025/2026',
-    role: 'pencatat',
-    buktiCount: 3,
-    updatedAt: '2026-05-16 10:30',
-  },
-  {
-    id: '2',
-    name: 'Penelitian Blockchain dalam Pendidikan',
-    jenisTridharma: 'penelitian',
-    kategori: 'Penelitian Mandiri',
-    periode: 'Ganjil 2025/2026',
-    semester: 'ganjil',
-    tahunAkademik: '2025/2026',
-    role: 'pencatat',
-    buktiCount: 5,
-    updatedAt: '2026-05-15 14:20',
-  },
-  {
-    id: '3',
-    name: 'Pengabdian Masyarakat Desa Cikoneng',
-    jenisTridharma: 'pengabdian',
-    kategori: 'Pengabdian Kepada Masyarakat',
-    periode: 'Genap 2024/2025',
-    semester: 'genap',
-    tahunAkademik: '2024/2025',
-    role: 'anggota',
-    buktiCount: 2,
-    updatedAt: '2026-05-10 09:15',
-  },
-  {
-    id: '4',
-    name: 'Koordinator Lab Komputer',
-    jenisTridharma: 'tugas_tambahan',
-    kategori: 'Koordinator Laboratorium',
-    periode: 'Ganjil 2025/2026',
-    semester: 'ganjil',
-    tahunAkademik: '2025/2026',
-    role: 'pencatat',
-    buktiCount: 1,
-    updatedAt: '2026-05-12 16:45',
-  },
-  {
-    id: '5',
-    name: 'Mata Kuliah Basis Data',
-    jenisTridharma: 'pengajaran',
-    kategori: 'Mengajar',
-    periode: 'Ganjil 2025/2026',
-    semester: 'ganjil',
-    tahunAkademik: '2025/2026',
-    role: 'pencatat',
-    buktiCount: 4,
-    updatedAt: '2026-05-08 11:20',
-  },
-];
 
 const jenisTridharmaLabels: Record<string, string> = {
   pengajaran: 'Pengajaran',
@@ -130,7 +67,8 @@ const jenisBadgeColors: Record<string, string> = {
 
 export function ActivitiesPage() {
   const navigate = useNavigate();
-  const [activities] = useState<Activity[]>(mockActivities);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('semua');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKategori, setFilterKategori] = useState('all');
@@ -140,13 +78,37 @@ export function ActivitiesPage() {
   const [shareLink, setShareLink] = useState('');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
+  const token = localStorage.getItem('token');
+
+  useEffect(() => {
+    fetchActivities();
+  }, []);
+
+  const fetchActivities = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setActivities(result.data);
+      } else {
+        toast.error(result.error || 'Gagal mengambil data kegiatan');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan koneksi ke server');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Filter activities
   const filteredActivities = activities.filter(activity => {
     const matchesTab = activeTab === 'semua' || activity.jenisTridharma === activeTab;
     const matchesSearch = activity.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSemester = filterSemester === 'all' || activity.semester === filterSemester;
-    const matchesTahun = filterTahun === 'all' || activity.tahunAkademik === filterTahun;
-    // Kategori filter would be dynamic based on jenis tridharma in production
+    const matchesTahun = filterTahun === 'all' || activity.periode === filterTahun;
     const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
 
     return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori;
@@ -172,8 +134,7 @@ export function ActivitiesPage() {
 
   const handleShare = (activity: Activity) => {
     setSelectedActivity(activity);
-    // Generate share link (mock)
-    const link = `${window.location.origin}/share/${activity.id}`;
+    const link = `${window.location.origin}/activities/${activity.id}`;
     setShareLink(link);
     setShowShareDialog(true);
   };
@@ -183,15 +144,33 @@ export function ActivitiesPage() {
       await navigator.clipboard.writeText(shareLink);
       toast.success('Link berhasil disalin!');
     } catch (err) {
-      // Fallback for when clipboard API is blocked
       toast.info(`Link: ${shareLink}`);
     }
   };
 
-  const handleDelete = (activity: Activity) => {
-    // In production, show confirmation dialog
-    toast.success(`Kegiatan "${activity.name}" berhasil dihapus.`);
+  const handleDelete = async (activity: Activity) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus kegiatan "${activity.name}"?`)) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${activity.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(`Kegiatan "${activity.name}" berhasil dihapus.`);
+        fetchActivities();
+      } else {
+        toast.error(result.error || 'Gagal menghapus kegiatan');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat menghapus kegiatan');
+    }
   };
+
+  // Unique years and categories for filters
+  const uniqueYears = Array.from(new Set(activities.map(a => a.periode))).sort().reverse();
+  const uniqueKategoris = Array.from(new Set(activities.map(a => a.kategori))).sort();
 
   return (
     <MainLayout
@@ -314,9 +293,9 @@ export function ActivitiesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Tahun</SelectItem>
-                  <SelectItem value="2025/2026">2025/2026</SelectItem>
-                  <SelectItem value="2024/2025">2024/2025</SelectItem>
-                  <SelectItem value="2023/2024">2023/2024</SelectItem>
+                  {uniqueYears.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -329,7 +308,7 @@ export function ActivitiesPage() {
             </div>
 
             {/* Table */}
-            <div className="border rounded-lg">
+            <div className="border rounded-lg bg-background">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -339,16 +318,22 @@ export function ActivitiesPage() {
                     <TableHead>Periode</TableHead>
                     <TableHead>Peran</TableHead>
                     <TableHead className="text-center">Bukti</TableHead>
-                    <TableHead>Diperbarui</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredActivities.length === 0 ? (
+                  {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-20">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                        <p className="mt-2 text-muted-foreground">Memuat kegiatan...</p>
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredActivities.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <p>Tidak ada kegiatan yang sesuai dengan filter</p>
+                          <p>Tidak ada kegiatan yang ditemukan</p>
                           {hasActiveFilters && (
                             <Button variant="outline" size="sm" onClick={resetFilters}>
                               Reset Filter
@@ -374,7 +359,9 @@ export function ActivitiesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm">{activity.kategori}</TableCell>
-                        <TableCell className="text-sm">{activity.periode}</TableCell>
+                        <TableCell className="text-sm">
+                          {activity.semester === 'ganjil' ? 'Ganjil' : 'Genap'} {activity.periode}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={activity.role === 'pencatat' ? 'default' : 'secondary'}>
                             {activity.role === 'pencatat' ? 'Pencatat' : 'Anggota'}
@@ -382,9 +369,6 @@ export function ActivitiesPage() {
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="text-sm font-medium">{activity.buktiCount}</span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {activity.updatedAt}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -398,20 +382,25 @@ export function ActivitiesPage() {
                                 <Eye className="w-4 h-4 mr-2" />
                                 Lihat Detail
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/activities/${activity.id}/edit`)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
+                              {activity.role === 'pencatat' && (
+                                <>
+                                  <DropdownMenuItem onClick={() => navigate(`/activities/${activity.id}/edit`)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDelete(activity)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                               <DropdownMenuItem onClick={() => handleShare(activity)}>
                                 <Share2 className="w-4 h-4 mr-2" />
                                 Bagikan
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(activity)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Hapus
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -423,9 +412,11 @@ export function ActivitiesPage() {
               </Table>
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              Menampilkan {filteredActivities.length} dari {counts[activeTab as keyof typeof counts]} kegiatan
-            </div>
+            {!isLoading && (
+              <div className="text-sm text-muted-foreground">
+                Menampilkan {filteredActivities.length} dari {counts[activeTab as keyof typeof counts]} kegiatan
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

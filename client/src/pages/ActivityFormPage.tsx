@@ -31,6 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import { Calendar } from "../components/ui/calendar";
 import {
   Popover,
@@ -45,8 +51,10 @@ import {
   Trash2,
   Highlighter,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
@@ -63,57 +71,9 @@ interface Document {
   name: string;
   jenis: string;
   tanggal: string;
-  uploadedBy: string; // ID dosen yang upload
-  uploadedByName: string; // Nama dosen yang upload
+  uploadedBy: string;
+  uploadedByName: string;
 }
-
-const mockDosen: Dosen[] = [
-  {
-    id: "1",
-    name: "Dr. Ahmad Fauzi",
-    nidn: "0420059102",
-    programStudi: "D4 Teknik Informatika",
-  },
-  {
-    id: "2",
-    name: "Dr. Siti Nurhaliza",
-    nidn: "0405067801",
-    programStudi: "D4 Teknik Informatika",
-  },
-  {
-    id: "3",
-    name: "Prof. Budi Santoso",
-    nidn: "0418088902",
-    programStudi: "D3 Teknik Informatika",
-  },
-];
-
-const mockDocuments: Document[] = [
-  {
-    id: "1",
-    name: "Sertifikat Pelatihan Web Development",
-    jenis: "Sertifikat",
-    tanggal: "2026-05-10",
-    uploadedBy: "1",
-    uploadedByName: "Dr. John Doe",
-  },
-  {
-    id: "2",
-    name: "Laporan Penelitian Blockchain",
-    jenis: "Laporan Kegiatan",
-    tanggal: "2026-04-15",
-    uploadedBy: "1",
-    uploadedByName: "Dr. John Doe",
-  },
-  {
-    id: "3",
-    name: "Artikel Jurnal - IoT in Education",
-    jenis: "Artikel Jurnal",
-    tanggal: "2026-03-20",
-    uploadedBy: "2",
-    uploadedByName: "Dr. Ahmad Fauzi",
-  },
-];
 
 const kategoriByJenis: Record<string, string[]> = {
   pengajaran: [
@@ -162,26 +122,116 @@ export function ActivityFormPage() {
   const [anggota, setAnggota] = useState<Dosen[]>([]);
   const [searchAnggota, setSearchAnggota] = useState("");
   const [lampiran, setLampiran] = useState<Document[]>([]);
+  const [availableDosen, setAvailableDosen] = useState<Dosen[]>([]);
+  const [availableDocs, setAvailableDocs] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDocPicker, setShowDocPicker] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const token = localStorage.getItem('token');
+
   useEffect(() => {
+    fetchDosenList();
+    fetchMyDocuments();
     if (isEdit) {
-      // Load existing data
-      setFormData({
-        namaKegiatan: "Mata Kuliah Pemrograman Web",
-        jenisTridharma: "pengajaran",
-        kategori: "Mengajar",
-        tanggalMulai: new Date("2026-01-15"),
-        tanggalSelesai: new Date("2026-05-30"),
-        tahunAkademik: "2025/2026",
-        semester: "ganjil",
-        sumberDana: "DIPA POLBAN",
-        biaya: "5000000",
-      });
-      setLampiran([mockDocuments[0], mockDocuments[1]]);
+      fetchActivityForEdit();
     }
   }, [isEdit]);
+
+  const fetchDosenList = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=DOSEN`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const mapped = result.data.map((u: any) => ({
+          id: u.id,
+          name: u.dosen?.nama || u.email,
+          nidn: u.dosen?.nidn || u.dosen?.nip,
+          programStudi: u.dosen?.program_studi?.nama_prodi || 'Tidak ada prodi'
+        }));
+        setAvailableDosen(mapped);
+      }
+    } catch (error) {
+      console.error('Gagal memuat daftar dosen:', error);
+    }
+  };
+
+  const fetchMyDocuments = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const mapped = result.data.map((d: any) => ({
+          id: d.id,
+          name: d.name,
+          jenis: d.jenis,
+          tanggal: d.tanggal,
+          uploadedBy: user?.id,
+          uploadedByName: user?.name
+        }));
+        setAvailableDocs(mapped);
+      }
+    } catch (error) {
+      console.error('Gagal memuat dokumen:', error);
+    }
+  };
+
+  const fetchActivityForEdit = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        const act = result.data;
+        setFormData({
+          namaKegiatan: act.namaKegiatan,
+          jenisTridharma: act.jenisTridharma,
+          kategori: act.kategori,
+          tanggalMulai: new Date(act.tanggalMulai),
+          tanggalSelesai: new Date(act.tanggalSelesai),
+          tahunAkademik: act.tahunAkademik,
+          semester: act.semester,
+          sumberDana: act.sumberDana || "",
+          biaya: act.biaya?.toString() || "",
+        });
+
+        // Set anggota (exclude current user)
+        const members = act.dosenTerlibat
+          .filter((d: any) => d.id !== user?.id)
+          .map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            nidn: d.nidn,
+            programStudi: "" // Backend doesn't return prodi in detail currently
+          }));
+        setAnggota(members);
+
+        // Set lampiran
+        const docs = act.dosenTerlibat.flatMap((d: any) => 
+          d.dokumen.map((doc: any) => ({
+            id: doc.id,
+            name: doc.name,
+            jenis: doc.jenis,
+            tanggal: doc.tanggalUpload,
+            uploadedBy: d.id,
+            uploadedByName: d.name
+          }))
+        );
+        setLampiran(docs);
+      }
+    } catch (error) {
+      toast.error('Gagal memuat data kegiatan');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -220,24 +270,66 @@ export function ActivityFormPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) {
       toast.error("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
 
-    if (isEdit) {
-      toast.success("Kegiatan berhasil diperbarui.");
-      navigate(`/activities/${id}`);
-    } else {
-      toast.success("Kegiatan berhasil dicatat.");
-      navigate("/activities");
+    setIsLoading(true);
+    try {
+      const payload = {
+        ...formData,
+        anggota_ids: anggota.map(a => a.id),
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.id).map(l => l.id)
+      };
+
+      const url = isEdit 
+        ? `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`;
+      
+      const response = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
+        navigate(isEdit ? `/activities/${id}` : "/activities");
+      } else {
+        toast.error(result.error || 'Gagal menyimpan kegiatan');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat menyimpan');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleDelete = () => {
-    toast.success(`Kegiatan "${formData.namaKegiatan}" berhasil dihapus.`);
-    navigate("/activities");
+  const handleDelete = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(`Kegiatan berhasil dihapus.`);
+        navigate("/activities");
+      } else {
+        toast.error(result.error || 'Gagal menghapus kegiatan');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAddAnggota = (dosen: Dosen) => {
@@ -251,13 +343,26 @@ export function ActivityFormPage() {
     setAnggota(anggota.filter((a) => a.id !== dosenId));
   };
 
-  const filteredDosen = mockDosen.filter(
+  const filteredDosen = availableDosen.filter(
     (d) =>
       d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
-      !anggota.find((a) => a.id === d.id)
+      !anggota.find((a) => a.id === d.id) &&
+      d.id !== user?.id
   );
 
-  const getInitials = (name: string) => {
+  const handleAddDoc = (doc: Document) => {
+    if (!lampiran.find(l => l.id === doc.id)) {
+      setLampiran([...lampiran, doc]);
+    }
+    setShowDocPicker(false);
+  };
+
+  const handleRemoveDoc = (docId: string) => {
+    setLampiran(lampiran.filter(l => l.id !== docId));
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return "U";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -275,7 +380,13 @@ export function ActivityFormPage() {
         { label: isEdit ? "Edit" : "Tambah Kegiatan Baru" },
       ]}
     >
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-4xl relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          </div>
+        )}
+
         {/* Section 1: Informasi Kegiatan */}
         <Card>
           <CardHeader>
@@ -391,7 +502,7 @@ export function ActivityFormPage() {
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {formData.tanggalMulai
-                        ? format(formData.tanggalMulai, "dd MMMM yyyy")
+                        ? format(formData.tanggalMulai, "dd MMMM yyyy", { locale: localeId })
                         : "Pilih tanggal"}
                     </Button>
                   </PopoverTrigger>
@@ -428,7 +539,7 @@ export function ActivityFormPage() {
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {formData.tanggalSelesai
-                        ? format(formData.tanggalSelesai, "dd MMMM yyyy")
+                        ? format(formData.tanggalSelesai, "dd MMMM yyyy", { locale: localeId })
                         : "Pilih tanggal"}
                     </Button>
                   </PopoverTrigger>
@@ -562,11 +673,6 @@ export function ActivityFormPage() {
                 </Avatar>
                 <div>
                   <p className="font-medium">{user?.name}</p>
-                  {user?.nidn && (
-                    <p className="text-xs text-muted-foreground font-mono">
-                      NIDN: {user.nidn}
-                    </p>
-                  )}
                   <p className="text-sm text-muted-foreground">
                     {user?.programStudi}
                   </p>
@@ -606,7 +712,7 @@ export function ActivityFormPage() {
                           <p className="font-medium text-sm">{dosen.name}</p>
                           {dosen.nidn && (
                             <p className="text-xs text-muted-foreground font-mono">
-                              NIDN: {dosen.nidn}
+                              ID/NIP: {dosen.nidn}
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">
@@ -623,26 +729,21 @@ export function ActivityFormPage() {
             {/* Added Members */}
             {anggota.length > 0 && (
               <div className="space-y-2">
-                {anggota.map((dosen) => (
+                {anggota.map((d) => (
                   <div
-                    key={dosen.id}
+                    key={d.id}
                     className="flex items-center justify-between p-3 border rounded-lg"
                   >
                     <div className="flex items-center gap-3">
                       <Avatar>
                         <AvatarFallback>
-                          {getInitials(dosen.name)}
+                          {getInitials(d.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-medium">{dosen.name}</p>
-                        {dosen.nidn && (
-                          <p className="text-xs text-muted-foreground font-mono">
-                            NIDN: {dosen.nidn}
-                          </p>
-                        )}
+                        <p className="font-medium">{d.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {dosen.programStudi}
+                          {d.programStudi || 'Anggota Eksternal/Lainnya'}
                         </p>
                       </div>
                     </div>
@@ -651,7 +752,7 @@ export function ActivityFormPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveAnggota(dosen.id)}
+                        onClick={() => handleRemoveAnggota(d.id)}
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -668,197 +769,120 @@ export function ActivityFormPage() {
           <CardHeader>
             <CardTitle>Lampiran Bukti Kegiatan</CardTitle>
             <CardDescription>
-              Setiap dosen yang terlibat harus mengupload dokumen bukti
-              masing-masing
+              Lampirkan dokumen pendukung untuk memverifikasi kegiatan ini
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Dokumen per Dosen */}
-            {lampiran.length > 0 ? (
-              <div className="space-y-4">
-                {/* Group by dosen */}
-                {Array.from(new Set(lampiran.map((d) => d.uploadedBy))).map(
-                  (dosenId) => {
-                    const dosenDocs = lampiran.filter(
-                      (d) => d.uploadedBy === dosenId
-                    );
-                    const dosenName = dosenDocs[0]?.uploadedByName || "Unknown";
-                    const isCurrentUser = user?.name === dosenName;
-
-                    return (
-                      <div
-                        key={dosenId}
-                        className="border rounded-lg p-4 space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Avatar>
-                              <AvatarFallback>
-                                {getInitials(dosenName)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{dosenName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {dosenDocs.length} dokumen
-                              </p>
-                            </div>
-                          </div>
-                          {isCurrentUser && (
-                            <Badge className="bg-blue-500">Anda</Badge>
-                          )}
-                        </div>
-
-                        <div className="space-y-2 pl-12">
-                          {dosenDocs.map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                            >
-                              <div className="flex items-center gap-3">
-                                <FileText className="w-5 h-5 text-muted-foreground" />
-                                <div>
-                                  <p className="font-medium text-sm">
-                                    {doc.name}
-                                  </p>
-                                  <div className="flex gap-2 mt-1">
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
-                                      {doc.jenis}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground">
-                                      {doc.tanggal}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    navigate(`/documents/${doc.id}/preview`, {
-                                      state: {
-                                        allowHighlight: true,
-                                        breadcrumbs: [
-                                          {
-                                            label: "Beranda",
-                                            path: "/dashboard",
-                                          },
-                                          {
-                                            label: "Kegiatan Tridharma",
-                                            path: "/activities",
-                                          },
-                                          {
-                                            label: isEdit
-                                              ? "Edit Kegiatan"
-                                              : "Tambah Kegiatan Baru",
-                                            path: isEdit
-                                              ? `/activities/${id}/edit`
-                                              : "/activities/new",
-                                          },
-                                          { label: doc.name },
-                                        ],
-                                      },
-                                    })
-                                  }
-                                >
-                                  <Highlighter className="w-4 h-4" />
-                                </Button>
-                                {isCurrentUser && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {isCurrentUser && (
-                          <div className="pl-12">
-                            <Button variant="outline" size="sm">
-                              <Plus className="w-4 h-4 mr-2" />
-                              Tambah Dokumen
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                )}
-
-                {/* Dosen yang belum upload */}
-                {[user, ...anggota]
-                  .filter((dosen): dosen is Dosen => dosen !== null)
-                  .map((dosen) => (
-                    <div
-                      key={dosen.id}
-                      className="border rounded-lg p-4 space-y-3 border-red-200 bg-red-50/30"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Avatar>
-                            <AvatarFallback>
-                              {getInitials(dosen.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{dosen.name}</p>
-                            <p className="text-xs text-red-600">
-                              Belum mengupload dokumen
-                            </p>
-                          </div>
-                        </div>
-                        {user?.name === dosen.name && (
-                          <Badge className="bg-blue-500">Anda</Badge>
-                        )}
-                      </div>
-
-                      {user?.name === dosen.name && (
-                        <div className="pl-12">
-                          <Button variant="outline" size="sm">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Upload Dokumen Bukti
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
+            {lampiran.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Belum ada dokumen bukti yang diupload</p>
                 <p className="text-sm mt-1">
                   Setiap dosen yang terlibat harus mengupload dokumen bukti
                 </p>
               </div>
+            ) : (
+              <>
+                {/* Dokumen Saya */}
+                {lampiran.filter((l) => l.uploadedBy === user?.id).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      Dokumen Anda{" "}
+                      <Badge variant="outline">
+                        {lampiran.filter((l) => l.uploadedBy === user?.id).length}
+                      </Badge>
+                    </h4>
+                    <div className="space-y-2">
+                      {lampiran
+                        .filter((l) => l.uploadedBy === user?.id)
+                        .map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                              <div>
+                                <p className="font-medium text-sm">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {doc.jenis}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => handleRemoveDoc(doc.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dokumen Anggota Lain (Read-only view) */}
+                {lampiran.filter((l) => l.uploadedBy !== user?.id).length > 0 && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                      Dokumen Anggota Lain{" "}
+                      <Badge variant="outline">
+                        {lampiran.filter((l) => l.uploadedBy !== user?.id).length}
+                      </Badge>
+                    </h4>
+                    <div className="space-y-2">
+                      {lampiran
+                        .filter((l) => l.uploadedBy !== user?.id)
+                        .map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/10 opacity-70"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                              <div>
+                                <p className="font-medium text-sm">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {doc.jenis} • Oleh: {doc.uploadedByName}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Upload untuk user saat ini jika belum upload */}
-            {user &&
-              !lampiran.some((doc) => doc.uploadedByName === user.name) && (
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button variant="outline" className="flex-1">
-                    Pilih dari Dokumen Saya
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    Unggah Dokumen Baru
-                  </Button>
-                </div>
-              )}
+            {/* Upload/Pick Actions always visible for the recorder */}
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowDocPicker(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Pilih dari Dokumen Saya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => navigate("/documents")}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Unggah Dokumen Baru
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
         {/* Footer Actions */}
-        <div className="flex justify-between sticky bottom-6 bg-background p-4 border rounded-lg shadow-lg">
+        <div className="flex justify-between sticky bottom-6 bg-background p-4 border rounded-lg shadow-lg z-20">
           <div>
             {isEdit && (
               <Button
@@ -873,10 +897,41 @@ export function ActivityFormPage() {
             <Button variant="outline" onClick={() => navigate("/activities")}>
               Batal
             </Button>
-            <Button onClick={handleSubmit}>Simpan Kegiatan</Button>
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Menyimpan...' : 'Simpan Kegiatan'}
+            </Button>
           </div>
         </div>
       </div>
+
+      {/* Document Picker Dialog */}
+      <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Pilih Dokumen Bukti</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {availableDocs.length === 0 ? (
+              <p className="text-center py-10 text-muted-foreground">Tidak ada dokumen tersedia. Silakan upload terlebih dahulu.</p>
+            ) : (
+              <div className="max-h-[400px] overflow-y-auto space-y-2">
+                {availableDocs.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer" onClick={() => handleAddDoc(doc)}>
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium text-sm">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">{doc.jenis}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm">Pilih</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -887,7 +942,6 @@ export function ActivityFormPage() {
               Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
               asosiasinya akan dihapus. Dokumen bukti yang terlampir tidak akan
               terhapus, tetapi asosiasi dengan kegiatan ini akan hilang.
-              Tindakan ini dicatat permanen di blockchain.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
