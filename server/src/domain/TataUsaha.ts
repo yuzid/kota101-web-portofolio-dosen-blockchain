@@ -25,10 +25,17 @@ export class TataUsaha extends User {
   }
 
   public distribusiDokumen(daftarDosen: Dosen[], dokumen: Dokumen): void {
-    // Logic encapsulated here: ensure document is assigned to each dosen
-    // In a real implementation, this might emit events or be used to validate distribution
-    console.log(`TU ${this.nama} mendistribusikan dokumen ke ${daftarDosen.length} dosen.`);
+    if (daftarDosen.length === 0) {
+      throw new Error('Daftar dosen penerima tidak boleh kosong.');
+    }
+    // Logic: Record the distribution event
+    this.logEvent(`TU ${this.nama} mendistribusikan dokumen: ${dokumen.getNama()}`);
   }
+
+  private logEvent(message: string): void {
+    console.log(`[AUDIT] ${new Date().toISOString()}: ${message}`);
+  }
+  
 
   public getJurusanId(): string | null { return this.jurusan_id; }
   public getId(): string { return this.id; }
