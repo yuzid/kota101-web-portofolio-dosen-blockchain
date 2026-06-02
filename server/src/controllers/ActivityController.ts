@@ -1,0 +1,122 @@
+import { Response } from 'express';
+import { ActivityService } from '../services/ActivityService';
+import { AuthRequest } from '../middleware/authMiddleware';
+
+export class ActivityController {
+  private activityService: ActivityService;
+
+  constructor(activityService: ActivityService) {
+    this.activityService = activityService;
+  }
+
+  getAllActivities = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const activities = await this.activityService.getAllActivities(dosenId);
+      res.status(200).json({ status: 'success', data: activities });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getSummaryStats = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const stats = await this.activityService.getSummaryStats(dosenId);
+      res.status(200).json({ status: 'success', data: stats });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getTanpaBukti = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const formatted = await this.activityService.getTanpaBukti(dosenId);
+      res.status(200).json({ status: 'success', data: formatted });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getActivityById = async (req: AuthRequest, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      const detail = await this.activityService.getActivityById(id);
+      res.status(200).json({ status: 'success', data: detail });
+    } catch (error: any) {
+      const status = error.message.includes('Format ID') ? 400 :
+                     error.message === 'Kegiatan tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  createActivity = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const newActivity = await this.activityService.createActivity(dosenId, req.body);
+      res.status(201).json({ status: 'success', data: newActivity });
+    } catch (error: any) {
+      res.status(400).json({ status: 'error', error: error.message });
+    }
+  };
+
+  updateActivity = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const updated = await this.activityService.updateActivity(req.params.id as string, dosenId, req.body);
+      res.status(200).json({ status: 'success', data: updated });
+    } catch (error: any) {
+      const status = error.message.includes('Akses ditolak') ? 403 :
+                     error.message === 'Kegiatan tidak ditemukan.' ? 404 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  deleteActivity = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      await this.activityService.deleteActivity(req.params.id as string, dosenId);
+      res.status(200).json({ status: 'success', message: 'Kegiatan berhasil dihapus.' });
+    } catch (error: any) {
+      const status = error.message.includes('Akses ditolak') ? 403 :
+                     error.message === 'Kegiatan tidak ditemukan.' ? 404 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  addLampiran = async (req: AuthRequest, res: Response) => {
+    try {
+      const lampiran = await this.activityService.addLampiran(req.params.id as string, req.body.dokumen_id);
+      res.status(201).json({ status: 'success', data: lampiran });
+    } catch (error: any) {
+      const status = error.message.includes('Format ID') ? 400 :
+                     error.message === 'Kegiatan tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+}
