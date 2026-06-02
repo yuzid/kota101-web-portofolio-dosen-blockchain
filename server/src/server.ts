@@ -4,7 +4,10 @@ import authRoutes from './routes/authRoutes';
 import adminUserRoutes from './routes/admin/userRoutes';
 import adminJabatanRoutes from './routes/admin/jabatan';
 import adminAkademikRoutes from './routes/admin/akademik';
-import { authenticate, requireAdmin, errorHandler } from './middleware/authMiddleware';
+// Menggunakan nama fungsi baru hasil penyesuaian di authMiddleware
+import { verifyToken, requireRole, errorHandler } from './middleware/authMiddleware';
+import tatausahaDocumentRoutes from './routes/tatausaha/documentRoutes';
+
 
 const app = express();
 app.use(express.json());
@@ -12,10 +15,13 @@ app.use(express.json());
 // ── Auth ──
 app.use('/api/auth', authRoutes);
 
-// ── Admin: User CRUD (dilindungi JWT + role ADMIN) ──
-app.use('/api/admin/users', authenticate, requireAdmin, adminUserRoutes);
-app.use('/api/admin/jabatan', authenticate, requireAdmin, adminJabatanRoutes);
-app.use('/api/admin/akademik', authenticate, requireAdmin, adminAkademikRoutes);
+// ── Admin: User CRUD (dilindungi JWT + role admin) ──
+// server.ts
+app.use('/api/admin/users', verifyToken, requireRole(['admin', 'tata_usaha']), adminUserRoutes);
+app.use('/api/admin/jabatan', verifyToken, requireRole(['admin']), adminJabatanRoutes);
+app.use('/api/admin/akademik', verifyToken, requireRole(['admin']), adminAkademikRoutes);
+
+app.use('/api/tatausaha/dokumen', verifyToken, requireRole(['tata_usaha']), tatausahaDocumentRoutes);
 
 // ── Status ──
 app.get('/api/status', (req: Request, res: Response) => {

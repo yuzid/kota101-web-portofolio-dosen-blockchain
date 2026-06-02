@@ -47,7 +47,9 @@ async function cekOverlapKaprodi(
 // KAJUR
 // ═══════════════════════════════════════════════════════
 
+// ───────────────────────────────────────────
 // GET /api/admin/jabatan/kajur?jurusan_id=...&dosen_id=...
+// ───────────────────────────────────────────
 router.get('/kajur', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { jurusan_id, dosen_id } = req.query;
 
@@ -65,9 +67,10 @@ router.get('/kajur', asyncHandler(async (req: AuthRequest, res: Response) => {
 
   res.json({ status: 'success', data });
 }));
-
+// ───────────────────────────────────────────
 // POST /api/admin/jabatan/kajur — assign kajur baru
 // Body: { dosen_id, jurusan_id, periode_mulai, periode_selesai }
+// ───────────────────────────────────────────
 router.post('/kajur', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { dosen_id, jurusan_id, periode_mulai, periode_selesai } = req.body;
 
@@ -112,7 +115,10 @@ router.post('/kajur', asyncHandler(async (req: AuthRequest, res: Response) => {
   res.status(201).json({ status: 'success', data: jabatan });
 }));
 
+// ───────────────────────────────────────────
 // PATCH /api/admin/jabatan/kajur/:id — update periode
+// Body: { dosen_id?, periode_mulai?, periode_selesai? }
+// ───────────────────────────────────────────
 router.patch('/kajur/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
   const { periode_mulai, periode_selesai, dosen_id } = req.body;
@@ -157,7 +163,9 @@ router.patch('/kajur/:id', asyncHandler(async (req: AuthRequest, res: Response) 
   res.json({ status: 'success', data: updated });
 }));
 
+// ───────────────────────────────────────────
 // DELETE /api/admin/jabatan/kajur/:id
+// ───────────────────────────────────────────
 router.delete('/kajur/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
 
@@ -175,6 +183,9 @@ router.delete('/kajur/:id', asyncHandler(async (req: AuthRequest, res: Response)
 // KAPRODI — struktur sama, beda foreign key
 // ═══════════════════════════════════════════════════════
 
+// ───────────────────────────────────────────
+// GET /api/admin/jabatan/kaprodi?program_studi_id=...&dosen_id=...
+// ───────────────────────────────────────────
 router.get('/kaprodi', asyncHandler(async (req: AuthRequest, res: Response) => {
   const { program_studi_id, dosen_id } = req.query;
 
@@ -235,6 +246,10 @@ router.post('/kaprodi', asyncHandler(async (req: AuthRequest, res: Response) => 
   res.status(201).json({ status: 'success', data: jabatan });
 }));
 
+// ───────────────────────────────────────────
+// PATCH /api/admin/jabatan/kaprodi/:id — update periode
+// Body: { dosen_id?, periode_mulai?, periode_selesai? }
+// ───────────────────────────────────────────
 router.patch('/kaprodi/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
   const { periode_mulai, periode_selesai, dosen_id } = req.body;
@@ -278,6 +293,9 @@ router.patch('/kaprodi/:id', asyncHandler(async (req: AuthRequest, res: Response
   res.json({ status: 'success', data: updated });
 }));
 
+// ───────────────────────────────────────────
+// DELETE /api/admin/jabatan/kaprodi/:id
+// ───────────────────────────────────────────
 router.delete('/kaprodi/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
   const id  = req.params.id as string;
 

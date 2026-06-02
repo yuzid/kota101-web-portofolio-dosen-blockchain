@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.tsx
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 
@@ -11,9 +12,10 @@ export type UserRole =
 export interface User {
   id: string;
   email: string;
-  name: string;
+  name: string; 
   roles: UserRole[];
   token: string;
+  programStudi?: string; 
   lastLogin?: string;
 }
 
@@ -27,23 +29,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper untuk memetakan response backend ke struktur User Frontend
+
 const mapBackendUserToFrontend = (backendData: any): User => {
   const roles: UserRole[] = [];
   
-  // Mapping base role dari database
-  if (backendData.role === 'ADMIN') roles.push('administrator');
-  if (backendData.role === 'TATA_USAHA') roles.push('admin_tu');
-  if (backendData.role === 'DOSEN') roles.push('dosen');
+  // Normalisasi ke uppercase agar aman dari ketidaksesuaian case database
+  const dbRole = backendData.role?.toUpperCase();
+  
+  if (dbRole === 'ADMIN') roles.push('administrator');
+  if (dbRole === 'TATA_USAHA') roles.push('admin_tu');
+  if (dbRole === 'DOSEN') roles.push('dosen');
 
-  // Tambahkan role struktural aktif hasil pengecekan periode di backend
   if (backendData.jabatan?.is_kajur) roles.push('kajur');
   if (backendData.jabatan?.is_kaprodi) roles.push('kaprodi');
 
   return {
-    id: backendData.email, // Atur sesuai dengan ID unik unik dari backend jika ada
+    id: backendData.email, 
     email: backendData.email,
-    name: backendData.email.split('@')[0], // Fallback nama dari email sebelum sinkronisasi profil penuh
+    name: backendData.name, 
+    programStudi: backendData.programStudi || undefined,
     roles: roles,
     token: backendData.token,
     lastLogin: new Date().toISOString()
