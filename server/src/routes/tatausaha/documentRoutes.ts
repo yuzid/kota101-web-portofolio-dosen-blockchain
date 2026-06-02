@@ -40,7 +40,8 @@ router.get('/', asyncHandler(async (req: AuthRequest, res: Response) => {
   }
 
   let whereClause: any = {
-    deleted_at: null // Spesifikasi Use Case: Hanya ambil dokumen yang belum di-soft delete
+    deleted_at: null, // Spesifikasi Use Case: Hanya ambil dokumen yang belum di-soft delete
+    sumber_dokumen: 'TATA_USAHA' // Filter: Hanya ambil dokumen yang bersumber dari TATA_USAHA
   };
 
   // Jika diakses oleh Tata Usaha, batasi hanya melihat dokumen yang diterbitkan di Jurusannya

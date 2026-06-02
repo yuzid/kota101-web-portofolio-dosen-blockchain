@@ -4,9 +4,9 @@ import authRoutes from './routes/authRoutes';
 import adminUserRoutes from './routes/admin/userRoutes';
 import adminJabatanRoutes from './routes/admin/jabatan';
 import adminAkademikRoutes from './routes/admin/akademik';
-// Menggunakan nama fungsi baru hasil penyesuaian di authMiddleware
 import { verifyToken, requireRole, errorHandler } from './middleware/authMiddleware';
-import tatausahaDocumentRoutes from './routes/tatausaha/documentRoutes';
+import dosenDocumentRoutes from './routes/tatausaha/documentRoutes';
+import dosenDocumentRoutesdosen from './routes/dosen/documentRoutes';
 
 
 const app = express();
@@ -21,7 +21,9 @@ app.use('/api/admin/users', verifyToken, requireRole(['admin', 'tata_usaha']), a
 app.use('/api/admin/jabatan', verifyToken, requireRole(['admin']), adminJabatanRoutes);
 app.use('/api/admin/akademik', verifyToken, requireRole(['admin']), adminAkademikRoutes);
 
-app.use('/api/tatausaha/dokumen', verifyToken, requireRole(['tata_usaha']), tatausahaDocumentRoutes);
+app.use('/api/tatausaha/dokumen', verifyToken, requireRole(['tata_usaha']), dosenDocumentRoutes);
+
+app.use('/api/dosen/dokumen', verifyToken, requireRole(['dosen']), dosenDocumentRoutesdosen);
 
 // ── Status ──
 app.get('/api/status', (req: Request, res: Response) => {

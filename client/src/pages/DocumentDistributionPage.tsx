@@ -53,6 +53,12 @@ interface DistributedDocument {
   jenis_dokumen: string;
   tanggal_upload: string;
   file_path: string;
+  kepemilikan: {
+    dosen: {
+      nama: string;
+      nip: string;
+    };
+  }[];
 }
 
 interface Dosen {
@@ -434,6 +440,26 @@ export function DocumentDistributionPage() {
               <div>
                 <Label className="text-sm text-muted-foreground">Nama Dokumen</Label>
                 <p className="font-semibold text-base">{selectedDocument.nama}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Jenis Dokumen</Label>
+                <p><Badge variant="secondary">{selectedDocument.jenis_dokumen}</Badge></p>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground">Penerima Dokumen</Label>
+                <div className="mt-2 border rounded-lg p-3 max-h-[200px] overflow-y-auto bg-muted/30">
+                  {selectedDocument.kepemilikan && selectedDocument.kepemilikan.length > 0 ? (
+                    <ul className="space-y-1">
+                      {selectedDocument.kepemilikan.map((k, idx) => (
+                        <li key={idx} className="text-sm">
+                          • {k.dosen.nama} <span className="text-muted-foreground text-xs">(NIP: {k.dosen.nip})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Tidak ada data penerima.</p>
+                  )}
+                </div>
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground">Lokasi S3 Storage</Label>
