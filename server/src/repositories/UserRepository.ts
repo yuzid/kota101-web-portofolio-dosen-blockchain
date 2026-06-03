@@ -11,6 +11,7 @@ export const userSelect = {
       nip: true,
       nidn: true,
       nama: true,
+      chain_address: true,
       program_studi: { select: { id: true, nama_prodi: true, jurusan_id: true } },
       jabatan_kajur: { select: { id: true, jurusan_id: true } },
       jabatan_kaprodi: { select: { id: true, program_studi_id: true } }
@@ -97,6 +98,13 @@ export class UserRepository {
   async findProgramStudi(id: string, jurusan_id: string) {
     return await prisma.programStudi.findFirst({
       where: { id, jurusan_id }
+    });
+  }
+
+  async findProgramStudiById(id: string) {
+    return await prisma.programStudi.findUnique({
+      where: { id },
+      select: { id: true, kode_prodi: true, nama_prodi: true, jurusan_id: true },
     });
   }
 }

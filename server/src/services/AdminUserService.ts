@@ -1,11 +1,38 @@
 import bcrypt from 'bcrypt';
 import { UserRepository } from '../repositories/UserRepository';
+import { MultiChainService } from './MultiChainService';
+
+type BlockchainNode = 'D3' | 'D4';
+
+const PRODI_NODE_BY_CODE: Record<string, BlockchainNode> = {
+  'D3-TI': 'D3',
+  'D4-TI': 'D4',
+};
+
+const PRODI_NODE_BY_NAME: Record<string, BlockchainNode> = {
+  'D3 TEKNIK INFORMATIKA': 'D3',
+  'D4 TEKNIK INFORMATIKA': 'D4',
+};
 
 export class AdminUserService {
   private userRepository: UserRepository;
+  private multiChainService: MultiChainService;
 
-  constructor(userRepository: UserRepository) {
+  constructor(userRepository: UserRepository, multiChainService = new MultiChainService()) {
     this.userRepository = userRepository;
+    this.multiChainService = multiChainService;
+  }
+
+  private resolveBlockchainNode(programStudi: { kode_prodi: string; nama_prodi: string }): BlockchainNode {
+    const kodeProdi = programStudi.kode_prodi.trim().toUpperCase();
+    const namaProdi = programStudi.nama_prodi.trim().toUpperCase();
+    const node = PRODI_NODE_BY_CODE[kodeProdi] || PRODI_NODE_BY_NAME[namaProdi];
+
+    if (!node) {
+      throw new Error(`Program studi "${programStudi.nama_prodi}" belum dipetakan ke node blockchain.`);
+    }
+
+    return node;
   }
 
   async getAllUsers(currentUser: any, roleQuery?: string) {
@@ -42,12 +69,14 @@ export class AdminUserService {
 
   async createUser(data: any, currentUser: any) {
     const { email, password, role, nama, nip, nidn, program_studi_id, jurusan_id } = data;
+    const roleUpper = role?.toUpperCase();
+    let targetProdi: any = null;
 
     if (currentUser.role.toUpperCase() === 'TATA_USAHA') {
-      if (role?.toUpperCase() !== 'DOSEN') {
+      if (roleUpper !== 'DOSEN') {
         throw new Error('Akses ditolak. Tata Usaha hanya diizinkan membuat akun DOSEN.');
       }
-      const targetProdi = await this.userRepository.findProgramStudi(program_studi_id, currentUser.jurusan_id!);
+      targetProdi = await this.userRepository.findProgramStudi(program_studi_id, currentUser.jurusan_id!);
       if (!targetProdi) {
         throw new Error('Program studi yang dipilih tidak valid atau berada di luar yurisdiksi jurusan Anda.');
       }
@@ -58,17 +87,17 @@ export class AdminUserService {
     }
 
     const validRoles = ['ADMIN', 'TATA_USAHA', 'DOSEN'];
-    if (!validRoles.includes(role.toUpperCase())) {
+    if (!validRoles.includes(roleUpper)) {
       throw new Error(`Role tidak valid. Pilihan: ${validRoles.join(', ')}`);
     }
 
-    if (role === 'TATA_USAHA' && !nip) {
+    if (roleUpper === 'TATA_USAHA' && !nip) {
       throw new Error('NIP wajib diisi untuk Tata Usaha.');
     }
-    if (role === 'DOSEN' && (!nip || !nidn || !program_studi_id)) {
+    if (roleUpper === 'DOSEN' && (!nip || !nidn || !program_studi_id)) {
       throw new Error('NIP, NIDN, dan program_studi_id wajib diisi untuk Dosen.');
     }
-    if (role === 'TATA_USAHA' && !jurusan_id) {
+    if (roleUpper === 'TATA_USAHA' && !jurusan_id) {
       throw new Error('Jurusan_id wajib diisi untuk Tata Usaha.');
     }
 
@@ -76,14 +105,25 @@ export class AdminUserService {
     if (existing) throw new Error('Email sudah terdaftar.');
 
     const passwordHash = await bcrypt.hash(password, 12);
+    let chainAddress: string | undefined;
+
+    if (roleUpper === 'DOSEN') {
+      targetProdi = targetProdi || await this.userRepository.findProgramStudiById(program_studi_id);
+      if (!targetProdi) {
+        throw new Error('Program studi tidak ditemukan.');
+      }
+
+      const blockchainNode = this.resolveBlockchainNode(targetProdi);
+      chainAddress = await this.multiChainService.getNewAddress(blockchainNode);
+    }
 
     const createData = {
       email,
       password_hash: passwordHash,
-      role: role.toUpperCase(),
-      ...(role.toUpperCase() === 'ADMIN' && { admin: { create: { nama } } }),
-      ...(role.toUpperCase() === 'TATA_USAHA' && { tata_usaha: { create: { nip, nama, jurusan_id } } }),
-      ...(role.toUpperCase() === 'DOSEN' && { dosen: { create: { nip, nidn, nama, program_studi_id } } }),
+      role: roleUpper,
+      ...(roleUpper === 'ADMIN' && { admin: { create: { nama } } }),
+      ...(roleUpper === 'TATA_USAHA' && { tata_usaha: { create: { nip, nama, jurusan_id } } }),
+      ...(roleUpper === 'DOSEN' && { dosen: { create: { nip, nidn, nama, program_studi_id, chain_address: chainAddress! } } }),
     };
 
     return await this.userRepository.create(createData);

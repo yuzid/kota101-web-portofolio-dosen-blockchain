@@ -94,6 +94,7 @@ model Dosen {
   kepemilikan_dokumen            KepemilikanDokumen[]
   partisipasi_kegiatan_tridharma PartisipasiKegiatanTridharma[]
   kegiatan_tridharma             KegiatanTridharma[]
+  chain_address                  String
 
   @@map("dosen")
 }
