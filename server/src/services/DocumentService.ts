@@ -174,7 +174,7 @@ export class DocumentService {
       tanggal: doc.tanggal_upload,
       asal: doc.sumber_dokumen === 'TATA_USAHA' ? 'tu' : 'dosen',
       size: 'Undetermined',
-      hasHighlight: doc.lampiran_bukti.some(l => (l as any).highlight.length > 0)
+      hasHighlight: doc.kepemilikan.some(k => k.highlights.length > 0)
     }));
   }
 

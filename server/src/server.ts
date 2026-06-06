@@ -8,10 +8,15 @@ import { verifyToken, requireRole, errorHandler } from './middleware/authMiddlew
 import dosenDocumentRoutes from './routes/tatausaha/documentRoutes';
 import dosenDocumentRoutesdosen from './routes/dosen/documentRoutes';
 import dosenActivityRoutes from './routes/dosen/activityRoutes';
+import highlightRoutes from './routes/dosen/highlightRoutes';
+import publicRoutes from './routes/publicRoutes';
 
 
 const app = express();
 app.use(express.json());
+
+// ── Public Routes (Unauthenticated) ──
+app.use('/api/public', publicRoutes);
 
 // ── Auth ──
 app.use('/api/auth', authRoutes);
@@ -26,6 +31,7 @@ app.use('/api/tatausaha/dokumen', verifyToken, requireRole(['tata_usaha']), dose
 
 app.use('/api/dosen/dokumen', verifyToken, requireRole(['dosen']), dosenDocumentRoutesdosen);
 app.use('/api/dosen/kegiatan', verifyToken, requireRole(['dosen']), dosenActivityRoutes);
+app.use('/api/dosen/highlights', verifyToken, requireRole(['dosen']), highlightRoutes);
 
 // ── Status ──
 app.get('/api/status', (req: Request, res: Response) => {

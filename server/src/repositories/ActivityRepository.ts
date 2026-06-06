@@ -52,7 +52,13 @@ export class ActivityRepository {
         partisipasi: { include: { dosen: true } },
         lampiran_bukti: {
           include: {
-            dokumen: { include: { kepemilikan: true } }
+            dokumen: {
+              include: {
+                kepemilikan: {
+                  include: { highlights: true }
+                }
+              }
+            }
           }
         }
       }
