@@ -38,6 +38,46 @@ export class DocumentController {
     }
   };
 
+  getDocumentPreview = async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+
+      const preview = await this.documentService.getDocumentPreview(
+        req.params.id as string,
+        req.user,
+        req.query.activityId as string | undefined,
+      );
+      res.json({ status: 'success', data: preview });
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getDocumentContent = async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+
+      const file = await this.documentService.getDocumentContent(req.params.id as string, req.user);
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Content-Length', file.contentLength);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.setHeader('X-Content-SHA256', file.contentHash);
+      res.send(file.bytes);
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
   // TU Handlers
   getTUDocuments = async (req: AuthRequest, res: Response) => {
     try {

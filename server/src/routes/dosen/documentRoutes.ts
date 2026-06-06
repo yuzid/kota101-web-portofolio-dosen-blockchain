@@ -25,6 +25,8 @@ const documentService = new DocumentService(documentRepository, fileStorageServi
 const documentController = new DocumentController(documentService);
 
 router.get('/', asyncHandler(documentController.getDosenDocuments));
+router.get('/:id/preview', asyncHandler(documentController.getDocumentPreview));
+router.get('/:id/content', asyncHandler(documentController.getDocumentContent));
 router.post('/upload', upload.single('file'), asyncHandler(documentController.uploadDosenDocument));
 router.delete('/:id', asyncHandler(documentController.deleteDocument));
 

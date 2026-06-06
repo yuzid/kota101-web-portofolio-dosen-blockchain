@@ -38,6 +38,25 @@ export class DocumentRepository {
     });
   }
 
+  async findPreviewById(id: string) {
+    return await prisma.dokumen.findUnique({
+      where: { id },
+      include: {
+        kepemilikan: true,
+        lampiran_bukti: {
+          include: {
+            kegiatan: {
+              include: {
+                dosen: { include: { program_studi: true } },
+                partisipasi: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async create(data: any, recipientIds: string[]) {
     return await prisma.$transaction(async (tx) => {
       const doc = await tx.dokumen.create({ data });

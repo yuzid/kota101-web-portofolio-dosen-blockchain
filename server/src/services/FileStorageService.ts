@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
+export type StoredFile = {
+  bytes: Buffer;
+  contentType: string;
+  contentLength: number;
+};
 
 export class FileStorageService {
   private s3: S3Client;
@@ -21,5 +27,32 @@ export class FileStorageService {
     }));
 
     return `https://${this.bucketName}.s3.${process.env.AWS_REGION || 'ap-southeast-1'}.amazonaws.com/${s3Key}`;
+  }
+
+  private getObjectKey(filePath: string): string {
+    try {
+      const url = new URL(filePath);
+      return decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    } catch {
+      return filePath.replace(/^\/+/, '');
+    }
+  }
+
+  async getFile(filePath: string): Promise<StoredFile> {
+    const response = await this.s3.send(new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: this.getObjectKey(filePath),
+    }));
+
+    if (!response.Body) {
+      throw new Error('File dokumen tidak ditemukan di penyimpanan.');
+    }
+
+    const bytes = Buffer.from(await response.Body.transformToByteArray());
+    return {
+      bytes,
+      contentType: response.ContentType || 'application/octet-stream',
+      contentLength: response.ContentLength ?? bytes.length,
+    };
   }
 }

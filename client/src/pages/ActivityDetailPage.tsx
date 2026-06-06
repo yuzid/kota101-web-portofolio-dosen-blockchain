@@ -507,6 +507,7 @@ export function ActivityDetailPage() {
                                 onClick={() =>
                                   navigate(`/documents/${doc.id}/preview`, {
                                     state: {
+                                      activityId: activity.id,
                                       breadcrumbs: [
                                         {
                                           label: "Beranda",
