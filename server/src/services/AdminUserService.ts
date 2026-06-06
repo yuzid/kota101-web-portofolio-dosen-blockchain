@@ -114,7 +114,7 @@ export class AdminUserService {
       }
 
       const blockchainNode = this.resolveBlockchainNode(targetProdi);
-      chainAddress = await this.multiChainService.getNewAddress(blockchainNode);
+      chainAddress = await this.multiChainService.createPublisherAddress(blockchainNode);
     }
 
     const createData = {

@@ -7,6 +7,19 @@ type MultiChainConfig = {
   password: string;
 };
 
+type RpcResponse<T> = {
+  result?: T;
+  error?: { message?: string } | null;
+};
+
+type MultiChainStream = {
+  name?: string;
+  open?: boolean;
+  restrictions?: {
+    write?: boolean;
+  };
+};
+
 export class MultiChainService {
   private getConfig(node: MultiChainNode): MultiChainConfig {
     const config = {
@@ -27,7 +40,7 @@ export class MultiChainService {
     return config as MultiChainConfig;
   }
 
-  async getNewAddress(node: MultiChainNode): Promise<string> {
+  private async callRpc<T>(node: MultiChainNode, method: string, params: unknown[]): Promise<T> {
     const config = this.getConfig(node);
     const rpcUrl = `http://${config.ip}:${config.port}`;
     const controller = new AbortController();
@@ -42,31 +55,68 @@ export class MultiChainService {
         },
         body: JSON.stringify({
           jsonrpc: '1.0',
-          id: `getnewaddress-${Date.now()}`,
-          method: 'getnewaddress',
-          params: [],
+          id: `${method}-${Date.now()}`,
+          method,
+          params,
         }),
         signal: controller.signal,
       });
 
-      const result = await response.json() as { result?: unknown; error?: { message?: string } | null };
+      const result = await response.json() as RpcResponse<T>;
 
       if (!response.ok || result.error) {
         throw new Error(result.error?.message || `HTTP ${response.status}`);
       }
 
-      if (typeof result.result !== 'string' || !result.result) {
-        throw new Error('Response getnewaddress tidak berisi alamat blockchain.');
+      if (result.result === undefined) {
+        throw new Error(`Response ${method} tidak berisi result.`);
       }
 
       return result.result;
     } catch (error: any) {
       if (error?.name === 'AbortError') {
-        throw new Error(`RPC blockchain ${node} timeout saat membuat address baru.`);
+        throw new Error(`RPC blockchain ${node} timeout saat menjalankan ${method}.`);
       }
-      throw new Error(`Gagal membuat address blockchain ${node}: ${error.message}`);
+      throw new Error(`RPC blockchain ${node} gagal menjalankan ${method}: ${error.message}`);
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async getNewAddress(node: MultiChainNode): Promise<string> {
+    const address = await this.callRpc<string>(node, 'getnewaddress', []);
+
+    if (typeof address !== 'string' || !address) {
+      throw new Error('Response getnewaddress tidak berisi alamat blockchain.');
+    }
+
+    return address;
+  }
+
+  async provisionPublisherAddress(node: MultiChainNode, address: string): Promise<void> {
+    const streamName = process.env.AUDIT_STREAM_NAME;
+    if (!streamName) {
+      throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
+    }
+
+    const streams = await this.callRpc<MultiChainStream[]>(node, 'liststreams', [streamName]);
+    const stream = streams[0];
+
+    if (!stream) {
+      throw new Error(`Stream blockchain "${streamName}" tidak ditemukan.`);
+    }
+
+    await this.callRpc<unknown>(node, 'grant', [address, 'send,receive']);
+
+    const isWriteRestricted = stream.open === false || stream.restrictions?.write === true;
+    if (isWriteRestricted) {
+      await this.callRpc<unknown>(node, 'grant', [address, `${streamName}.write`]);
+    }
+  }
+
+  async createPublisherAddress(node: MultiChainNode): Promise<string> {
+    const address = await this.getNewAddress(node);
+    await this.provisionPublisherAddress(node, address);
+    return address;
   }
 }
