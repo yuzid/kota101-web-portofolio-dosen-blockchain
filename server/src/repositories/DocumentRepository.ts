@@ -12,9 +12,7 @@ export class DocumentRepository {
         sumber_dokumen: true,
         file_path: true,
         lampiran_bukti: {
-          select: {
-            highlight: { select: { id: true } }
-          }
+          select: { id: true }
         },
         kepemilikan: {
           select: {
@@ -23,6 +21,9 @@ export class DocumentRepository {
                 nama: true,
                 nip: true
               }
+            },
+            highlights: {
+              select: { id: true }
             }
           }
         }

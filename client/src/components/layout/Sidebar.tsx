@@ -64,6 +64,18 @@ const navigationItems: NavItem[] = [
     roles: ["kaprodi", "kajur"],
   },
   {
+    label: "Monitoring Jurusan",
+    icon: BarChart3,
+    path: "/monitoring/jurusan",
+    roles: ["kajur"],
+  },
+  {
+    label: "Monitoring Prodi",
+    icon: BarChart3,
+    path: "/monitoring/prodi",
+    roles: ["kaprodi"],
+  },
+  {
     label: "Notifikasi",
     icon: Bell,
     path: "/notifications",

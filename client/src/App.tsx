@@ -61,6 +61,11 @@ const NotificationsPage = lazy(() =>
     default: m.NotificationsPage,
   }))
 );
+const AcademicRoleActivitiesPage = lazy(() =>
+  import("./pages/AcademicRoleActivitiesPage").then((m) => ({
+    default: m.AcademicRoleActivitiesPage,
+  }))
+);
 
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
 
@@ -228,6 +233,24 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Academic Role Monitoring */}
+        <Route
+          path="/monitoring/jurusan"
+          element={
+            <ProtectedRoute>
+              <AcademicRoleActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi"
+          element={
+            <ProtectedRoute>
+              <AcademicRoleActivitiesPage />
             </ProtectedRoute>
           }
         />

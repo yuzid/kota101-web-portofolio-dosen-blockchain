@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { asyncHandler } from '../../middleware/authMiddleware';
+import { asyncHandler, requireRole } from '../../middleware/authMiddleware';
 import { AkademikController } from '../../controllers/AkademikController';
 import { AkademikService } from '../../services/AkademikService';
 import { AkademikRepository } from '../../repositories/AkademikRepository';
@@ -13,15 +13,15 @@ const akademikController = new AkademikController(akademikService);
 // JURUSAN
 router.get('/jurusan', asyncHandler(akademikController.getAllJurusan));
 router.get('/jurusan/:id', asyncHandler(akademikController.getJurusanById));
-router.post('/jurusan', asyncHandler(akademikController.createJurusan));
-router.patch('/jurusan/:id', asyncHandler(akademikController.updateJurusan));
-router.delete('/jurusan/:id', asyncHandler(akademikController.deleteJurusan));
+router.post('/jurusan', requireRole(['admin']), asyncHandler(akademikController.createJurusan));
+router.patch('/jurusan/:id', requireRole(['admin']), asyncHandler(akademikController.updateJurusan));
+router.delete('/jurusan/:id', requireRole(['admin']), asyncHandler(akademikController.deleteJurusan));
 
 // PRODI
 router.get('/prodi', asyncHandler(akademikController.getAllProdi));
 router.get('/prodi/:id', asyncHandler(akademikController.getProdiById));
-router.post('/prodi', asyncHandler(akademikController.createProdi));
-router.patch('/prodi/:id', asyncHandler(akademikController.updateProdi));
-router.delete('/prodi/:id', asyncHandler(akademikController.deleteProdi));
+router.post('/prodi', requireRole(['admin']), asyncHandler(akademikController.createProdi));
+router.patch('/prodi/:id', requireRole(['admin']), asyncHandler(akademikController.updateProdi));
+router.delete('/prodi/:id', requireRole(['admin']), asyncHandler(akademikController.deleteProdi));
 
 export default router;

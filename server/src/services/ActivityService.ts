@@ -123,11 +123,11 @@ export class ActivityService {
     
     return {
       total: activities.length,
-      pengajaran: activities.filter(a => a.kategori_tridharma === KategoriTridharma.PENDIDIKAN).length,
-      penelitian: activities.filter(a => a.kategori_tridharma === KategoriTridharma.PENELITIAN).length,
-      pengabdian: activities.filter(a => a.kategori_tridharma === KategoriTridharma.PENGABDIAN).length,
-      tugas_tambahan: activities.filter(a => a.kategori_tridharma === KategoriTridharma.TUGAS_TAMBAHAN).length,
-      tanpa_bukti: activities.filter(a => a.lampiran_bukti.length === 0).length,
+      pengajaran: activities.filter((a: any) => a.kategori_tridharma === KategoriTridharma.PENDIDIKAN).length,
+      penelitian: activities.filter((a: any) => a.kategori_tridharma === KategoriTridharma.PENELITIAN).length,
+      pengabdian: activities.filter((a: any) => a.kategori_tridharma === KategoriTridharma.PENGABDIAN).length,
+      tugas_tambahan: activities.filter((a: any) => a.kategori_tridharma === KategoriTridharma.TUGAS_TAMBAHAN).length,
+      tanpa_bukti: activities.filter((a: any) => a.lampiran_bukti.length === 0).length,
       total_dokumen
     };
   }
@@ -177,7 +177,7 @@ export class ActivityService {
         name: lb.dokumen.nama,
         jenis: lb.dokumen.jenis_dokumen,
         tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
-        hasHighlight: lb.highlighted
+        hasHighlight: lb.dokumen.kepemilikan.some((k: any) => k.highlights.length > 0)
       };
 
       lb.dokumen.kepemilikan.forEach((k: any) => {
@@ -269,7 +269,7 @@ export class ActivityService {
     }
 
     const lampiranData = (lampiran_ids && Array.isArray(lampiran_ids)) 
-      ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId, highlighted: false }))
+      ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId }))
       : [];
 
     const createdActivity = await this.activityRepository.create(activityData, partisipasiData, lampiranData);
@@ -355,8 +355,7 @@ export class ActivityService {
 
     const lampiran = await this.activityRepository.createLampiran({
       kegiatan_id: id,
-      dokumen_id: String(dokumen_id),
-      highlighted: false
+      dokumen_id: String(dokumen_id)
     });
 
     let txId: string;

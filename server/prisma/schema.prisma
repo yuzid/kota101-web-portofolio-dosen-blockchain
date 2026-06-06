@@ -147,11 +147,12 @@ model JabatanKaprodi {
 }
 
 model KepemilikanDokumen {
-  id         String  @id @default(uuid()) @db.Uuid
-  dosen_id   String  @db.Uuid
-  dokumen_id String  @db.Uuid
-  dosen      Dosen   @relation(fields: [dosen_id], references: [id])
-  dokumen    Dokumen @relation(fields: [dokumen_id], references: [id])
+  id         String      @id @default(uuid()) @db.Uuid
+  dosen_id   String      @db.Uuid
+  dokumen_id String      @db.Uuid
+  dosen      Dosen       @relation(fields: [dosen_id], references: [id])
+  dokumen    Dokumen     @relation(fields: [dokumen_id], references: [id])
+  highlights Highlight[]
 
   @@map("kepemilikan_dokumen")
 }
@@ -215,20 +216,18 @@ model LampiranBukti {
   id          String            @id @default(uuid()) @db.Uuid
   kegiatan_id String            @db.Uuid
   dokumen_id  String            @db.Uuid
-  highlighted Boolean
   kegiatan    KegiatanTridharma @relation(fields: [kegiatan_id], references: [id])
   dokumen     Dokumen           @relation(fields: [dokumen_id], references: [id])
-  highlight   Highlight[]
 
   @@map("lampiran_bukti")
 }
 
 model Highlight {
-  id               String         @id @default(uuid()) @db.Uuid
-  lampiran_id      String         @db.Uuid
+  id               String             @id @default(uuid()) @db.Uuid
+  kepemilikan_id   String             @db.Uuid
   page_number      Int
-  highlighted_text String         @db.Text
-  lampiran         LampiranBukti  @relation(fields: [lampiran_id], references: [id])
+  highlighted_text String             @db.Text
+  kepemilikan      KepemilikanDokumen @relation(fields: [kepemilikan_id], references: [id])
   highlight_rect   HighlightRect[]
 
   @@map("highlight")
