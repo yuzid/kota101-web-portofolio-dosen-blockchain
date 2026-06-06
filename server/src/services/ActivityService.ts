@@ -1,12 +1,15 @@
-import crypto from 'crypto';
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
+import { resolveBlockchainNode } from '../lib/blockchainNode';
+import { MultiChainService } from './MultiChainService';
 
 export class ActivityService {
   private activityRepository: ActivityRepository;
+  private multiChainService: MultiChainService;
 
-  constructor(activityRepository: ActivityRepository) {
+  constructor(activityRepository: ActivityRepository, multiChainService = new MultiChainService()) {
     this.activityRepository = activityRepository;
+    this.multiChainService = multiChainService;
   }
 
   isValidUUID(uuid: any): uuid is string {
@@ -155,7 +158,7 @@ export class ActivityService {
       tanggal_selesai: new Date(String(tanggalSelesai)),
       periode: String(tahunAkademik),
       semester: String(semester).toUpperCase(),
-      tx_id: crypto.randomBytes(16).toString('hex'),
+      tx_id: 'PENDING_BLOCKCHAIN',
     };
 
     const partisipasiData: any[] = [];
@@ -173,7 +176,76 @@ export class ActivityService {
       ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId, highlighted: false }))
       : [];
 
-    return await this.activityRepository.create(activityData, partisipasiData, lampiranData);
+    const createdActivity = await this.activityRepository.create(activityData, partisipasiData, lampiranData);
+
+    let txId: string;
+
+    try {
+      const activity = await this.activityRepository.findById(createdActivity.id);
+      if (!activity) {
+        throw new Error('Kegiatan gagal dimuat setelah dibuat.');
+      }
+      if (!activity.dosen.chain_address) {
+        throw new Error('Dosen belum memiliki blockchain address.');
+      }
+
+      const blockchainNode = resolveBlockchainNode(activity.dosen.program_studi);
+      const payload = {
+        event_type: 'KEGIATAN_CREATED',
+        payload_version: 1,
+        recorded_at: new Date().toISOString(),
+        kegiatan: {
+          id: activity.id,
+          dosen_id: activity.dosen_id,
+          kategori_tridharma: activity.kategori_tridharma,
+          jenis_kegiatan: activity.jenis_kegiatan,
+          nama_kegiatan: activity.nama_kegiatan,
+          tanggal_mulai: activity.tanggal_mulai.toISOString(),
+          tanggal_selesai: activity.tanggal_selesai.toISOString(),
+          periode: activity.periode,
+          semester: activity.semester,
+        },
+        pencatat: {
+          id: activity.dosen.id,
+          nip: activity.dosen.nip,
+          nidn: activity.dosen.nidn,
+          nama: activity.dosen.nama,
+          chain_address: activity.dosen.chain_address,
+          program_studi: {
+            id: activity.dosen.program_studi.id,
+            kode: activity.dosen.program_studi.kode_prodi,
+            nama: activity.dosen.program_studi.nama_prodi,
+          },
+        },
+        partisipasi: activity.partisipasi.map((participant) => ({
+          dosen_id: participant.dosen_id,
+          nip: participant.dosen.nip,
+          nidn: participant.dosen.nidn,
+          nama: participant.dosen.nama,
+          peran: participant.peran,
+        })),
+        dokumen_pendukung: activity.lampiran_bukti.map((lampiran) => ({
+          dokumen_id: lampiran.dokumen.id,
+          nama: lampiran.dokumen.nama,
+          jenis_dokumen: lampiran.dokumen.jenis_dokumen,
+          sumber_dokumen: lampiran.dokumen.sumber_dokumen,
+          tanggal_upload: lampiran.dokumen.tanggal_upload.toISOString(),
+          hash_file: lampiran.dokumen.hash_file,
+        })),
+      };
+
+      txId = await this.multiChainService.publishJson(
+        blockchainNode,
+        activity.dosen.chain_address,
+        activity.id,
+        payload,
+      );
+    } catch (error) {
+      await this.activityRepository.delete(createdActivity.id);
+      throw error;
+    }
+
+    return await this.activityRepository.updateTransactionId(createdActivity.id, txId);
   }
 
   async updateActivity(id: string, dosenId: string, data: any) {

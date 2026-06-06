@@ -1,4 +1,4 @@
-type MultiChainNode = 'D3' | 'D4';
+import { BlockchainNode } from '../lib/blockchainNode';
 
 type MultiChainConfig = {
   ip: string;
@@ -21,7 +21,7 @@ type MultiChainStream = {
 };
 
 export class MultiChainService {
-  private getConfig(node: MultiChainNode): MultiChainConfig {
+  private getConfig(node: BlockchainNode): MultiChainConfig {
     const config = {
       ip: process.env[`${node}_IP`],
       port: process.env[`${node}_RPC_PORT`],
@@ -40,7 +40,7 @@ export class MultiChainService {
     return config as MultiChainConfig;
   }
 
-  private async callRpc<T>(node: MultiChainNode, method: string, params: unknown[]): Promise<T> {
+  private async callRpc<T>(node: BlockchainNode, method: string, params: unknown[]): Promise<T> {
     const config = this.getConfig(node);
     const rpcUrl = `http://${config.ip}:${config.port}`;
     const controller = new AbortController();
@@ -83,7 +83,7 @@ export class MultiChainService {
     }
   }
 
-  async getNewAddress(node: MultiChainNode): Promise<string> {
+  async getNewAddress(node: BlockchainNode): Promise<string> {
     const address = await this.callRpc<string>(node, 'getnewaddress', []);
 
     if (typeof address !== 'string' || !address) {
@@ -93,7 +93,7 @@ export class MultiChainService {
     return address;
   }
 
-  async provisionPublisherAddress(node: MultiChainNode, address: string): Promise<void> {
+  async provisionPublisherAddress(node: BlockchainNode, address: string): Promise<void> {
     const streamName = process.env.AUDIT_STREAM_NAME;
     if (!streamName) {
       throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
@@ -114,9 +114,33 @@ export class MultiChainService {
     }
   }
 
-  async createPublisherAddress(node: MultiChainNode): Promise<string> {
+  async createPublisherAddress(node: BlockchainNode): Promise<string> {
     const address = await this.getNewAddress(node);
     await this.provisionPublisherAddress(node, address);
     return address;
+  }
+
+  async publishJson(
+    node: BlockchainNode,
+    address: string,
+    key: string,
+    payload: Record<string, unknown>,
+  ): Promise<string> {
+    const streamName = process.env.AUDIT_STREAM_NAME;
+    if (!streamName) {
+      throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
+    }
+
+    const txId = await this.callRpc<string>(
+      node,
+      'publishfrom',
+      [address, streamName, key, { json: payload }],
+    );
+
+    if (typeof txId !== 'string' || !txId) {
+      throw new Error('Response publishfrom tidak berisi transaction ID.');
+    }
+
+    return txId;
   }
 }
