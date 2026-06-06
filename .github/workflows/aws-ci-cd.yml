@@ -78,25 +78,36 @@ jobs:
            --arg password "$ADMIN_PASSWORD" \
            --arg name "$ADMIN_NAME" \
            --arg google_id "$GOOGLE_CLIENT_ID" \
+           --arg database_url "$DATABASE_URL" \
+           --arg s3_bucket "$AWS_S3_BUCKET" \
+           --arg audit_stream "$AUDIT_STREAM_NAME" \
+           --arg d3_ip "$D3_IP" \
+           --arg d4_ip "$D4_IP" \
+           --arg d3_port "$D3_RPC_PORT" \
+           --arg d3_user "$D3_RPC_USERNAME" \
+           --arg d3_pass "$D3_RPC_PASSWORD" \
+           --arg d4_port "$D4_RPC_PORT" \
+           --arg d4_user "$D4_RPC_USERNAME" \
+           --arg d4_pass "$D4_RPC_PASSWORD" \
            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
             (.containerDefinitions[] | select(.name == $container) | .environment) |= 
-            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID")) + [
+            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID" and . != "DATABASE_URL" and . != "AWS_S3_BUCKET" and . != "AUDIT_STREAM_NAME" and . != "D3_IP" and . != "D4_IP" and . != "D3_RPC_PORT" and . != "D3_RPC_USERNAME" and . != "D3_RPC_PASSWORD" and . != "D4_RPC_PORT" and . != "D4_RPC_USERNAME" and . != "D4_RPC_PASSWORD")) + [
               {"name": "JWT_SECRET",       "value": $jwt},
               {"name": "ADMIN_EMAIL",      "value": $email},
               {"name": "ADMIN_PASSWORD",   "value": $password},
               {"name": "ADMIN_NAME",       "value": $name},
               {"name": "GOOGLE_CLIENT_ID", "value": $google_id},
-              {"name": "DATABASE_URL", "value": $DATABASE_URL},
-              {"name": "AWS_S3_BUCKET", "value": $AWS_S3_BUCKET},
-              {"name": "AUDIT_STREAM_NAME", "value": $AUDIT_STREAM_NAME},
-              {"name": "D3_IP", "value": $D3_IP},
-              {"name": "D4_IP", "value": $D4_IP},
-              {"name": "D3_RPC_PORT", "value": $D3_RPC_PORT},
-              {"name": "D3_RPC_USERNAME", "value": $D3_RPC_USERNAME},
-              {"name": "D3_RPC_PASSWORD", "value": $D3_RPC_PASSWORD},
-              {"name": "D4_RPC_PORT", "value": $D4_RPC_PORT},
-              {"name": "D4_RPC_USERNAME", "value": $D4_RPC_USERNAME},
-              {"name": "D4_RPC_PASSWORD", "value": $D4_RPC_PASSWORD}
+              {"name": "DATABASE_URL", "value": $database_url},
+              {"name": "AWS_S3_BUCKET", "value": $s3_bucket},
+              {"name": "AUDIT_STREAM_NAME", "value": $audit_stream},
+              {"name": "D3_IP", "value": $d3_ip},
+              {"name": "D4_IP", "value": $d4_ip},
+              {"name": "D3_RPC_PORT", "value": $d3_port},
+              {"name": "D3_RPC_USERNAME", "value": $d3_user},
+              {"name": "D3_RPC_PASSWORD", "value": $d3_pass},
+              {"name": "D4_RPC_PORT", "value": $d4_port},
+              {"name": "D4_RPC_USERNAME", "value": $d4_user},
+              {"name": "D4_RPC_PASSWORD", "value": $d4_pass}
             ])' raw-task-def.json > task-definition.json
 
     - name: Fill in the new image ID in the Amazon ECS task definition
