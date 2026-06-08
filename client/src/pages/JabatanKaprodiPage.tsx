@@ -46,6 +46,8 @@ interface Dosen {
   nama: string;
   nip: string;
   nidn: string;
+  program_studi_id?: string;
+  jurusan_id?: string;
 }
 
 interface Prodi {
@@ -119,15 +121,27 @@ export function JabatanKaprodiPage() {
 
   const fetchDosens = async () => {
     try {
-      const res = await fetch(`${usersUrl}?role=DOSEN`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const result = await res.json();
-      if (result.status === 'success') {
-        setDosens(result.data.map((u: any) => ({
-          id: u.id,
-          nama: u.dosen?.nama || u.email,
-          nip: u.dosen?.nip || '',
-          nidn: u.dosen?.nidn || '',
-        })));
+      const [dosenRes, kajurRes] = await Promise.all([
+        fetch(`${usersUrl}?role=DOSEN`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(apiUrl.replace('/kaprodi', '/kajur'), { headers: { 'Authorization': `Bearer ${token}` } }),
+      ]);
+      const dosenResult = await dosenRes.json();
+      const kajurResult = await kajurRes.json();
+      const kajurDosenIds = new Set(
+        (kajurResult.data || []).map((k: any) => k.dosen_id)
+      );
+      if (dosenResult.status === 'success') {
+        setDosens(dosenResult.data
+          .filter((u: any) => !kajurDosenIds.has(u.id))
+          .map((u: any) => ({
+            id: u.id,
+            nama: u.dosen?.nama || u.email,
+            nip: u.dosen?.nip || '',
+            nidn: u.dosen?.nidn || '',
+            program_studi_id: u.dosen?.program_studi?.id || '',
+            jurusan_id: u.dosen?.program_studi?.jurusan_id || '',
+          }))
+        );
       }
     } catch {
       console.error('Gagal memuat data dosen');
@@ -326,9 +340,9 @@ export function JabatanKaprodiPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">No</TableHead>
+                <TableHead>Program Studi</TableHead>
                 <TableHead>Nama Dosen</TableHead>
                 <TableHead>NIP / NIDN</TableHead>
-                <TableHead>Program Studi</TableHead>
                 <TableHead>Periode Mulai</TableHead>
                 <TableHead>Periode Selesai</TableHead>
                 <TableHead>Status</TableHead>
@@ -355,9 +369,9 @@ export function JabatanKaprodiPage() {
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{index + 1}</TableCell>
+                      <TableCell>{item.program_studi?.nama_prodi || getProdiName(item.program_studi_id)}</TableCell>
                       <TableCell className="font-medium">{item.dosen?.nama || getDosenName(item.dosen_id)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{item.dosen?.nip || getDosenDetail(item.dosen_id)}</TableCell>
-                      <TableCell>{item.program_studi?.nama_prodi || getProdiName(item.program_studi_id)}</TableCell>
                       <TableCell className="text-sm">{item.periode_mulai ? format(new Date(item.periode_mulai), 'dd/MM/yyyy') : '-'}</TableCell>
                       <TableCell className="text-sm">{item.periode_selesai ? format(new Date(item.periode_selesai), 'dd/MM/yyyy') : '-'}</TableCell>
                       <TableCell>
@@ -408,19 +422,6 @@ export function JabatanKaprodiPage() {
           </DialogHeader>
           <div className="space-y-4 px-1">
             <div className="space-y-2">
-              <Label htmlFor="add-dosen">Dosen *</Label>
-              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih dosen" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dosens.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="add-prodi">Program Studi *</Label>
               <Select value={formData.program_studi_id} onValueChange={(v) => setFormData({ ...formData, program_studi_id: v })}>
                 <SelectTrigger>
@@ -430,6 +431,24 @@ export function JabatanKaprodiPage() {
                   {prodis.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-dosen">Dosen *</Label>
+              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih dosen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.program_studi_id
+                    ? dosens
+                        .filter(d => d.program_studi_id === formData.program_studi_id)
+                        .map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
+                        ))
+                    : <SelectItem value="__placeholder__" disabled>Pilih prodi terlebih dahulu</SelectItem>
+                  }
                 </SelectContent>
               </Select>
             </div>
@@ -472,21 +491,8 @@ export function JabatanKaprodiPage() {
           </DialogHeader>
           <div className="space-y-4 px-1">
             <div className="space-y-2">
-              <Label htmlFor="edit-dosen">Dosen *</Label>
-              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {dosens.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="edit-prodi">Program Studi *</Label>
-              <Select value={formData.program_studi_id} onValueChange={(v) => setFormData({ ...formData, program_studi_id: v })}>
+              <Select value={formData.program_studi_id} onValueChange={(v) => setFormData({ ...formData, program_studi_id: v, dosen_id: '' })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -494,6 +500,24 @@ export function JabatanKaprodiPage() {
                   {prodis.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-dosen">Dosen *</Label>
+              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.program_studi_id
+                    ? dosens
+                        .filter(d => d.program_studi_id === formData.program_studi_id)
+                        .map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
+                        ))
+                    : <SelectItem value="__placeholder__" disabled>Pilih prodi terlebih dahulu</SelectItem>
+                  }
                 </SelectContent>
               </Select>
             </div>

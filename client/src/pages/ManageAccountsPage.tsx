@@ -572,6 +572,43 @@ export function ManageAccountsPage() {
               </div>
             )}
 
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-jurusan">Jurusan *</Label>
+                <Select
+                  value={formData.jurusanId}
+                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurusans.map((j: any) => (
+                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih program studi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis
+                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="add-password">Password Awal *</Label>
               <div className="relative">
@@ -591,22 +628,6 @@ export function ManageAccountsPage() {
                 </button>
               </div>
             </div>
-
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
-                <Label htmlFor="add-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih program studi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prodis.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {formData.role === 'admin_tu' && (
               <div className="space-y-2">
@@ -700,6 +721,43 @@ export function ManageAccountsPage() {
               </div>
             )}
 
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-jurusan">Jurusan *</Label>
+                <Select
+                  value={formData.jurusanId}
+                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurusans.map((j: any) => (
+                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis
+                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="edit-password">Reset Password (opsional)</Label>
               <div className="relative">
@@ -719,22 +777,6 @@ export function ManageAccountsPage() {
                 </button>
               </div>
             </div>
-
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prodis.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
           <DialogFooter>
