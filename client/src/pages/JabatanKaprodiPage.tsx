@@ -1,0 +1,555 @@
+import { useState, useEffect } from 'react';
+import { MainLayout } from '../components/layout/MainLayout';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import { Badge } from '../components/ui/badge';
+import { Label } from '../components/ui/label';
+import { Plus, Search, Edit, Trash2, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { format } from 'date-fns';
+
+interface Dosen {
+  id: string;
+  nama: string;
+  nip: string;
+  nidn: string;
+}
+
+interface Prodi {
+  id: string;
+  kode_prodi: string;
+  nama_prodi: string;
+  jurusan_id: string;
+  jurusan?: { id: string; kode_jurusan: string; nama_jurusan: string };
+}
+
+interface Kaprodi {
+  id: string;
+  dosen_id: string;
+  program_studi_id: string;
+  periode_mulai: string;
+  periode_selesai: string;
+  dosen?: { nama: string; nip: string; nidn: string };
+  program_studi?: { id: string; kode_prodi: string; nama_prodi: string };
+}
+
+function isActive(periodeMulai: string, periodeSelesai: string): boolean {
+  const now = new Date();
+  const start = new Date(periodeMulai);
+  const end = new Date(periodeSelesai);
+  return now >= start && now <= end;
+}
+
+export function JabatanKaprodiPage() {
+  const [items, setItems] = useState<Kaprodi[]>([]);
+  const [dosens, setDosens] = useState<Dosen[]>([]);
+  const [prodis, setProdis] = useState<Prodi[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterProdi, setFilterProdi] = useState('all');
+
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Kaprodi | null>(null);
+
+  const [formData, setFormData] = useState({
+    dosen_id: '',
+    program_studi_id: '',
+    periode_mulai: '',
+    periode_selesai: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const token = localStorage.getItem('token');
+  const apiUrl = `${import.meta.env.VITE_API_URL}/api/admin/jabatan/kaprodi`;
+  const usersUrl = `${import.meta.env.VITE_API_URL}/api/admin/users`;
+  const prodiUrl = `${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`;
+
+  useEffect(() => {
+    Promise.all([fetchKaprodi(), fetchDosens(), fetchProdis()]);
+  }, []);
+
+  const fetchKaprodi = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(apiUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+      const result = await res.json();
+      if (result.status === 'success') setItems(result.data);
+      else toast.error(result.error || 'Gagal memuat data Kaprodi');
+    } catch {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchDosens = async () => {
+    try {
+      const res = await fetch(`${usersUrl}?role=DOSEN`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const result = await res.json();
+      if (result.status === 'success') {
+        setDosens(result.data.map((u: any) => ({
+          id: u.id,
+          nama: u.dosen?.nama || u.email,
+          nip: u.dosen?.nip || '',
+          nidn: u.dosen?.nidn || '',
+        })));
+      }
+    } catch {
+      console.error('Gagal memuat data dosen');
+    }
+  };
+
+  const fetchProdis = async () => {
+    try {
+      const res = await fetch(prodiUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+      const result = await res.json();
+      if (result.status === 'success') setProdis(result.data);
+    } catch {
+      console.error('Gagal memuat data program studi');
+    }
+  };
+
+  const filteredItems = items.filter(item => {
+    const dosenName = item.dosen?.nama || '';
+    const matchesSearch = dosenName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesProdi = filterProdi === 'all' || item.program_studi_id === filterProdi;
+    return matchesSearch && matchesProdi;
+  });
+
+  const hasActiveFilters = searchTerm !== '' || filterProdi !== 'all';
+  const resetFilters = () => { setSearchTerm(''); setFilterProdi('all'); };
+
+  const openAddDialog = () => {
+    setFormData({ dosen_id: '', program_studi_id: '', periode_mulai: '', periode_selesai: '' });
+    setShowAddDialog(true);
+  };
+
+  const openEditDialog = (item: Kaprodi) => {
+    setSelectedItem(item);
+    setFormData({
+      dosen_id: item.dosen_id,
+      program_studi_id: item.program_studi_id,
+      periode_mulai: item.periode_mulai ? format(new Date(item.periode_mulai), 'yyyy-MM-dd') : '',
+      periode_selesai: item.periode_selesai ? format(new Date(item.periode_selesai), 'yyyy-MM-dd') : '',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleSubmitAdd = async () => {
+    if (!formData.dosen_id || !formData.program_studi_id || !formData.periode_mulai || !formData.periode_selesai) {
+      toast.error('Semua field wajib diisi');
+      return;
+    }
+    if (new Date(formData.periode_selesai) <= new Date(formData.periode_mulai)) {
+      toast.error('Periode selesai harus setelah periode mulai');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        toast.success('Jabatan Kaprodi berhasil dibuat');
+        setShowAddDialog(false);
+        fetchKaprodi();
+      } else {
+        toast.error(result.error || 'Gagal membuat jabatan Kaprodi');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!selectedItem || !formData.dosen_id || !formData.program_studi_id || !formData.periode_mulai || !formData.periode_selesai) {
+      toast.error('Semua field wajib diisi');
+      return;
+    }
+    if (new Date(formData.periode_selesai) <= new Date(formData.periode_mulai)) {
+      toast.error('Periode selesai harus setelah periode mulai');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`${apiUrl}/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        toast.success('Jabatan Kaprodi berhasil diperbarui');
+        setShowEditDialog(false);
+        fetchKaprodi();
+      } else {
+        toast.error(result.error || 'Gagal memperbarui jabatan Kaprodi');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedItem) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`${apiUrl}/${selectedItem.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        toast.success('Jabatan Kaprodi berhasil dihapus');
+        setShowDeleteDialog(false);
+        fetchKaprodi();
+      } else {
+        toast.error(result.error || 'Gagal menghapus jabatan Kaprodi');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan koneksi');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getDosenName = (id: string) => dosens.find(d => d.id === id)?.nama || '-';
+  const getProdiName = (id: string) => prodis.find(p => p.id === id)?.nama_prodi || '-';
+  const getDosenDetail = (id: string) => {
+    const d = dosens.find(d => d.id === id);
+    return d ? `${d.nip || d.nidn || ''}` : '-';
+  };
+
+  return (
+    <MainLayout
+      title="Jabatan Ketua Program Studi (Kaprodi)"
+      breadcrumbs={[
+        { label: 'Beranda', path: '/dashboard' },
+        { label: 'Jabatan', path: '/admin/jabatan/kaprodi' },
+        { label: 'Ketua Prodi' },
+      ]}
+    >
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Jabatan Ketua Program Studi</h2>
+            <p className="text-sm text-muted-foreground">
+              Kelola jabatan Ketua Program Studi — setiap prodi hanya dapat memiliki satu Kaprodi aktif
+            </p>
+          </div>
+          <Button onClick={openAddDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Tambah Kaprodi
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[250px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama dosen..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <Select value={filterProdi} onValueChange={setFilterProdi}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Program Studi" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Prodi</SelectItem>
+              {prodis.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
+            <Button variant="outline" onClick={resetFilters}>
+              <X className="w-4 h-4 mr-2" />
+              Reset Filter
+            </Button>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="border rounded-lg bg-background">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">No</TableHead>
+                <TableHead>Nama Dosen</TableHead>
+                <TableHead>NIP / NIDN</TableHead>
+                <TableHead>Program Studi</TableHead>
+                <TableHead>Periode Mulai</TableHead>
+                <TableHead>Periode Selesai</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
+                    <p className="mt-2 text-muted-foreground">Memuat data Kaprodi...</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    {searchTerm || filterProdi !== 'all' ? 'Tidak ada data yang sesuai filter' : 'Belum ada data Kaprodi'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredItems.map((item, index) => {
+                  const active = isActive(item.periode_mulai, item.periode_selesai);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">{item.dosen?.nama || getDosenName(item.dosen_id)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{item.dosen?.nip || getDosenDetail(item.dosen_id)}</TableCell>
+                      <TableCell>{item.program_studi?.nama_prodi || getProdiName(item.program_studi_id)}</TableCell>
+                      <TableCell className="text-sm">{item.periode_mulai ? format(new Date(item.periode_mulai), 'dd/MM/yyyy') : '-'}</TableCell>
+                      <TableCell className="text-sm">{item.periode_selesai ? format(new Date(item.periode_selesai), 'dd/MM/yyyy') : '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={active ? 'default' : 'secondary'}>
+                          {active ? 'Aktif' : 'Tidak Aktif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(item)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowDeleteDialog(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {!isLoading && (
+          <div className="text-sm text-muted-foreground">
+            Menampilkan {filteredItems.length} dari {items.length} jabatan Kaprodi
+          </div>
+        )}
+      </div>
+
+      {/* Add Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Jabatan Kaprodi Baru</DialogTitle>
+            <DialogDescription>
+              Pilih dosen dan tentukan periode jabatan. Satu prodi hanya boleh memiliki satu Kaprodi aktif.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 px-1">
+            <div className="space-y-2">
+              <Label htmlFor="add-dosen">Dosen *</Label>
+              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih dosen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dosens.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-prodi">Program Studi *</Label>
+              <Select value={formData.program_studi_id} onValueChange={(v) => setFormData({ ...formData, program_studi_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih prodi" />
+                </SelectTrigger>
+                <SelectContent>
+                  {prodis.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-mulai">Periode Mulai *</Label>
+              <Input
+                id="add-mulai"
+                type="date"
+                value={formData.periode_mulai}
+                onChange={(e) => setFormData({ ...formData, periode_mulai: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-selesai">Periode Selesai *</Label>
+              <Input
+                id="add-selesai"
+                type="date"
+                value={formData.periode_selesai}
+                onChange={(e) => setFormData({ ...formData, periode_selesai: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isSubmitting}>
+              Batal
+            </Button>
+            <Button onClick={handleSubmitAdd} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Jabatan Kaprodi</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 px-1">
+            <div className="space-y-2">
+              <Label htmlFor="edit-dosen">Dosen *</Label>
+              <Select value={formData.dosen_id} onValueChange={(v) => setFormData({ ...formData, dosen_id: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {dosens.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.nama} ({d.nip || d.nidn})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-prodi">Program Studi *</Label>
+              <Select value={formData.program_studi_id} onValueChange={(v) => setFormData({ ...formData, program_studi_id: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {prodis.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-mulai">Periode Mulai *</Label>
+              <Input
+                id="edit-mulai"
+                type="date"
+                value={formData.periode_mulai}
+                onChange={(e) => setFormData({ ...formData, periode_mulai: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-selesai">Periode Selesai *</Label>
+              <Input
+                id="edit-selesai"
+                type="date"
+                value={formData.periode_selesai}
+                onChange={(e) => setFormData({ ...formData, periode_selesai: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSubmitting}>
+              Batal
+            </Button>
+            <Button onClick={handleSubmitEdit} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Jabatan Kaprodi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Jabatan Kaprodi untuk <strong>{selectedItem?.dosen?.nama || 'dosen terpilih'}</strong> akan dihapus.
+              Pastikan tidak ada jabatan aktif lain yang bergantung pada data ini.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Menghapus...' : 'Hapus'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </MainLayout>
+  );
+}

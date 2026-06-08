@@ -233,7 +233,7 @@ export function ManageAccountsPage() {
   const checkUsernameAvailability = (username: string, excludeId?: string) => {
     const exists = accounts.some(acc => acc.username === username && acc.id !== excludeId);
     if (exists) {
-      setUsernameError('Username ini sudah digunakan');
+      setUsernameError('Email ini sudah digunakan');
       return false;
     }
     setUsernameError('');
@@ -343,7 +343,7 @@ export function ManageAccountsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Cari nama atau username..."
+                placeholder="Cari nama atau email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -359,8 +359,7 @@ export function ManageAccountsPage() {
               <SelectItem value="all">Semua Role</SelectItem>
               <SelectItem value="dosen">Dosen</SelectItem>
               <SelectItem value="admin_tu">Admin TU</SelectItem>
-              <SelectItem value="kaprodi">Kaprodi</SelectItem>
-              <SelectItem value="kajur">Kajur</SelectItem>
+              <SelectItem value="administrator">Administrator</SelectItem>
             </SelectContent>
           </Select>
 
@@ -416,7 +415,7 @@ export function ManageAccountsPage() {
               <TableRow>
                 <TableHead className="w-12">No</TableHead>
                 <TableHead>Nama Lengkap</TableHead>
-                <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Program Studi / Unit</TableHead>
                 <TableHead>Status</TableHead>
@@ -521,16 +520,16 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-username">Username *</Label>
+              <Label htmlFor="add-email">Email *</Label>
               <Input
-                id="add-username"
+                id="add-email"
                 value={formData.username}
                 onChange={(e) => {
                   setFormData({ ...formData, username: e.target.value });
                   setUsernameError('');
                 }}
                 onBlur={() => formData.username && checkUsernameAvailability(formData.username)}
-                placeholder="Masukkan username (email)"
+                placeholder="Masukkan email"
               />
               {usernameError && (
                 <p className="text-sm text-destructive">{usernameError}</p>
@@ -538,7 +537,7 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-nip">NIP</Label>
+              <Label htmlFor="add-nip">NIP *</Label>
               <Input
                 id="add-nip"
                 value={formData.nip}
@@ -548,14 +547,30 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-nidn">NIDN</Label>
-              <Input
-                id="add-nidn"
-                value={formData.nidn}
-                onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
-                placeholder="Masukkan NIDN (opsional untuk dosen)"
-              />
+              <Label htmlFor="add-role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dosen">Dosen</SelectItem>
+                  <SelectItem value="admin_tu">Admin TU</SelectItem>
+                  <SelectItem value="administrator">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-nidn">NIDN *</Label>
+                <Input
+                  id="add-nidn"
+                  value={formData.nidn}
+                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  placeholder="Masukkan NIDN"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="add-password">Password Awal *</Label>
@@ -575,21 +590,6 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="kaprodi">Kaprodi</SelectItem>
-                  <SelectItem value="kajur">Kajur</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {formData.role === 'dosen' && (
@@ -655,18 +655,18 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-username">Username</Label>
+              <Label htmlFor="edit-email">Email</Label>
               <Input
-                id="edit-username"
+                id="edit-email"
                 value={formData.username}
                 disabled
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Username tidak dapat diubah</p>
+              <p className="text-xs text-muted-foreground">Email tidak dapat diubah</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-nip">NIP</Label>
+              <Label htmlFor="edit-nip">NIP *</Label>
               <Input
                 id="edit-nip"
                 value={formData.nip}
@@ -675,17 +675,30 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-nidn">NIDN</Label>
-              <Input
-                id="edit-nidn"
-                value={formData.nidn}
-                onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
-                placeholder="Masukkan NIDN (opsional)"
-              />
-              <p className="text-xs text-muted-foreground">
-                (opsional, khusus untuk dosen)
-              </p>
+              <Label htmlFor="edit-role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dosen">Dosen</SelectItem>
+                  <SelectItem value="admin_tu">Admin TU</SelectItem>
+                  <SelectItem value="administrator">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-nidn">NIDN *</Label>
+                <Input
+                  id="edit-nidn"
+                  value={formData.nidn}
+                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  placeholder="Masukkan NIDN"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-password">Reset Password (opsional)</Label>
@@ -705,21 +718,6 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="kaprodi">Kaprodi</SelectItem>
-                  <SelectItem value="kajur">Kajur</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {formData.role === 'dosen' && (
@@ -761,13 +759,13 @@ export function ManageAccountsPage() {
             <AlertDialogDescription>
               {selectedAccount?.status === 'active' ? (
                 <>
-                  Akun <strong>{selectedAccount?.name}</strong> (username: <code>{selectedAccount?.username}</code>) akan dinonaktifkan.
+                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan dinonaktifkan.
                   Pengguna ini tidak akan bisa login dan seluruh sesi aktifnya akan langsung diakhiri.
                   Akun dapat diaktifkan kembali kapan saja.
                 </>
               ) : (
                 <>
-                  Akun <strong>{selectedAccount?.name}</strong> (username: <code>{selectedAccount?.username}</code>) akan diaktifkan kembali
+                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan diaktifkan kembali
                   dan pengguna dapat login ke sistem.
                 </>
               )}

@@ -17,6 +17,26 @@ const ManageAccountsPage = lazy(() =>
     default: m.ManageAccountsPage,
   }))
 );
+const AkademikJurusanPage = lazy(() =>
+  import("./pages/AkademikJurusanPage").then((m) => ({
+    default: m.AkademikJurusanPage,
+  }))
+);
+const AkademikProdiPage = lazy(() =>
+  import("./pages/AkademikProdiPage").then((m) => ({
+    default: m.AkademikProdiPage,
+  }))
+);
+const JabatanKajurPage = lazy(() =>
+  import("./pages/JabatanKajurPage").then((m) => ({
+    default: m.JabatanKajurPage,
+  }))
+);
+const JabatanKaprodiPage = lazy(() =>
+  import("./pages/JabatanKaprodiPage").then((m) => ({
+    default: m.JabatanKaprodiPage,
+  }))
+);
 const ActivitiesPage = lazy(() =>
   import("./pages/ActivitiesPage").then((m) => ({ default: m.ActivitiesPage }))
 );
@@ -80,12 +100,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (isLoading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
 
-  const isAdminOnly =
-    user.roles.includes("administrator") && user.roles.length === 1;
-  if (isAdminOnly && window.location.pathname === "/dashboard") {
-    return <Navigate to="/manage-accounts" replace />;
-  }
-
   return <>{children}</>;
 }
 
@@ -130,6 +144,42 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ManageAccountsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Akademik */}
+        <Route
+          path="/admin/akademik/jurusan"
+          element={
+            <ProtectedRoute>
+              <AkademikJurusanPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/akademik/prodi"
+          element={
+            <ProtectedRoute>
+              <AkademikProdiPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Jabatan */}
+        <Route
+          path="/admin/jabatan/kajur"
+          element={
+            <ProtectedRoute>
+              <JabatanKajurPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/jabatan/kaprodi"
+          element={
+            <ProtectedRoute>
+              <JabatanKaprodiPage />
             </ProtectedRoute>
           }
         />

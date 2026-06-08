@@ -7,7 +7,7 @@ import { Badge } from '../components/ui/badge';
 import {
   FileText, Activity, FolderOpen, Bell, Users, Send,
   TrendingUp, BookOpen, AlertCircle, Plus, Eye, CheckCircle2,
-  Clock, FileCheck, BarChart3, Loader2
+  Clock, FileCheck, BarChart3, Loader2, Building2, Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { format } from "date-fns";
@@ -22,11 +22,39 @@ export function DashboardPage() {
 
   const token = localStorage.getItem('token');
 
+  const [adminStats, setAdminStats] = useState({ total: 0, dosen: 0, admin_tu: 0, admin: 0 });
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
+
   useEffect(() => {
     if (user?.roles?.includes('dosen')) {
       fetchDosenDashboardData();
     }
+    if (user?.roles?.includes('administrator')) {
+      fetchAdminDashboardData();
+    }
   }, [user]);
+
+  const fetchAdminDashboardData = async () => {
+    setIsAdminLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        const users = result.data;
+        const total = users.length;
+        const dosen = users.filter((u: any) => u.role === 'DOSEN').length;
+        const admin_tu = users.filter((u: any) => u.role === 'TATA_USAHA').length;
+        const admin = users.filter((u: any) => u.role === 'ADMIN').length;
+        setAdminStats({ total, dosen, admin_tu, admin });
+      }
+    } catch {
+      console.error('Gagal memuat statistik admin');
+    } finally {
+      setIsAdminLoading(false);
+    }
+  };
 
   const fetchDosenDashboardData = async () => {
     setIsLoading(true);
@@ -614,46 +642,95 @@ export function DashboardPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Akun Terdaftar</CardDescription>
-                <CardTitle className="text-3xl">127</CardTitle>
+                <CardTitle className="text-3xl">
+                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.total}
+                </CardTitle>
               </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Akun Aktif</CardDescription>
-                <CardTitle className="text-3xl">115</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Akun Nonaktif</CardDescription>
-                <CardTitle className="text-3xl">12</CardTitle>
-              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Semua role</p>
+              </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Dosen</CardDescription>
-                <CardTitle className="text-3xl">98</CardTitle>
+                <CardTitle className="text-3xl text-green-500">
+                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.dosen}
+                </CardTitle>
               </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Tenaga pengajar</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Tata Usaha</CardDescription>
+                <CardTitle className="text-3xl text-blue-500">
+                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.admin_tu}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Staff administrasi</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Administrator</CardDescription>
+                <CardTitle className="text-3xl text-red-500">
+                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.admin}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">Admin sistem</p>
+              </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Aksi Cepat</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-3">
-                <Button onClick={() => navigate('/manage-accounts')} className="flex gap-2">
-                  <Plus className="w-4 h-4" />
-                  Tambah Akun Baru
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/manage-accounts')}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Akun</CardTitle>
+                <CardDescription>Manajemen pengguna sistem</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button onClick={() => navigate('/manage-accounts')} className="w-full justify-start">
                   <Users className="w-4 h-4 mr-2" />
-                  Lihat Semua Akun
+                  Kelola Akun Pengguna
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Akademik</CardTitle>
+                <CardDescription>Jurusan dan program studi</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button onClick={() => navigate('/admin/akademik/jurusan')} variant="outline" className="w-full justify-start">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Kelola Jurusan
+                </Button>
+                <Button onClick={() => navigate('/admin/akademik/prodi')} variant="outline" className="w-full justify-start">
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Kelola Program Studi
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Jabatan</CardTitle>
+                <CardDescription>Ketua Jurusan dan Ketua Prodi</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Button onClick={() => navigate('/admin/jabatan/kajur')} variant="outline" className="w-full justify-start">
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Kelola Ketua Jurusan
+                </Button>
+                <Button onClick={() => navigate('/admin/jabatan/kaprodi')} variant="outline" className="w-full justify-start">
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Kelola Ketua Prodi
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </MainLayout>
     );
