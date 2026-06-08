@@ -86,6 +86,21 @@ const AcademicRoleActivitiesPage = lazy(() =>
     default: m.AcademicRoleActivitiesPage,
   }))
 );
+const LaporanRekapitulasiPage = lazy(() =>
+  import("./pages/LaporanRekapitulasiPage").then((m) => ({
+    default: m.LaporanRekapitulasiPage,
+  }))
+);
+const RekapLaporanDetailPage = lazy(() =>
+  import("./pages/RekapLaporanDetailPage").then((m) => ({
+    default: m.RekapLaporanDetailPage,
+  }))
+);
+const RekapLaporanEditPage = lazy(() =>
+  import("./pages/RekapLaporanEditPage").then((m) => ({
+    default: m.RekapLaporanEditPage,
+  }))
+);
 
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
 
@@ -297,10 +312,58 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/monitoring/jurusan/rekap"
+          element={
+            <ProtectedRoute>
+              <LaporanRekapitulasiPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/jurusan/rekap/:id"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/jurusan/rekap/:id/edit"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/monitoring/prodi"
           element={
             <ProtectedRoute>
               <AcademicRoleActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap"
+          element={
+            <ProtectedRoute>
+              <LaporanRekapitulasiPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap/:id"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap/:id/edit"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanEditPage />
             </ProtectedRoute>
           }
         />

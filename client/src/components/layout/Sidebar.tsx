@@ -108,22 +108,42 @@ const navigationItems: NavItem[] = [
     roles: ["dosen"],
   },
   {
-    label: "Rekap AMI",
-    icon: BarChart3,
-    path: "/ami-recap",
-    roles: ["kaprodi", "kajur"],
-  },
-  {
     label: "Monitoring Jurusan",
     icon: BarChart3,
-    path: "/monitoring/jurusan",
     roles: ["kajur"],
+    children: [
+      {
+        label: "Kegiatan",
+        icon: Activity,
+        path: "/monitoring/jurusan",
+        roles: ["kajur"],
+      },
+      {
+        label: "Laporan Rekapitulasi",
+        icon: FileText,
+        path: "/monitoring/jurusan/rekap",
+        roles: ["kajur"],
+      },
+    ],
   },
   {
     label: "Monitoring Prodi",
     icon: BarChart3,
-    path: "/monitoring/prodi",
     roles: ["kaprodi"],
+    children: [
+      {
+        label: "Kegiatan",
+        icon: Activity,
+        path: "/monitoring/prodi",
+        roles: ["kaprodi"],
+      },
+      {
+        label: "Laporan Rekapitulasi",
+        icon: FileText,
+        path: "/monitoring/prodi/rekap",
+        roles: ["kaprodi"],
+      },
+    ],
   },
   {
     label: "Notifikasi",

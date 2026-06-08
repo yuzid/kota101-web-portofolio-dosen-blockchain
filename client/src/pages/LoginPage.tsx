@@ -106,11 +106,9 @@ export function LoginPage() {
           <div className="w-full flex flex-col items-center justify-center">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
-              onError={() => setError('Otentikasi Google gagal digagalkan.')}
-              useOneTap
+              onError={() => setError('Otentikasi Google gagal.')}
               theme="outline"
               size="large"
-              width="100%"
             />
           </div>
 

@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 import { UserRepository } from '../repositories/UserRepository';
 import { MultiChainService } from './MultiChainService';
 import { resolveBlockchainNode } from '../lib/blockchainNode';
@@ -103,7 +104,18 @@ export class AdminUserService {
       ...(roleUpper === 'DOSEN' && { dosen: { create: { nip, nidn, nama, program_studi_id, chain_address: chainAddress! } } }),
     };
 
-    return await this.userRepository.create(createData);
+    try {
+      return await this.userRepository.create(createData);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[])?.join(', ') || '';
+        if (target.includes('nip')) throw new Error('NIP sudah terdaftar.');
+        if (target.includes('nidn')) throw new Error('NIDN sudah terdaftar.');
+        if (target.includes('email')) throw new Error('Email sudah terdaftar.');
+        throw new Error('Data sudah terdaftar.');
+      }
+      throw err;
+    }
   }
 
   async updateUser(id: string, data: any, currentUser: any) {
@@ -140,9 +152,20 @@ export class AdminUserService {
     if (nip) profileData.nip = nip;
     if (nidn) profileData.nidn = nidn;
     if (program_studi_id) profileData.program_studi_id = program_studi_id;
-    if (jurusan_id) profileData.jurusan_id = jurusan_id;
+    if (existing.role === 'TATA_USAHA' && jurusan_id) profileData.jurusan_id = jurusan_id;
 
-    await this.userRepository.update(id, userData, profileData, existing.role);
+    try {
+      await this.userRepository.update(id, userData, profileData, existing.role);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[])?.join(', ') || '';
+        if (target.includes('nip')) throw new Error('NIP sudah digunakan user lain.');
+        if (target.includes('nidn')) throw new Error('NIDN sudah digunakan user lain.');
+        if (target.includes('email')) throw new Error('Email sudah digunakan user lain.');
+        throw new Error('Data sudah digunakan user lain.');
+      }
+      throw err;
+    }
     return await this.userRepository.findById(id);
   }
 

@@ -38,8 +38,16 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
+import {
   Search,
-  Download,
   Eye,
   Activity,
   CheckCircle,
@@ -51,10 +59,12 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import { createRekap } from "../lib/rekapStorage";
 
 interface Activity {
   id: string;
@@ -113,6 +123,27 @@ export function AcademicRoleActivitiesPage() {
   const [dosenList, setDosenList] = useState<{id: string, nama: string}[]>([]);
   const [prodiList, setProdiList] = useState<{id: string, nama: string}[]>([]);
   const [kategoriList, setKategoriList] = useState<string[]>([]);
+
+  // Rekap modal state
+  const [showRekapModal, setShowRekapModal] = useState(false);
+  const [rekapForm, setRekapForm] = useState({ nama: '', tanggalPerekapan: '', tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [] as string[], kategori: [] as string[] });
+  const [isSubmittingRekap, setIsSubmittingRekap] = useState(false);
+  const [previewData, setPreviewData] = useState<Activity[]>([]);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [hasPreviewed, setHasPreviewed] = useState(false);
+
+  const kategoriByJenis: Record<string, string[]> = {
+    PENDIDIKAN: ["PENGAJARAN", "BAHAN_AJAR", "BIMBINGAN_MAHASISWA", "PEMBINAAN_MAHASISWA", "PENGUJIAN_MAHASISWA"],
+    PENELITIAN: ["PENELITIAN", "PUBLIKASI_KARYA", "PATEN"],
+    PENGABDIAN: ["PENGABDIAN", "PEMBICARA", "PENGELOLA_JURNAL"],
+    TUGAS_TAMBAHAN: ["TUGAS_TAMBAHAN"],
+  };
+
+  const allKategoris = Object.values(kategoriByJenis).flat();
+
+  const filteredKategoris = rekapForm.jenisTridharma.length > 0
+    ? rekapForm.jenisTridharma.flatMap(j => kategoriByJenis[j] || [])
+    : allKategoris;
 
   const token = localStorage.getItem('token');
   const isKajur = location.pathname.includes('/monitoring/jurusan');
@@ -272,8 +303,125 @@ export function AcademicRoleActivitiesPage() {
     setPage(1);
   };
 
-  const handleExportRecap = () => {
-    toast.success("Export monitoring sedang diproses...");
+  const openRekapModal = () => {
+    setRekapForm({ nama: '', tanggalPerekapan: new Date().toISOString().split('T')[0], tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [], kategori: [] });
+    setPreviewData([]);
+    setHasPreviewed(false);
+    setShowRekapModal(true);
+  };
+
+  const handleBuatRekap = async () => {
+    if (!rekapForm.nama.trim()) {
+      toast.error('Nama rekap harus diisi');
+      return;
+    }
+    if (!rekapForm.tanggalPerekapan) {
+      toast.error('Tanggal perekapan harus diisi');
+      return;
+    }
+
+    setIsSubmittingRekap(true);
+    try {
+      const params = new URLSearchParams({ page: '1', size: '1000' });
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.jenisTridharma.length > 0) {
+        rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
+      }
+      if (rekapForm.kategori.length > 0) {
+        rekapForm.kategori.forEach(k => params.append('kategori', k));
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/akademik-role/${endpoint}/kegiatan?${params.toString()}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const result = await response.json();
+
+      if (result.status !== 'success') {
+        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        return;
+      }
+
+      const kegiatanData = result.data.data;
+      if (kegiatanData.length === 0) {
+        toast.error('Tidak ada kegiatan yang sesuai dengan filter. Rekap tidak dibuat.');
+        return;
+      }
+
+      const rekap = createRekap({
+        nama: rekapForm.nama.trim(),
+        tanggalPerekapan: rekapForm.tanggalPerekapan,
+        dibuatOleh: { id: user?.id || '', nama: user?.name || '', role: isKajur ? 'kajur' : 'kaprodi' },
+        prodiId: isKajur ? '' : (user?.programStudi || ''),
+        prodiNama: isKajur ? '' : (user?.programStudi || ''),
+        jurusanId: isKajur ? 'kajur' : '',
+        jurusanNama: isKajur ? 'Jurusan' : '',
+        filter: {
+          tanggalAwal: rekapForm.tanggalAwal || undefined,
+          tanggalAkhir: rekapForm.tanggalAkhir || undefined,
+          jenisTridharma: rekapForm.jenisTridharma.length > 0 ? rekapForm.jenisTridharma : undefined,
+          kategori: rekapForm.kategori.length > 0 ? rekapForm.kategori : undefined,
+        },
+        kegiatanData,
+      });
+
+      toast.success(`Rekap "${rekap.nama}" berhasil dibuat dengan ${kegiatanData.length} kegiatan`);
+      setShowRekapModal(false);
+    } catch {
+      toast.error('Terjadi kesalahan saat membuat rekap');
+    } finally {
+      setIsSubmittingRekap(false);
+    }
+  };
+
+  const handlePreview = async () => {
+    setIsPreviewLoading(true);
+    setHasPreviewed(true);
+    try {
+      const params = new URLSearchParams({ page: '1', size: '1000' });
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.jenisTridharma.length > 0) {
+        rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
+      }
+      if (rekapForm.kategori.length > 0) {
+        rekapForm.kategori.forEach(k => params.append('kategori', k));
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/akademik-role/${endpoint}/kegiatan?${params.toString()}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (result.status === 'success') {
+        setPreviewData(result.data.data);
+      } else {
+        toast.error(result.error || 'Gagal memuat preview');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan saat memuat preview');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const toggleJenisTridharma = (jenis: string) => {
+    setRekapForm(prev => {
+      const newJenis = prev.jenisTridharma.includes(jenis)
+        ? prev.jenisTridharma.filter(j => j !== jenis)
+        : [...prev.jenisTridharma, jenis];
+      const removedKategoris = kategoriByJenis[jenis] || [];
+      const newKategori = prev.kategori.filter(k => !removedKategoris.includes(k) || newJenis.includes(jenis));
+      return { ...prev, jenisTridharma: newJenis, kategori: newKategori };
+    });
+  };
+
+  const toggleKategori = (kat: string) => {
+    setRekapForm(prev => ({
+      ...prev,
+      kategori: prev.kategori.includes(kat) ? prev.kategori.filter(k => k !== kat) : [...prev.kategori, kat],
+    }));
   };
 
   // UI Helper: formatting category names for display
@@ -298,9 +446,9 @@ export function AcademicRoleActivitiesPage() {
               {isKajur ? "Seluruh Jurusan" : `Program Studi: ${user?.programStudi || "Memuat..."}`}
             </p>
           </div>
-          <Button onClick={handleExportRecap}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Data
+          <Button onClick={openRekapModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Buat Rekap
           </Button>
         </div>
 
@@ -678,6 +826,188 @@ export function AcademicRoleActivitiesPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Rekap Modal */}
+      <Dialog open={showRekapModal} onOpenChange={setShowRekapModal}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0">
+          <div className="p-6 pb-0">
+            <DialogHeader>
+              <DialogTitle>Buat Rekap Kegiatan</DialogTitle>
+              <DialogDescription>
+                Atur filter, lihat preview, lalu simpan rekap
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="bg-muted/20 rounded-lg p-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rekap-nama" className="text-sm font-semibold">Nama Rekap *</Label>
+                <Input
+                  id="rekap-nama"
+                  value={rekapForm.nama}
+                  onChange={(e) => setRekapForm({ ...rekapForm, nama: e.target.value })}
+                  placeholder="Contoh: Rekap Pengajaran Ganjil 2025"
+                  className="border-muted-foreground/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rekap-tanggal" className="text-sm font-semibold">Tanggal Perekapan *</Label>
+                <Input
+                  id="rekap-tanggal"
+                  type="date"
+                  value={rekapForm.tanggalPerekapan}
+                  onChange={(e) => setRekapForm({ ...rekapForm, tanggalPerekapan: e.target.value })}
+                  className="border-muted-foreground/20"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="rekap-tanggal-awal" className="text-sm font-semibold">Tanggal Mulai</Label>
+                  <Input
+                    id="rekap-tanggal-awal"
+                    type="date"
+                    value={rekapForm.tanggalAwal}
+                    onChange={(e) => setRekapForm({ ...rekapForm, tanggalAwal: e.target.value })}
+                    className="border-muted-foreground/20"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rekap-tanggal-akhir" className="text-sm font-semibold">Tanggal Selesai</Label>
+                  <Input
+                    id="rekap-tanggal-akhir"
+                    type="date"
+                    value={rekapForm.tanggalAkhir}
+                    onChange={(e) => setRekapForm({ ...rekapForm, tanggalAkhir: e.target.value })}
+                    className="border-muted-foreground/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-muted/20 rounded-lg p-4 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold">Jenis Tridharma</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(kategoriByJenis).map((jenis) => (
+                    <Badge
+                      key={jenis}
+                      variant={rekapForm.jenisTridharma.includes(jenis) ? "default" : "outline"}
+                      className={`cursor-pointer text-xs px-3 py-1.5 ${
+                        rekapForm.jenisTridharma.includes(jenis)
+                          ? jenis === "PENDIDIKAN" ? "bg-blue-500" :
+                            jenis === "PENELITIAN" ? "bg-green-500" :
+                            jenis === "PENGABDIAN" ? "bg-purple-500" : "bg-orange-500"
+                          : ""
+                      }`}
+                      onClick={() => toggleJenisTridharma(jenis)}
+                    >
+                      {formatCategory(jenis)}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Pilih jenis tridharma, lalu pilih kategori di bawah</p>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <Label className="text-sm font-semibold">Kategori Kegiatan</Label>
+                <div className="flex flex-wrap gap-2">
+                  {filteredKategoris.map((kat) => (
+                    <Badge
+                      key={kat}
+                      variant={rekapForm.kategori.includes(kat) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleKategori(kat)}
+                    >
+                      {formatCategory(kat)}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Kosongkan untuk mengambil semua kategori
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handlePreview}
+              disabled={isPreviewLoading}
+            >
+              {isPreviewLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Eye className="w-4 h-4 mr-2" />
+              )}
+              Lihat Preview Data
+            </Button>
+
+            {(hasPreviewed || previewData.length > 0) && (
+              <div className="rounded-lg border">
+                <div className="p-3 bg-muted/20 border-b flex items-center justify-between">
+                  <span className="text-sm font-semibold">
+                    Preview Data {isPreviewLoading && <Loader2 className="w-4 h-4 animate-spin inline ml-2" />}
+                  </span>
+                  <Badge variant="secondary">{previewData.length} kegiatan</Badge>
+                </div>
+                <div className="overflow-auto max-h-[300px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">No</TableHead>
+                        <TableHead className="min-w-[180px]">Nama Kegiatan</TableHead>
+                        <TableHead className="min-w-[120px]">Dosen</TableHead>
+                        <TableHead className="min-w-[120px]">Kategori</TableHead>
+                        <TableHead className="min-w-[100px]">Tanggal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isPreviewLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                          </TableCell>
+                        </TableRow>
+                      ) : previewData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            Tidak ada kegiatan yang sesuai filter
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        previewData.map((a, i) => (
+                          <TableRow key={a.id}>
+                            <TableCell className="text-xs">{i + 1}</TableCell>
+                            <TableCell className="text-sm font-medium">{a.nama_kegiatan}</TableCell>
+                            <TableCell className="text-sm">{a.dosen?.nama || '-'}</TableCell>
+                            <TableCell>{getJenisBadge(a.kategori_tridharma)}</TableCell>
+                            <TableCell className="text-xs whitespace-nowrap">
+                              {a.tanggal_mulai ? format(new Date(a.tanggal_mulai), 'dd/MM/yyyy') : '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t p-6 pt-4 mt-0">
+            <Button variant="outline" onClick={() => setShowRekapModal(false)} disabled={isSubmittingRekap}>
+              Batal
+            </Button>
+            <Button onClick={handleBuatRekap} disabled={isSubmittingRekap || previewData.length === 0}>
+              {isSubmittingRekap && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Buat Rekap ({previewData.length} kegiatan)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
