@@ -65,13 +65,18 @@ export function LaporanRekapitulasiPage() {
 
   useEffect(() => {
     loadRekaps();
-  }, []);
+  }, [isKajur]);
 
-  const loadRekaps = () => {
+  const loadRekaps = async () => {
     setIsLoading(true);
-    const data = listRekap();
-    setRekaps(data);
-    setIsLoading(false);
+    try {
+      const data = await listRekap(isKajur);
+      setRekaps(data);
+    } catch (error) {
+      toast.error("Gagal memuat rekap");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const filteredRekaps = rekaps.filter((r) =>
@@ -81,30 +86,43 @@ export function LaporanRekapitulasiPage() {
   const handleDelete = async () => {
     if (!deleteRekapId) return;
     setIsDeleting(true);
-    const success = deleteRekap(deleteRekapId);
-    if (success) {
-      toast.success("Rekap berhasil dihapus");
-      setDeleteRekapId(null);
-      loadRekaps();
-    } else {
-      toast.error("Gagal menghapus rekap");
-    }
-    setIsDeleting(false);
-  };
-
-  const handleExportXlsx = (id: string) => {
-    const rekap = getRekap(id);
-    if (rekap) {
-      exportRekapXlsx(rekap);
-      toast.success("File Excel berhasil diunduh");
+    try {
+      const success = await deleteRekap(deleteRekapId, isKajur);
+      if (success) {
+        toast.success("Rekap berhasil dihapus");
+        setDeleteRekapId(null);
+        loadRekaps();
+      } else {
+        toast.error("Gagal menghapus rekap");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan saat menghapus rekap");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleExportCsv = (id: string) => {
-    const rekap = getRekap(id);
-    if (rekap) {
-      exportRekapCsv(rekap);
-      toast.success("File CSV berhasil diunduh");
+  const handleExportXlsx = async (id: string) => {
+    try {
+      const rekap = await getRekap(id, isKajur);
+      if (rekap) {
+        exportRekapXlsx(rekap);
+        toast.success("File Excel berhasil diunduh");
+      }
+    } catch (error) {
+      toast.error("Gagal mengunduh file Excel");
+    }
+  };
+
+  const handleExportCsv = async (id: string) => {
+    try {
+      const rekap = await getRekap(id, isKajur);
+      if (rekap) {
+        exportRekapCsv(rekap);
+        toast.success("File CSV berhasil diunduh");
+      }
+    } catch (error) {
+      toast.error("Gagal mengunduh file CSV");
     }
   };
 

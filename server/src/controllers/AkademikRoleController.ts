@@ -3,14 +3,17 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 import { Kajur } from '../services/Kajur';
 import { Kaprodi } from '../services/Kaprodi';
+import { RekapService } from '../services/RekapService';
 import { KegiatanFilter, PageRequest } from '../types/activity';
 import { prisma } from '../lib/prisma';
 
 export class AkademikRoleController {
   private activityRepository: ActivityRepository;
+  private rekapService: RekapService;
 
   constructor() {
     this.activityRepository = new ActivityRepository();
+    this.rekapService = new RekapService();
   }
 
   getJurusanActivities = async (req: AuthRequest, res: Response) => {
@@ -21,7 +24,6 @@ export class AkademikRoleController {
         return;
       }
 
-      // Ambil jabatan kajur aktif untuk user ini
       const jabatan = await prisma.jabatanKajur.findFirst({
         where: {
           dosen_id: userId,
@@ -68,7 +70,6 @@ export class AkademikRoleController {
         return;
       }
 
-      // Ambil jabatan kaprodi aktif untuk user ini
       const jabatan = await prisma.jabatanKaprodi.findFirst({
         where: {
           dosen_id: userId,
@@ -172,6 +173,187 @@ export class AkademikRoleController {
 
       const result = await this.activityRepository.findProdiSummaryStats(jabatan.program_studi_id, filter);
       res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  createJurusanRekap = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKajur.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak.' });
+        return;
+      }
+
+      const { nama, tanggalPerekapan, filter, kegiatanData } = req.body;
+
+      const result = await this.rekapService.createRekap({
+        nama,
+        tanggalPerekapan: new Date(tanggalPerekapan),
+        dibuatOlehId: userId,
+        jurusanId: jabatan.jurusan_id,
+        filter,
+        kegiatanData
+      });
+
+      res.status(201).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getJurusanRekaps = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKajur.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak.' });
+        return;
+      }
+
+      const result = await this.rekapService.getAllRekap({ jurusan_id: jabatan.jurusan_id });
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  createProdiRekap = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKaprodi.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak.' });
+        return;
+      }
+
+      const { nama, tanggalPerekapan, filter, kegiatanData } = req.body;
+
+      const result = await this.rekapService.createRekap({
+        nama,
+        tanggalPerekapan: new Date(tanggalPerekapan),
+        dibuatOlehId: userId,
+        prodiId: jabatan.program_studi_id,
+        filter,
+        kegiatanData
+      });
+
+      res.status(201).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getProdiRekaps = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKaprodi.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak.' });
+        return;
+      }
+
+      const result = await this.rekapService.getAllRekap({ prodi_id: jabatan.program_studi_id });
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getRekapDetail = async (req: AuthRequest, res: Response) => {
+    try {
+      const  id  = req.params.id as string;
+      const result = await this.rekapService.getRekapDetail(id);
+      if (!result) {
+        res.status(404).json({ status: 'error', error: 'Rekap tidak ditemukan.' });
+        return;
+      }
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  updateRekap = async (req: AuthRequest, res: Response) => {
+    try {
+      const  id  = req.params.id as string;
+      const { nama, tanggalPerekapan, filter, kegiatanData } = req.body;
+      
+      const user = await prisma.user.findUnique({
+        where: { id: req.user?.id },
+        include: { dosen: true, admin: true, tata_usaha: true }
+      });
+      const userName = user?.dosen?.nama || user?.admin?.nama || user?.tata_usaha?.nama || user?.email || 'Unknown';
+
+      const result = await this.rekapService.updateRekap(id, {
+        nama,
+        tanggalPerekapan: tanggalPerekapan ? new Date(tanggalPerekapan) : undefined,
+        filter,
+        kegiatanData,
+        dilakukanOlehName: userName
+      });
+
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  deleteRekap = async (req: AuthRequest, res: Response) => {
+    try {
+      const  id  = req.params.id as string;
+      await this.rekapService.deleteRekap(id);
+      res.status(200).json({ status: 'success', message: 'Rekap berhasil dihapus.' });
     } catch (error: any) {
       res.status(500).json({ status: 'error', error: error.message });
     }

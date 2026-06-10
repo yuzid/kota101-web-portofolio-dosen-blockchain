@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -52,13 +52,47 @@ import {
 export function RekapLaporanEditPage() {
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
 
-  const rekap = id ? getRekap(id) : undefined;
-
-  const [nama, setNama] = useState(rekap?.nama || "");
-  const [tanggalPerekapan, setTanggalPerekapan] = useState(rekap?.tanggalPerekapan || "");
+  const [rekap, setRekap] = useState<RekapLaporan | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [nama, setNama] = useState("");
+  const [tanggalPerekapan, setTanggalPerekapan] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isKajur = location.pathname.includes("/monitoring/jurusan");
+
+  useEffect(() => {
+    if (id) {
+      loadRekap();
+    }
+  }, [id, isKajur]);
+
+  const loadRekap = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getRekap(id!, isKajur);
+      setRekap(data);
+      setNama(data.nama);
+      setTanggalPerekapan(data.tanggalPerekapan.split('T')[0]);
+    } catch (error) {
+      toast.error("Gagal memuat rekap");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <MainLayout title="Edit Rekap" breadcrumbs={[{ label: "Edit Rekap" }]}>
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p className="mt-2">Memuat data rekap...</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   if (!rekap) {
     return (
@@ -73,7 +107,6 @@ export function RekapLaporanEditPage() {
     );
   }
 
-  const isKajur = rekap.dibuatOleh.role === "kajur";
   const backPath = isKajur ? "/monitoring/jurusan/rekap" : "/monitoring/prodi/rekap";
 
   const formatDate = (dateStr: string) => {
@@ -133,17 +166,23 @@ export function RekapLaporanEditPage() {
     }
 
     setIsSubmitting(true);
-    const updated = updateRekap(rekap.id, {
-      nama: nama.trim(),
-      tanggalPerekapan,
-    }, user?.name);
-    if (updated) {
-      toast.success("Rekap berhasil diperbarui");
-      navigate(`${backPath}/${rekap.id}`);
-    } else {
-      toast.error("Gagal memperbarui rekap");
+    try {
+      const updated = await updateRekap(rekap.id, {
+        nama: nama.trim(),
+        tanggalPerekapan,
+      }, isKajur);
+      
+      if (updated) {
+        toast.success("Rekap berhasil diperbarui");
+        navigate(`${backPath}/${rekap.id}`);
+      } else {
+        toast.error("Gagal memperbarui rekap");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan saat memperbarui rekap");
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   return (

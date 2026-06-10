@@ -58,6 +58,7 @@ model User {
   tata_usaha    TataUsaha?
   dosen         Dosen?
   admin         Admin?
+  rekap_laporan RekapLaporan[]
 
   @@map("user")
 }
@@ -107,6 +108,7 @@ model ProgramStudi {
   jurusan         Jurusan          @relation(fields: [jurusan_id], references: [id])
   dosen           Dosen[]
   jabatan_kaprodi JabatanKaprodi[]
+  rekap_laporan   RekapLaporan[]
 
   @@map("program_studi")
 }
@@ -118,6 +120,7 @@ model Jurusan {
   program_studi ProgramStudi[]
   jabatan_kajur JabatanKajur[]
   tata_usaha    TataUsaha[]    // Tambahkan ini agar sinkron
+  rekap_laporan RekapLaporan[]
   
   @@map("jurusan")
 }
@@ -144,6 +147,26 @@ model JabatanKaprodi {
   program_studi    ProgramStudi @relation(fields: [program_studi_id], references: [id])
 
   @@map("jabatan_kaprodi")
+}
+
+model RekapLaporan {
+  id                String       @id @default(uuid()) @db.Uuid
+  nama              String       @db.VarChar(255)
+  tanggal_perekapan DateTime     @db.Date
+  dibuat_oleh_id    String       @db.Uuid
+  prodi_id          String?      @db.Uuid
+  jurusan_id        String?      @db.Uuid
+  filter            Json
+  kegiatan_data     Json
+  riwayat           Json
+  created_at        DateTime     @default(now()) @db.Timestamp
+  updated_at        DateTime     @updatedAt @db.Timestamp
+
+  user              User         @relation(fields: [dibuat_oleh_id], references: [id])
+  program_studi     ProgramStudi? @relation(fields: [prodi_id], references: [id])
+  jurusan           Jurusan?     @relation(fields: [jurusan_id], references: [id])
+
+  @@map("rekap_laporan")
 }
 
 model KepemilikanDokumen {
