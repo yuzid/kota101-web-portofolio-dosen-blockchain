@@ -349,14 +349,9 @@ export function AcademicRoleActivitiesPage() {
         return;
       }
 
-      const rekap = createRekap({
+      const rekap = await createRekap({
         nama: rekapForm.nama.trim(),
         tanggalPerekapan: rekapForm.tanggalPerekapan,
-        dibuatOleh: { id: user?.id || '', nama: user?.name || '', role: isKajur ? 'kajur' : 'kaprodi' },
-        prodiId: isKajur ? '' : (user?.programStudi || ''),
-        prodiNama: isKajur ? '' : (user?.programStudi || ''),
-        jurusanId: isKajur ? 'kajur' : '',
-        jurusanNama: isKajur ? 'Jurusan' : '',
         filter: {
           tanggalAwal: rekapForm.tanggalAwal || undefined,
           tanggalAkhir: rekapForm.tanggalAkhir || undefined,
@@ -364,7 +359,7 @@ export function AcademicRoleActivitiesPage() {
           kategori: rekapForm.kategori.length > 0 ? rekapForm.kategori : undefined,
         },
         kegiatanData,
-      });
+      }, isKajur);
 
       toast.success(`Rekap "${rekap.nama}" berhasil dibuat dengan ${kegiatanData.length} kegiatan`);
       setShowRekapModal(false);

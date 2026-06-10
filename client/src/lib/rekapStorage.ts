@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-const STORAGE_KEY = 'rekap_laporan';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export interface RekapFilter {
   tanggalAwal?: string;
@@ -32,111 +32,95 @@ export interface RekapLaporan {
   updatedAt: string;
 }
 
-function getAll(): RekapLaporan[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const items: RekapLaporan[] = JSON.parse(raw);
-    let migrated = false;
-    const migratedItems = items.map((item) => {
-      if (!item.riwayat) {
-        migrated = true;
-        return {
-          ...item,
-          riwayat: [{
-            aktivitas: 'Rekap dibuat',
-            dilakukanOleh: item.dibuatOleh.nama,
-            waktu: item.createdAt,
-          }],
-        };
-      }
-      return item;
-    });
-    if (migrated) saveAll(migratedItems);
-    return migratedItems;
-  } catch {
-    return [];
-  }
-}
-
-function saveAll(items: RekapLaporan[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-export function generateId(): string {
-  return `rekap_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-}
-
-export function createRekap(data: Omit<RekapLaporan, 'id' | 'createdAt' | 'updatedAt' | 'riwayat'>): RekapLaporan {
-  const items = getAll();
-  const now = new Date().toISOString();
-  const rekap: RekapLaporan = {
-    ...data,
-    id: generateId(),
-    riwayat: [{
-      aktivitas: 'Rekap dibuat',
-      dilakukanOleh: data.dibuatOleh.nama,
-      waktu: now,
-    }],
-    createdAt: now,
-    updatedAt: now,
+// Helper to map backend data to frontend interface
+function mapFromBackend(data: any): RekapLaporan {
+  return {
+    id: data.id,
+    nama: data.nama,
+    tanggalPerekapan: data.tanggal_perekapan,
+    dibuatOleh: {
+      id: data.dibuat_oleh_id,
+      nama: data.user?.dosen?.nama || data.user?.admin?.nama || data.user?.tata_usaha?.nama || data.user?.email || 'Unknown',
+      role: data.jurusan_id ? 'kajur' : 'kaprodi',
+    },
+    prodiId: data.prodi_id,
+    prodiNama: data.program_studi?.nama_prodi,
+    jurusanId: data.jurusan_id,
+    jurusanNama: data.jurusan?.nama_jurusan,
+    filter: data.filter,
+    kegiatanData: data.kegiatan_data,
+    riwayat: data.riwayat,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
   };
-  items.push(rekap);
-  saveAll(items);
-  return rekap;
 }
 
-export function listRekap(options?: { prodiId?: string; jurusanId?: string }): RekapLaporan[] {
-  let items = getAll();
-  if (options?.prodiId) {
-    items = items.filter(r => r.prodiId === options.prodiId);
-  }
-  if (options?.jurusanId) {
-    items = items.filter(r => r.jurusanId === options.jurusanId);
-  }
-  return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-}
+const getHeaders = () => {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+};
 
-export function getRekap(id: string): RekapLaporan | undefined {
-  return getAll().find(r => r.id === id);
-}
-
-export function updateRekap(id: string, data: Partial<Omit<RekapLaporan, 'id' | 'createdAt'>>, dilakukanOleh?: string): RekapLaporan | undefined {
-  const items = getAll();
-  const idx = items.findIndex(r => r.id === id);
-  if (idx === -1) return undefined;
-  const now = new Date().toISOString();
-  const prev = items[idx];
-  const changes: string[] = [];
-  if (data.nama !== undefined && data.nama !== prev.nama) {
-    changes.push(`Nama dari "${prev.nama}" menjadi "${data.nama}"`);
-  }
-  if (data.tanggalPerekapan !== undefined && data.tanggalPerekapan !== prev.tanggalPerekapan) {
-    changes.push('Tanggal perekapan diubah');
-  }
-  items[idx] = { ...prev, ...data, updatedAt: now };
-  items[idx].riwayat.push({
-    aktivitas: 'Rekap diperbarui',
-    detail: changes.length > 0 ? changes.join('; ') : undefined,
-    dilakukanOleh: dilakukanOleh || prev.dibuatOleh.nama,
-    waktu: now,
+export async function createRekap(data: any, isKajur: boolean): Promise<RekapLaporan> {
+  const endpoint = isKajur ? 'jurusan' : 'prodi';
+  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
   });
-  saveAll(items);
-  return items[idx];
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.error || 'Gagal membuat rekap');
+  return mapFromBackend(result.data);
 }
 
-export function deleteRekap(id: string): boolean {
-  const items = getAll();
-  const filtered = items.filter(r => r.id !== id);
-  if (filtered.length === items.length) return false;
-  saveAll(filtered);
-  return true;
+export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
+  const endpoint = isKajur ? 'jurusan' : 'prodi';
+  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`, {
+    headers: getHeaders()
+  });
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
+  return result.data.map(mapFromBackend);
+}
+
+export async function getRekap(id: string, isKajur: boolean): Promise<RekapLaporan> {
+  const endpoint = isKajur ? 'jurusan' : 'prodi';
+  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
+    headers: getHeaders()
+  });
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil detail rekap');
+  return mapFromBackend(result.data);
+}
+
+export async function updateRekap(id: string, data: any, isKajur: boolean): Promise<RekapLaporan> {
+  const endpoint = isKajur ? 'jurusan' : 'prodi';
+  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
+    method: 'PUT',
+    headers: getHeaders(),
+    body: JSON.stringify(data)
+  });
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.error || 'Gagal memperbarui rekap');
+  return mapFromBackend(result.data);
+}
+
+export async function deleteRekap(id: string, isKajur: boolean): Promise<boolean> {
+  const endpoint = isKajur ? 'jurusan' : 'prodi';
+  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+  const result = await response.json();
+  return result.status === 'success';
 }
 
 function formatDokumenLinks(k: any): string {
   if (!k.lampiran_bukti || k.lampiran_bukti.length === 0) return '-';
   return k.lampiran_bukti
-    .map((lb: any) => lb.file_url || lb.path || '')
+    .map((lb: any) => lb.file_url || lb.path || (lb.dokumen?.file_path) || '')
     .filter(Boolean)
     .join('; ');
 }

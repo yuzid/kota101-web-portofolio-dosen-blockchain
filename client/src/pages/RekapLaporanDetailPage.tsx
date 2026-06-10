@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -41,11 +41,33 @@ import { getRekap, exportRekapXlsx, exportRekapCsv, type RekapLaporan } from "..
 
 export function RekapLaporanDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [rekap] = useState<RekapLaporan | undefined>(() => id ? getRekap(id) : undefined);
+  const [rekap, setRekap] = useState<RekapLaporan | undefined>();
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("detail");
 
-  if (!rekap) {
+  const isKajur = location.pathname.includes("/monitoring/jurusan");
+
+  useEffect(() => {
+    if (id) {
+      loadRekap();
+    }
+  }, [id, isKajur]);
+
+  const loadRekap = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getRekap(id!, isKajur);
+      setRekap(data);
+    } catch (error) {
+      toast.error("Gagal memuat detail rekap");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
     return (
       <MainLayout title="Detail Rekap" breadcrumbs={[{ label: "Detail Rekap" }]}>
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -56,7 +78,20 @@ export function RekapLaporanDetailPage() {
     );
   }
 
-  const isKajur = rekap.dibuatOleh.role === "kajur";
+  if (!rekap) {
+    return (
+      <MainLayout title="Detail Rekap" breadcrumbs={[{ label: "Detail Rekap" }]}>
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+          <FileText className="w-8 h-8" />
+          <p className="mt-2">Rekap tidak ditemukan</p>
+          <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Kembali
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
 
   const formatDate = (dateStr: string) => {
     try { return format(new Date(dateStr), "dd MMM yyyy"); } catch { return dateStr; }
