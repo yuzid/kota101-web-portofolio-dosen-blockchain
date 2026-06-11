@@ -252,7 +252,7 @@ export function AcademicRoleActivitiesPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "PENDIDIKAN":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
+        return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "PENELITIAN":
         return <Badge className="bg-green-500">Penelitian</Badge>;
       case "PENGABDIAN":
@@ -523,7 +523,7 @@ export function AcademicRoleActivitiesPage() {
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="PENDIDIKAN">
-              Pengajaran
+              Pendidikan
               <Badge variant="secondary" className="ml-2">
                 {counts.PENDIDIKAN}
               </Badge>
@@ -847,7 +847,7 @@ export function AcademicRoleActivitiesPage() {
                   id="rekap-nama"
                   value={rekapForm.nama}
                   onChange={(e) => setRekapForm({ ...rekapForm, nama: e.target.value })}
-                  placeholder="Contoh: Rekap Pengajaran Ganjil 2025"
+                  placeholder="Contoh: Rekap Pendidikan Ganjil 2025"
                   className="border-muted-foreground/20"
                 />
               </div>

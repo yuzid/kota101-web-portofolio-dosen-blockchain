@@ -181,7 +181,7 @@ const getMockNotifications = (role: string): Notification[] => {
         type: "activity",
         title: "Kegiatan Baru Ditambahkan",
         description:
-          'Dr. John Doe menambahkan kegiatan "Mata Kuliah Pemrograman Web" (Pengajaran - D4 TI).',
+          'Dr. John Doe menambahkan kegiatan "Mata Kuliah Pemrograman Web" (Pendidikan - D4 TI).',
         actor: "Dr. John Doe",
         timestamp: "2026-05-16T10:30:00",
         isRead: false,

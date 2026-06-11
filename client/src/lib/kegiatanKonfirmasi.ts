@@ -84,3 +84,8 @@ export function deleteKonfirmasiByKegiatan(kegiatanId: string): void {
   const all = getAll();
   saveAll(all.filter((k) => k.kegiatanId !== kegiatanId));
 }
+
+export function deleteKonfirmasi(kegiatanId: string, dosenId: string): void {
+  const all = getAll();
+  saveAll(all.filter((k) => !(k.kegiatanId === kegiatanId && k.dosenId === dosenId)));
+}

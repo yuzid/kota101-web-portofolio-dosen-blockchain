@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
@@ -58,11 +58,12 @@ import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { createKonfirmasi } from "../lib/kegiatanKonfirmasi";
+import { createKonfirmasi, deleteKonfirmasi } from "../lib/kegiatanKonfirmasi";
 import { useNotifications } from "../contexts/NotificationContext";
 
 interface Dosen {
   id: string;
+  email: string;
   name: string;
   nidn?: string;
   programStudi: string;
@@ -125,13 +126,21 @@ export function ActivityFormPage() {
   const [jenisBukti, setJenisBukti] = useState<'masing-masing' | 'bersama'>('masing-masing');
   const [anggota, setAnggota] = useState<Dosen[]>([]);
   const [searchAnggota, setSearchAnggota] = useState("");
+  const [searchAnggotaFocused, setSearchAnggotaFocused] = useState(false);
   const [lampiran, setLampiran] = useState<Document[]>([]);
   const [availableDosen, setAvailableDosen] = useState<Dosen[]>([]);
   const [availableDocs, setAvailableDocs] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFileName, setUploadFileName] = useState('');
+  const [uploadJenis, setUploadJenis] = useState('');
+  const [uploadTanggal, setUploadTanggal] = useState<Date | undefined>(undefined);
+  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const originalAnggotaIds = useRef<string[]>([]);
 
   const token = localStorage.getItem('token');
 
@@ -152,6 +161,7 @@ export function ActivityFormPage() {
       if (result.status === 'success') {
         const mapped = result.data.map((u: any) => ({
           id: u.id,
+          email: u.email,
           name: u.dosen?.nama || u.email,
           nidn: u.dosen?.nidn || u.dosen?.nip,
           programStudi: u.dosen?.program_studi?.nama_prodi || 'Tidak ada prodi'
@@ -175,7 +185,7 @@ export function ActivityFormPage() {
           name: d.name,
           jenis: d.jenis,
           tanggal: d.tanggal,
-          uploadedBy: user?.id,
+          uploadedBy: user?.uuid,
           uploadedByName: user?.name
         }));
         setAvailableDocs(mapped);
@@ -206,9 +216,9 @@ export function ActivityFormPage() {
           biaya: act.biaya?.toString() || "",
         });
 
-        // Set anggota (exclude current user)
+        // Set anggota (exclude current user / pencatat)
         const members = act.dosenTerlibat
-          .filter((d: any) => d.id !== user?.id)
+          .filter((d: any) => !d.isPencatat)
           .map((d: any) => ({
             id: d.id,
             name: d.name,
@@ -216,6 +226,7 @@ export function ActivityFormPage() {
             programStudi: "" // Backend doesn't return prodi in detail currently
           }));
         setAnggota(members);
+        originalAnggotaIds.current = members.map((m: any) => m.id);
 
         // Set lampiran
         const docs = act.dosenTerlibat.flatMap((d: any) => 
@@ -286,7 +297,7 @@ export function ActivityFormPage() {
         ...formData,
         jenisBukti,
         anggota_ids: anggota.map(a => a.id),
-        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.id).map(l => l.id)
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id)
       };
 
       const url = isEdit 
@@ -304,12 +315,12 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
+        const kegiatanId = result.data?.id || id || '';
         if (!isEdit) {
-          const newId = result.data?.id || id;
           createKonfirmasi(
-            newId,
+            kegiatanId,
             anggota.map(a => a.id),
-            user?.id || '',
+            user?.uuid || '',
             user?.name || '',
             formData.namaKegiatan
           );
@@ -323,6 +334,21 @@ export function ActivityFormPage() {
               category: 'Kegiatan',
             });
           }
+        } else {
+          const currentIds = anggota.map(a => a.id);
+          const newIds = currentIds.filter(id => !originalAnggotaIds.current.includes(id));
+          const removedIds = originalAnggotaIds.current.filter(id => !currentIds.includes(id));
+
+          if (newIds.length > 0) {
+            createKonfirmasi(
+              kegiatanId,
+              newIds,
+              user?.uuid || '',
+              user?.name || '',
+              formData.namaKegiatan
+            );
+          }
+          removedIds.forEach(id => deleteKonfirmasi(kegiatanId, id));
         }
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
@@ -372,7 +398,8 @@ export function ActivityFormPage() {
     (d) =>
       d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
       !anggota.find((a) => a.id === d.id) &&
-      d.id !== user?.id
+      d.email !== user?.email &&
+      d.id !== user?.uuid
   );
 
   const handleAddDoc = (doc: Document) => {
@@ -384,6 +411,54 @@ export function ActivityFormPage() {
 
   const handleRemoveDoc = (docId: string) => {
     setLampiran(lampiran.filter(l => l.id !== docId));
+  };
+
+  const handleUploadDoc = async () => {
+    if (!uploadFile || !uploadFileName.trim() || !uploadJenis || !uploadTanggal) {
+      toast.error("Lengkapi nama, jenis, tanggal, dan pilih file.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('nama', uploadFileName.trim());
+      formData.append('jenis_dokumen', uploadJenis);
+      formData.append('tanggal_dokumen', format(uploadTanggal, 'yyyy-MM-dd'));
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        const newDoc: Document = {
+          id: result.data?.id || `doc-${Date.now()}`,
+          name: uploadFileName.trim(),
+          jenis: uploadJenis,
+          tanggal: uploadTanggal.toISOString(),
+          uploadedBy: user?.uuid || '',
+          uploadedByName: user?.name || '',
+        };
+        setLampiran([...lampiran, newDoc]);
+        setAvailableDocs([...availableDocs, newDoc]);
+        setShowUploadDialog(false);
+        setUploadFile(null);
+        setUploadFileName('');
+        setUploadJenis('');
+        setUploadTanggal(undefined);
+        toast.success("Dokumen berhasil diupload.");
+      } else {
+        toast.error(result.error || 'Gagal mengupload dokumen');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat mengupload');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const getInitials = (name?: string) => {
@@ -459,7 +534,7 @@ export function ActivityFormPage() {
                     <SelectValue placeholder="Pilih jenis tridharma" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pengajaran">Pengajaran</SelectItem>
+                    <SelectItem value="pengajaran">Pendidikan</SelectItem>
                     <SelectItem value="penelitian">Penelitian</SelectItem>
                     <SelectItem value="pengabdian">
                       Pengabdian kepada Masyarakat
@@ -794,17 +869,19 @@ export function ActivityFormPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama dosen..."
+                  placeholder="Klik untuk cari nama dosen..."
                   value={searchAnggota}
                   onChange={(e) => setSearchAnggota(e.target.value)}
+                  onFocus={() => setSearchAnggotaFocused(true)}
+                  onBlur={() => setTimeout(() => setSearchAnggotaFocused(false), 200)}
                   className="pl-9"
                 />
-                {searchAnggota && filteredDosen.length > 0 && (
+                {(searchAnggotaFocused || (searchAnggota && filteredDosen.length > 0)) && filteredDosen.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 max-h-48 overflow-y-auto">
                     {filteredDosen.map((dosen) => (
                       <button
                         key={dosen.id}
-                        onClick={() => handleAddAnggota(dosen)}
+                        onMouseDown={(e) => { e.preventDefault(); handleAddAnggota(dosen); }}
                         className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
                       >
                         <Avatar>
@@ -825,22 +902,20 @@ export function ActivityFormPage() {
                         </div>
                       </button>
                     ))}
+                    {!searchAnggota && (
+                      <div className="p-2 text-xs text-muted-foreground text-center border-t">
+                        Ketik untuk memfilter hasil
+                      </div>
+                    )}
+                  </div>
+                )}
+                {(searchAnggotaFocused || searchAnggota) && filteredDosen.length === 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 p-4 text-sm text-muted-foreground text-center">
+                    {searchAnggota ? 'Tidak ada dosen ditemukan' : 'Semua dosen sudah ditambahkan'}
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Konfirmasi info */}
-            {anggota.length > 0 && (
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200">
-                <p className="font-medium">⏳ Menunggu Konfirmasi</p>
-                <p className="mt-1">
-                  {anggota.length} dosen yang ditambahkan harus mengonfirmasi
-                  keterlibatan mereka. Kegiatan tidak akan muncul di daftar
-                  mereka sampai dikonfirmasi.
-                </p>
-              </div>
-            )}
 
             {/* Added Members */}
             {anggota.length > 0 && (
@@ -865,9 +940,6 @@ export function ActivityFormPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge>Anggota</Badge>
-                      <Badge variant="outline" className="text-amber-600 border-amber-300">
-                        Menunggu
-                      </Badge>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -904,9 +976,39 @@ export function ActivityFormPage() {
                 </p>
               </div>
             )}
+            {/* Dokumen Anda heading (always visible) */}
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              Dokumen Anda{" "}
+              <Badge variant="outline">
+                {lampiran.filter((l) => l.uploadedBy === user?.uuid).length}
+              </Badge>
+            </h4>
+
+            {/* Upload/Pick Actions — placed right after Dokumen Anda heading */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowDocPicker(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Pilih dari Dokumen Saya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowUploadDialog(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Unggah Dokumen Baru
+              </Button>
+            </div>
+
             {lampiran.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
+                <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
                 <p>Belum ada dokumen bukti yang diupload</p>
                 <p className="text-sm mt-1">
                   {jenisBukti === 'bersama'
@@ -916,58 +1018,50 @@ export function ActivityFormPage() {
               </div>
             ) : (
               <>
-                {/* Dokumen Saya */}
-                {lampiran.filter((l) => l.uploadedBy === user?.id).length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      Dokumen Anda{" "}
-                      <Badge variant="outline">
-                        {lampiran.filter((l) => l.uploadedBy === user?.id).length}
-                      </Badge>
-                    </h4>
-                    <div className="space-y-2">
-                      {lampiran
-                        .filter((l) => l.uploadedBy === user?.id)
-                        .map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                          >
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium text-sm">{doc.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {doc.jenis}
-                                </p>
-                              </div>
+                {/* Dokumen Saya list */}
+                {lampiran.filter((l) => l.uploadedBy === user?.uuid).length > 0 && (
+                  <div className="space-y-2">
+                    {lampiran
+                      .filter((l) => l.uploadedBy === user?.uuid)
+                      .map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-muted-foreground" />
+                            <div>
+                              <p className="font-medium text-sm">{doc.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {doc.jenis}
+                              </p>
                             </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive"
-                              onClick={() => handleRemoveDoc(doc.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
                           </div>
-                        ))}
-                    </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => handleRemoveDoc(doc.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
                   </div>
                 )}
 
                 {/* Dokumen Anggota Lain (Read-only view) */}
-                {lampiran.filter((l) => l.uploadedBy !== user?.id).length > 0 && (
+                {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length > 0 && (
                   <div className="space-y-3 pt-4 border-t">
                     <h4 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
                       Dokumen Anggota Lain{" "}
                       <Badge variant="outline">
-                        {lampiran.filter((l) => l.uploadedBy !== user?.id).length}
+                        {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length}
                       </Badge>
                     </h4>
                     <div className="space-y-2">
                       {lampiran
-                        .filter((l) => l.uploadedBy !== user?.id)
+                        .filter((l) => l.uploadedBy !== user?.uuid)
                         .map((doc) => (
                           <div
                             key={doc.id}
@@ -989,28 +1083,6 @@ export function ActivityFormPage() {
                 )}
               </>
             )}
-
-            {/* Upload/Pick Actions always visible for the recorder */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setShowDocPicker(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Pilih dari Dokumen Saya
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => navigate("/documents")}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Unggah Dokumen Baru
-              </Button>
-            </div>
           </CardContent>
         </Card>
 
@@ -1062,6 +1134,115 @@ export function ActivityFormPage() {
                 ))}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Unggah Dokumen Baru</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="upload-file">File *</Label>
+              <Input
+                id="upload-file"
+                type="file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setUploadFile(file);
+                    if (!uploadFileName) {
+                      setUploadFileName(file.name.replace(/\.[^/.]+$/, ''));
+                    }
+                  }
+                }}
+              />
+              {uploadFile && (
+                <p className="text-xs text-muted-foreground">
+                  {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="upload-nama">Nama Dokumen *</Label>
+              <Input
+                id="upload-nama"
+                placeholder="Nama dokumen"
+                value={uploadFileName}
+                onChange={(e) => setUploadFileName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="upload-jenis">Jenis Dokumen *</Label>
+              <Select value={uploadJenis} onValueChange={setUploadJenis}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih jenis dokumen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SURAT_KEPUTUSAN">Surat Keputusan</SelectItem>
+                  <SelectItem value="SURAT_TUGAS">Surat Tugas</SelectItem>
+                  <SelectItem value="LEMBAR_PENGESAHAN">Lembar Pengesahan</SelectItem>
+                  <SelectItem value="KONTRAK_PENELITIAN">Kontrak Penelitian</SelectItem>
+                  <SelectItem value="SERTIFIKAT">Sertifikat</SelectItem>
+                  <SelectItem value="FOTO">Foto</SelectItem>
+                  <SelectItem value="LAPORAN">Laporan</SelectItem>
+                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">Bukti Pendukung Lain</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tanggal Dokumen *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !uploadTanggal && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {uploadTanggal
+                      ? format(uploadTanggal, "dd MMMM yyyy", { locale: localeId })
+                      : "Pilih tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={uploadTanggal}
+                    onSelect={setUploadTanggal}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowUploadDialog(false);
+                  setUploadFile(null);
+                  setUploadFileName('');
+                  setUploadJenis('');
+                  setUploadTanggal(undefined);
+                }}
+              >
+                Batal
+              </Button>
+              <Button className="flex-1" onClick={handleUploadDoc} disabled={isUploading}>
+                {isUploading ? 'Mengupload...' : 'Upload'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

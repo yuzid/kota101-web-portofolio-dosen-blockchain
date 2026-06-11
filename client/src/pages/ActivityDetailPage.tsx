@@ -49,12 +49,23 @@ import {
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
 import {
   getKonfirmasi,
   getKonfirmasiByKegiatan,
   updateKonfirmasi,
+  createKonfirmasi,
 } from "../lib/kegiatanKonfirmasi";
 
 interface DosenBukti {
@@ -109,6 +120,7 @@ export function ActivityDetailPage() {
   const { user } = useAuth();
   const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState("detail");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -179,8 +191,19 @@ export function ActivityDetailPage() {
   };
 
   const handleAccept = () => {
-    if (!id || !user?.id) return;
-    updateKonfirmasi(id, user.id, 'diterima');
+    if (!id || !user?.uuid || !activity) return;
+    const existing = getKonfirmasi(id, user.uuid);
+    if (!existing) {
+      const pencatat = activity.dosenTerlibat.find(d => d.isPencatat);
+      createKonfirmasi(
+        id,
+        [user.uuid],
+        pencatat?.id || '',
+        pencatat?.name || 'Pembuat Kegiatan',
+        activity.namaKegiatan
+      );
+    }
+    updateKonfirmasi(id, user.uuid, 'diterima');
     toast.success("Anda menerima undangan kegiatan ini.");
     addNotification({
       type: 'approval',
@@ -193,8 +216,19 @@ export function ActivityDetailPage() {
   };
 
   const handleReject = () => {
-    if (!id || !user?.id) return;
-    updateKonfirmasi(id, user.id, 'ditolak');
+    if (!id || !user?.uuid || !activity) return;
+    const existing = getKonfirmasi(id, user.uuid);
+    if (!existing) {
+      const pencatat = activity.dosenTerlibat.find(d => d.isPencatat);
+      createKonfirmasi(
+        id,
+        [user.uuid],
+        pencatat?.id || '',
+        pencatat?.name || 'Pembuat Kegiatan',
+        activity.namaKegiatan
+      );
+    }
+    updateKonfirmasi(id, user.uuid, 'ditolak');
     toast.info("Anda menolak undangan kegiatan ini.");
     addNotification({
       type: 'approval',
@@ -220,22 +254,22 @@ export function ActivityDetailPage() {
 
   if (!activity) return null;
 
-  const isPencatat = activity.dosenTerlibat.find(d => d.isPencatat)?.id === user?.id;
+  const isPencatat = activity.dosenTerlibat.find(d => d.isPencatat)?.id === user?.uuid;
 
-  const isReadOnlyView =
-    !isPencatat ||
-    user?.roles?.includes("kaprodi") ||
-    user?.roles?.includes("kajur") ||
-    location.pathname.includes("/ami-recap/");
+  const isAnggotaTerlibat = activity.dosenTerlibat.some(d => d.id === user?.uuid);
 
-  const konfirmasiSaya = user?.id ? getKonfirmasi(activity.id, user.id) : undefined;
-  const isUndangan = konfirmasiSaya?.status === 'menunggu' && !isPencatat;
+  const konfirmasiSaya = user?.uuid ? getKonfirmasi(activity.id, user.uuid) : undefined;
+  // No record = treat as menunggu for non-pembuat
+  const statusSaya = konfirmasiSaya?.status || (isAnggotaTerlibat && !isPencatat ? 'menunggu' : undefined);
+  const isUndangan = statusSaya === 'menunggu' && !isPencatat;
+  const isInvolved = isPencatat || konfirmasiSaya?.status === 'diterima';
   const konfirmasiAll = getKonfirmasiByKegiatan(activity.id);
   const jenisBukti = (activity as any).jenisBukti || 'masing-masing';
 
   const getStatusKonfirmasiBadge = (dosenId: string) => {
     const k = konfirmasiAll.find((k) => k.dosenId === dosenId);
-    if (!k || k.status === 'diterima') {
+    if (!k) return null;
+    if (k.status === 'diterima') {
       return (
         <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
           <UserCheck className="w-3 h-3 mr-1" />
@@ -264,8 +298,7 @@ export function ActivityDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Hapus kegiatan "${activity.namaKegiatan}"?`)) return;
-
+    setShowDeleteDialog(false);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
@@ -294,7 +327,7 @@ export function ActivityDetailPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis.toLowerCase()) {
       case "pengajaran":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
+        return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "penelitian":
         return <Badge className="bg-green-500">Penelitian</Badge>;
       case "pengabdian":
@@ -306,8 +339,23 @@ export function ActivityDetailPage() {
     }
   };
 
-  const getKelengkapanBadge = (status: string) => {
-    if (status === "lengkap") {
+  const getKelengkapanBadge = () => {
+    if (!activity) return null;
+
+    const nonDitolak = activity.dosenTerlibat.filter(
+      (d) => !konfirmasiAll.find((k) => k.dosenId === d.id && k.status === 'ditolak')
+    );
+
+    let lengkap = false;
+    if (jenisBukti === 'bersama') {
+      // Bukti bersama: cukup 1 dokumen oleh siapapun
+      lengkap = activity.dosenTerlibat.some((d) => d.dokumen.length > 0);
+    } else {
+      // Masing-masing: SEMUA dosen (yg tidak ditolak) harus punya dokumen
+      lengkap = nonDitolak.every((d) => d.dokumen.length > 0);
+    }
+
+    if (lengkap) {
       return (
         <Badge className="bg-green-500 text-white">
           <CheckCircle className="w-4 h-4 mr-1" />
@@ -357,7 +405,7 @@ export function ActivityDetailPage() {
             Kembali
           </Button>
 
-          {!isReadOnlyView && !isUndangan && (
+          {isInvolved && !isUndangan && (
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleShare}>
                 <Share2 className="w-4 h-4 mr-2" />
@@ -367,10 +415,12 @@ export function ActivityDetailPage() {
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </Button>
-              <Button variant="destructive" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Hapus
-              </Button>
+              {isPencatat && (
+                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Hapus
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -430,7 +480,7 @@ export function ActivityDetailPage() {
                   {activity.programStudi}
                 </p>
               </div>
-              <div>{getKelengkapanBadge(activity.statusKelengkapan)}</div>
+              <div>{getKelengkapanBadge()}</div>
             </div>
           </CardHeader>
         </Card>
@@ -564,7 +614,7 @@ export function ActivityDetailPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-medium">{dosen.name}</p>
                               {dosen.isPencatat && (
-                                <Badge className="bg-blue-500">Pencatat</Badge>
+                                <Badge className="bg-blue-500">Pembuat</Badge>
                               )}
                               {dosen.isKetua && (
                                 <Badge className="bg-purple-500">Ketua</Badge>
@@ -920,6 +970,23 @@ export function ActivityDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Kegiatan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus kegiatan "{activity?.namaKegiatan}"? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
