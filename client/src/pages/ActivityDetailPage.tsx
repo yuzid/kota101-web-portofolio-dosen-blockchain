@@ -25,6 +25,14 @@ import {
   TableRow,
 } from "../components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { ScrollArea } from "../components/ui/scroll-area";
+import {
   ArrowLeft,
   Calendar,
   DollarSign,
@@ -39,6 +47,7 @@ import {
   Share2,
   History as HistoryIcon,
   Loader2,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -87,6 +96,42 @@ interface ActivityLog {
   documentCount: number;
   confirmations: number;
   blockHeight: number | null;
+  payload: {
+    event_type?: string;
+    payload_version?: number;
+    recorded_at?: string;
+    kegiatan?: Record<string, unknown>;
+    pencatat?: Record<string, unknown> & {
+      program_studi?: Record<string, unknown>;
+    };
+    partisipasi?: Array<Record<string, unknown>>;
+    dokumen_pendukung?: Array<Record<string, unknown>>;
+  };
+}
+
+const activityFieldLabels: Record<string, string> = {
+  nama_kegiatan: "Nama kegiatan",
+  kategori_tridharma: "Kategori Tridharma",
+  jenis_kegiatan: "Jenis kegiatan",
+  tanggal_mulai: "Tanggal mulai",
+  tanggal_selesai: "Tanggal selesai",
+  periode: "Tahun akademik",
+  semester: "Semester",
+};
+
+function formatAuditValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value !== "string") return String(value);
+
+  const parsedDate = new Date(value);
+  if (value.includes("T") && !Number.isNaN(parsedDate.getTime())) {
+    return format(parsedDate, "dd MMM yyyy HH:mm", { locale: localeId });
+  }
+  return value.replaceAll("_", " ");
+}
+
+function getRecordId(record: Record<string, unknown>, key: string) {
+  return typeof record[key] === "string" ? String(record[key]) : "";
 }
 
 export function ActivityDetailPage() {
@@ -101,6 +146,7 @@ export function ActivityDetailPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
 
   const token = localStorage.getItem('token');
 
@@ -160,6 +206,45 @@ export function ActivityDetailPage() {
     if (value === 'riwayat') {
       void fetchAuditTrail();
     }
+  };
+
+  const getPreviousLog = (log: ActivityLog) => {
+    const selectedIndex = logs.findIndex((item) => item.id === log.id);
+    return selectedIndex >= 0 ? logs[selectedIndex + 1] ?? null : null;
+  };
+
+  const getActivityChanges = (log: ActivityLog) => {
+    const current = log.payload.kegiatan ?? {};
+    const previous = getPreviousLog(log)?.payload.kegiatan ?? null;
+
+    return Object.entries(activityFieldLabels)
+      .filter(([field]) => !previous || current[field] !== previous[field])
+      .map(([field, label]) => ({
+        label,
+        before: previous?.[field],
+        after: current[field],
+        isInitial: !previous,
+      }));
+  };
+
+  const getCollectionChanges = (
+    log: ActivityLog,
+    collection: "partisipasi" | "dokumen_pendukung",
+    idKey: string,
+  ) => {
+    const current = log.payload[collection] ?? [];
+    const previous = getPreviousLog(log)?.payload[collection] ?? [];
+    const currentById = new Map(current.map((item) => [getRecordId(item, idKey), item]));
+    const previousById = new Map(previous.map((item) => [getRecordId(item, idKey), item]));
+
+    return {
+      added: current.filter((item) => !previousById.has(getRecordId(item, idKey))),
+      removed: previous.filter((item) => !currentById.has(getRecordId(item, idKey))),
+      changed: current.filter((item) => {
+        const oldItem = previousById.get(getRecordId(item, idKey));
+        return oldItem && JSON.stringify(oldItem) !== JSON.stringify(item);
+      }),
+    };
   };
 
   if (isLoading) {
@@ -617,7 +702,19 @@ export function ActivityDetailPage() {
                       </TableHeader>
                       <TableBody>
                         {logs.map((log) => (
-                          <TableRow key={log.id}>
+                          <TableRow
+                            key={log.id}
+                            role="button"
+                            tabIndex={0}
+                            className="cursor-pointer transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                            onClick={() => setSelectedLog(log)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setSelectedLog(log);
+                              }
+                            }}
+                          >
                             <TableCell className="text-sm">
                               {format(new Date(log.timestamp), "dd MMM yyyy HH:mm", { locale: localeId })}
                             </TableCell>
@@ -638,11 +735,14 @@ export function ActivityDetailPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="space-y-1 text-sm">
-                                <p>#{log.blockHeight ?? "-"}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {log.confirmations} konfirmasi
-                                </p>
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="space-y-1 text-sm">
+                                  <p>#{log.blockHeight ?? "-"}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {log.confirmations} konfirmasi
+                                  </p>
+                                </div>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </TableCell>
                           </TableRow>
@@ -660,6 +760,284 @@ export function ActivityDetailPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog
+          open={selectedLog !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedLog(null);
+          }}
+        >
+          <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+            {selectedLog && (() => {
+              const activityChanges = getActivityChanges(selectedLog);
+              const participantChanges = getCollectionChanges(
+                selectedLog,
+                "partisipasi",
+                "dosen_id",
+              );
+              const documentChanges = getCollectionChanges(
+                selectedLog,
+                "dokumen_pendukung",
+                "dokumen_id",
+              );
+              const activitySnapshot = selectedLog.payload.kegiatan ?? {};
+              const recorder = selectedLog.payload.pencatat ?? {};
+              const participants = selectedLog.payload.partisipasi ?? [];
+              const documents = selectedLog.payload.dokumen_pendukung ?? [];
+              const hasCollectionChanges =
+                participantChanges.added.length > 0 ||
+                participantChanges.removed.length > 0 ||
+                participantChanges.changed.length > 0 ||
+                documentChanges.added.length > 0 ||
+                documentChanges.removed.length > 0 ||
+                documentChanges.changed.length > 0;
+
+              return (
+                <>
+                  <DialogHeader className="border-b px-6 py-5 pr-12">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DialogTitle>Detail Perubahan</DialogTitle>
+                      <Badge variant="secondary">
+                        {selectedLog.action.replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                    <DialogDescription>
+                      Dicatat oleh {selectedLog.actor} pada{" "}
+                      {format(new Date(selectedLog.timestamp), "dd MMMM yyyy, HH:mm", {
+                        locale: localeId,
+                      })}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <ScrollArea className="max-h-[calc(90vh-110px)]">
+                    <div className="space-y-6 p-6">
+                      <section className="grid gap-3 sm:grid-cols-3">
+                        <div className="border p-3">
+                          <p className="text-xs text-muted-foreground">Block</p>
+                          <p className="mt-1 font-medium">
+                            #{selectedLog.blockHeight ?? "Belum dikonfirmasi"}
+                          </p>
+                        </div>
+                        <div className="border p-3">
+                          <p className="text-xs text-muted-foreground">Konfirmasi</p>
+                          <p className="mt-1 font-medium">
+                            {selectedLog.confirmations}
+                          </p>
+                        </div>
+                        <div className="border p-3">
+                          <p className="text-xs text-muted-foreground">Versi payload</p>
+                          <p className="mt-1 font-medium">
+                            {selectedLog.payload.payload_version ?? "-"}
+                          </p>
+                        </div>
+                      </section>
+
+                      <section className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold">Perubahan Tercatat</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Dibandingkan dengan snapshot blockchain sebelumnya.
+                          </p>
+                        </div>
+
+                        {activityChanges.length > 0 && (
+                          <div className="divide-y border">
+                            {activityChanges.map((change) => (
+                              <div
+                                key={change.label}
+                                className="grid gap-1 px-4 py-3 sm:grid-cols-[170px_1fr]"
+                              >
+                                <p className="text-sm font-medium">{change.label}</p>
+                                {change.isInitial ? (
+                                  <p className="text-sm">
+                                    {formatAuditValue(change.after)}
+                                  </p>
+                                ) : (
+                                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground line-through">
+                                      {formatAuditValue(change.before)}
+                                    </span>
+                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="font-medium">
+                                      {formatAuditValue(change.after)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {participantChanges.added.map((participant) => (
+                          <div
+                            key={`participant-added-${getRecordId(participant, "dosen_id")}`}
+                            className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+                          >
+                            Dosen ditambahkan: <strong>{String(participant.nama ?? "-")}</strong>
+                            {" "}sebagai {formatAuditValue(participant.peran)}.
+                          </div>
+                        ))}
+                        {participantChanges.removed.map((participant) => (
+                          <div
+                            key={`participant-removed-${getRecordId(participant, "dosen_id")}`}
+                            className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+                          >
+                            Dosen dihapus: <strong>{String(participant.nama ?? "-")}</strong>.
+                          </div>
+                        ))}
+                        {participantChanges.changed.map((participant) => (
+                          <div
+                            key={`participant-changed-${getRecordId(participant, "dosen_id")}`}
+                            className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                          >
+                            Data partisipasi berubah:{" "}
+                            <strong>{String(participant.nama ?? "-")}</strong>.
+                          </div>
+                        ))}
+
+                        {documentChanges.added.map((document) => (
+                          <div
+                            key={`document-added-${getRecordId(document, "dokumen_id")}`}
+                            className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+                          >
+                            Dokumen ditambahkan: <strong>{String(document.nama ?? "-")}</strong>.
+                          </div>
+                        ))}
+                        {documentChanges.removed.map((document) => (
+                          <div
+                            key={`document-removed-${getRecordId(document, "dokumen_id")}`}
+                            className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+                          >
+                            Dokumen dihapus: <strong>{String(document.nama ?? "-")}</strong>.
+                          </div>
+                        ))}
+                        {documentChanges.changed.map((document) => (
+                          <div
+                            key={`document-changed-${getRecordId(document, "dokumen_id")}`}
+                            className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                          >
+                            Data atau hash dokumen berubah:{" "}
+                            <strong>{String(document.nama ?? "-")}</strong>.
+                          </div>
+                        ))}
+
+                        {activityChanges.length === 0 && !hasCollectionChanges && (
+                          <div className="border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                            Tidak ada perbedaan data dengan snapshot sebelumnya.
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="space-y-3">
+                        <h3 className="font-semibold">Snapshot Kegiatan</h3>
+                        <div className="grid gap-x-6 gap-y-3 border p-4 sm:grid-cols-2">
+                          {Object.entries(activityFieldLabels).map(([field, label]) => (
+                            <div key={field}>
+                              <p className="text-xs text-muted-foreground">{label}</p>
+                              <p className="mt-1 text-sm font-medium">
+                                {formatAuditValue(activitySnapshot[field])}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="space-y-3">
+                        <h3 className="font-semibold">Pencatat dan Publisher</h3>
+                        <div className="space-y-3 border p-4 text-sm">
+                          <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                            <span className="text-muted-foreground">Nama</span>
+                            <span className="font-medium">{String(recorder.nama ?? selectedLog.actor)}</span>
+                          </div>
+                          <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                            <span className="text-muted-foreground">Program studi</span>
+                            <span>{String(recorder.program_studi?.nama ?? "-")}</span>
+                          </div>
+                          <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                            <span className="text-muted-foreground">Publisher</span>
+                            <span className="break-all font-mono text-xs">
+                              {selectedLog.publisher ?? "-"}
+                            </span>
+                          </div>
+                          <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                            <span className="text-muted-foreground">Transaction ID</span>
+                            <span className="break-all font-mono text-xs">
+                              {selectedLog.txId}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="space-y-3">
+                        <h3 className="font-semibold">
+                          Dosen Terlibat ({participants.length})
+                        </h3>
+                        {participants.length > 0 ? (
+                          <div className="divide-y border">
+                            {participants.map((participant) => (
+                              <div
+                                key={getRecordId(participant, "dosen_id")}
+                                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                              >
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {String(participant.nama ?? "-")}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    NIDN {String(participant.nidn ?? "-")}
+                                  </p>
+                                </div>
+                                <Badge variant="outline">
+                                  {formatAuditValue(participant.peran)}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="border p-4 text-sm text-muted-foreground">
+                            Tidak ada data partisipan pada snapshot ini.
+                          </p>
+                        )}
+                      </section>
+
+                      <section className="space-y-3">
+                        <h3 className="font-semibold">
+                          Dokumen Pendukung ({documents.length})
+                        </h3>
+                        {documents.length > 0 ? (
+                          <div className="divide-y border">
+                            {documents.map((document) => (
+                              <div
+                                key={getRecordId(document, "dokumen_id")}
+                                className="space-y-2 px-4 py-3"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-sm font-medium">
+                                    {String(document.nama ?? "-")}
+                                  </p>
+                                  <Badge variant="outline">
+                                    {formatAuditValue(document.jenis_dokumen)}
+                                  </Badge>
+                                </div>
+                                <p className="break-all font-mono text-xs text-muted-foreground">
+                                  SHA-256: {String(document.hash_file ?? "-")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="border p-4 text-sm text-muted-foreground">
+                            Tidak ada dokumen pendukung pada snapshot ini.
+                          </p>
+                        )}
+                      </section>
+                    </div>
+                  </ScrollArea>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
