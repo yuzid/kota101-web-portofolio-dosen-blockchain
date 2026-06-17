@@ -22,53 +22,49 @@ import {
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import {
-  CheckCircle,
-  XCircle,
-  Clock,
-  Plus,
-  Search,
-  Eye,
-  Share2,
-  X,
-  Loader2,
-  MailOpen,
-  UserCheck,
-  UserX,
-} from 'lucide-react';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { Plus, Search, Eye, Share2, X, Copy, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { useAuth } from '../contexts/AuthContext';
-import { useNotifications } from '../contexts/NotificationContext';
-import {
-  getKonfirmasiByDosen,
-  getKonfirmasiByKegiatan,
-  updateKonfirmasi,
-  type KonfirmasiKegiatan,
-} from '../lib/kegiatanKonfirmasi';
+import { format } from 'date-fns';
+import { id as localeId } from 'date-fns/locale';
 
 interface Activity {
   id: string;
   name: string;
-  jenisTridharma: 'pengajaran' | 'penelitian' | 'pengabdian' | 'tugas_tambahan';
+  jenisTridharma: 'pendidikan' | 'penelitian' | 'pengabdian' | 'tugas_tambahan';
   kategori: string;
   periode: string;
   semester: 'ganjil' | 'genap';
   role: 'pencatat' | 'anggota';
-  buktiCount: number;
+  anggotaCount: number;
+  tanggalMulai: string;
+  tanggalSelesai: string;
   updatedAt: string;
-  tanggalMulai?: string;
-  tanggalSelesai?: string;
+}
+
+interface PendingConfirmation {
+  id: string;
+  kegiatanId: string;
+  namaKegiatan: string;
+  pengundang: string;
+  status: string;
 }
 
 const jenisTridharmaLabels: Record<string, string> = {
-  pengajaran: 'Pendidikan',
+  pendidikan: 'Pendidikan',
   penelitian: 'Penelitian',
   pengabdian: 'Pengabdian',
   tugas_tambahan: 'Tugas Tambahan',
 };
 
 const jenisBadgeColors: Record<string, string> = {
-  pengajaran: 'bg-blue-500',
+  pendidikan: 'bg-blue-500',
   penelitian: 'bg-green-500',
   pengabdian: 'bg-purple-500',
   tugas_tambahan: 'bg-orange-500',
@@ -76,21 +72,23 @@ const jenisBadgeColors: Record<string, string> = {
 
 export function ActivitiesPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { addNotification } = useNotifications();
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [undangan, setUndangan] = useState<KonfirmasiKegiatan[]>([]);
+  const [pendingConfirmations, setPendingConfirmations] = useState<PendingConfirmation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('semua');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterSemester, setFilterSemester] = useState('all');
   const [filterTahun, setFilterTahun] = useState('all');
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     fetchActivities();
+    fetchPendingConfirmations();
   }, []);
 
   const fetchActivities = async () => {
@@ -102,50 +100,70 @@ export function ActivitiesPage() {
       const result = await response.json();
       if (result.status === 'success') {
         setActivities(result.data);
-        if (user?.uuid && Array.isArray(result.data)) {
-          const allExisting = JSON.parse(localStorage.getItem('kegiatan_konfirmasi') || '[]');
-          let changed = false;
-          result.data.forEach((act: Activity) => {
-            if (
-              act.role === 'anggota' &&
-              !allExisting.find((k: any) => k.kegiatanId === act.id && k.dosenId === user.uuid)
-            ) {
-              allExisting.push({
-                kegiatanId: act.id,
-                dosenId: user.uuid,
-                pencatatId: '',
-                pencatatNama: 'Pembuat Kegiatan',
-                namaKegiatan: act.name,
-                status: 'menunggu',
-                createdAt: new Date().toISOString(),
-              });
-              changed = true;
-            }
-          });
-          if (changed) {
-            localStorage.setItem('kegiatan_konfirmasi', JSON.stringify(allExisting));
-          }
-        }
       } else {
         toast.error(result.error || 'Gagal mengambil data kegiatan');
       }
     } catch (error) {
       toast.error('Terjadi kesalahan koneksi ke server');
     } finally {
-      loadUndangan();
       setIsLoading(false);
     }
   };
 
-  const loadUndangan = () => {
-    if (user?.uuid) {
-      const all = getKonfirmasiByDosen(user.uuid);
-      setUndangan(all.filter((k) => k.status === 'menunggu'));
+  const fetchPendingConfirmations = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/permintaan-konfirmasi`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === 'success') {
+          setPendingConfirmations(result.data);
+        }
+      }
+    } catch (error) {
+      // Backend belum menyediakan endpoint ini - catat sebagai Backend Requirement
+      console.log('Endpoint permintaan-konfirmasi belum tersedia');
     }
   };
 
-  // Filter undangan dari activities utama — kegiatan yang menunggu tidak muncul di list
-  const undanganKegiatanIds = new Set(undangan.map((u) => u.kegiatanId));
+  const handleTerima = async (partisipasiId: string, kegiatanId: string) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${kegiatanId}/partisipasi/${partisipasiId}/terima`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success('Undangan kegiatan diterima');
+        setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
+        fetchActivities();
+      } else {
+        toast.error(result.error || 'Gagal menerima undangan');
+      }
+    } catch (error) {
+      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+    }
+  };
+
+  const handleTolak = async (partisipasiId: string, kegiatanId: string) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${kegiatanId}/partisipasi/${partisipasiId}/tolak`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success('Undangan kegiatan ditolak');
+        setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
+        setActivities(prev => prev.filter(a => a.id !== kegiatanId));
+      } else {
+        toast.error(result.error || 'Gagal menolak undangan');
+      }
+    } catch (error) {
+      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+    }
+  };
 
   const filteredActivities = activities.filter(activity => {
     const matchesTab = activeTab === 'semua' || activity.jenisTridharma === activeTab;
@@ -153,14 +171,13 @@ export function ActivitiesPage() {
     const matchesSemester = filterSemester === 'all' || activity.semester === filterSemester;
     const matchesTahun = filterTahun === 'all' || activity.periode === filterTahun;
     const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
-    const notUndangan = !undanganKegiatanIds.has(activity.id);
 
-    return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori && notUndangan;
+    return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori;
   });
 
   const counts = {
     semua: activities.length,
-    pengajaran: activities.filter(a => a.jenisTridharma === 'pengajaran').length,
+    pendidikan: activities.filter(a => a.jenisTridharma === 'pendidikan').length,
     penelitian: activities.filter(a => a.jenisTridharma === 'penelitian').length,
     pengabdian: activities.filter(a => a.jenisTridharma === 'pengabdian').length,
     tugas_tambahan: activities.filter(a => a.jenisTridharma === 'tugas_tambahan').length,
@@ -175,35 +192,20 @@ export function ActivitiesPage() {
     setFilterTahun('all');
   };
 
-  const handleTerima = (item: KonfirmasiKegiatan) => {
-    if (!user?.uuid) return;
-    updateKonfirmasi(item.kegiatanId, user.uuid, 'diterima');
-    toast.success(`Anda menerima undangan kegiatan "${item.namaKegiatan}".`);
-    addNotification({
-      type: 'approval',
-      title: 'Undangan Kegiatan Diterima',
-      description: `Anda menerima undangan kegiatan "${item.namaKegiatan}".`,
-      actor: user.name,
-      priority: 'medium',
-      category: 'Kegiatan',
-    });
-    loadUndangan();
-    fetchActivities();
+  const handleShare = (activity: Activity) => {
+    setSelectedActivity(activity);
+    const link = `${window.location.origin}/activities/${activity.id}`;
+    setShareLink(link);
+    setShowShareDialog(true);
   };
 
-  const handleTolak = (item: KonfirmasiKegiatan) => {
-    if (!user?.uuid) return;
-    updateKonfirmasi(item.kegiatanId, user.uuid, 'ditolak');
-    toast.info(`Anda menolak undangan kegiatan "${item.namaKegiatan}".`);
-    addNotification({
-      type: 'approval',
-      title: 'Undangan Kegiatan Ditolak',
-      description: `Anda menolak undangan kegiatan "${item.namaKegiatan}".`,
-      actor: user.name,
-      priority: 'low',
-      category: 'Kegiatan',
-    });
-    loadUndangan();
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      toast.success('Link berhasil disalin!');
+    } catch (err) {
+      toast.info(`Link: ${shareLink}`);
+    }
   };
 
   const uniqueYears = Array.from(new Set(activities.map(a => a.periode))).sort().reverse();
@@ -218,7 +220,6 @@ export function ActivitiesPage() {
       ]}
     >
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Kegiatan Tridharma Saya</h2>
@@ -238,105 +239,51 @@ export function ActivitiesPage() {
           </div>
         </div>
 
-        {/* Permintaan Konfirmasi Kegiatan Section */}
-        {undangan.length > 0 && (
-          <Card className="border-amber-200 dark:border-amber-800">
+        {pendingConfirmations.length > 0 && (
+          <Card className="border-yellow-200 bg-yellow-50">
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <MailOpen className="w-5 h-5 text-amber-600" />
-                <CardTitle className="text-lg">Permintaan Konfirmasi Kegiatan</CardTitle>
-                <Badge variant="secondary" className="ml-2">{undangan.length}</Badge>
-              </div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                Permintaan Konfirmasi Kegiatan
+              </CardTitle>
               <CardDescription>
-                Anda diundang sebagai anggota pada kegiatan berikut. Silakan konfirmasi keterlibatan Anda.
+                Anda memiliki {pendingConfirmations.length} undangan kegiatan yang menunggu konfirmasi
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {undangan.map((item) => {
-                const relatedActivity = activities.find((a) => a.id === item.kegiatanId);
-                return (
-                  <div
-                    key={item.kegiatanId}
-                    className="flex items-start justify-between p-4 border rounded-lg bg-amber-50/50 dark:bg-amber-950/10"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{item.namaKegiatan}</p>
-                        {relatedActivity && (
-                          <Badge className={jenisBadgeColors[relatedActivity.jenisTridharma]}>
-                            {jenisTridharmaLabels[relatedActivity.jenisTridharma]}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          Oleh: {item.pencatatNama}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 ml-4 shrink-0">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handleTerima(item)}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1.5" />
-                        Terima
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                        onClick={() => handleTolak(item)}
-                      >
-                        <XCircle className="w-4 h-4 mr-1.5" />
-                        Tolak
-                      </Button>
-                      {relatedActivity && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => navigate(`/activities/${item.kegiatanId}`)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
+              {pendingConfirmations.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg bg-white">
+                  <div>
+                    <p className="font-medium">{item.namaKegiatan}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Diundang oleh {item.pengundang}
+                    </p>
+                    <Badge variant="outline" className="mt-1">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Menunggu Konfirmasi
+                    </Badge>
                   </div>
-                );
-              })}
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleTerima(item.id, item.kegiatanId)}>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Terima
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleTolak(item.id, item.kegiatanId)}>
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Tolak
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
 
-        {/* Ditolak notification */}
-        {getKonfirmasiByDosen(user?.uuid || '').filter((k) => k.status === 'ditolak').length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            <Button
-              variant="link"
-              size="sm"
-              className="text-muted-foreground h-auto p-0"
-              onClick={() => {
-                const ditolak = getKonfirmasiByDosen(user?.uuid || '').filter((k) => k.status === 'ditolak');
-                toast.info(
-                  `Kegiatan yang ditolak: ${ditolak.map((d) => d.namaKegiatan).join(', ')}`,
-                  { duration: 5000 }
-                );
-              }}
-            >
-              {getKonfirmasiByDosen(user?.uuid || '').filter((k) => k.status === 'ditolak').length} kegiatan ditolak
-            </Button>
-          </div>
-        )}
-
-        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Pendidikan</CardDescription>
-              <CardTitle className="text-3xl">{counts.pengajaran}</CardTitle>
+              <CardTitle className="text-3xl">{counts.pendidikan}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">kegiatan</p>
@@ -371,14 +318,13 @@ export function ActivitiesPage() {
           </Card>
         </div>
 
-        {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="semua">
               Semua <Badge variant="secondary" className="ml-2">{counts.semua}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="pengajaran">
-              Pendidikan <Badge variant="secondary" className="ml-2">{counts.pengajaran}</Badge>
+            <TabsTrigger value="pendidikan">
+              Pendidikan <Badge variant="secondary" className="ml-2">{counts.pendidikan}</Badge>
             </TabsTrigger>
             <TabsTrigger value="penelitian">
               Penelitian <Badge variant="secondary" className="ml-2">{counts.penelitian}</Badge>
@@ -392,7 +338,6 @@ export function ActivitiesPage() {
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4 mt-4">
-            {/* Filters */}
             <div className="flex flex-wrap gap-3">
               <div className="flex-1 min-w-[250px]">
                 <div className="relative">
@@ -437,7 +382,6 @@ export function ActivitiesPage() {
               )}
             </div>
 
-            {/* Table */}
             <div className="border rounded-lg bg-background">
               <Table>
                 <TableHeader>
@@ -449,8 +393,8 @@ export function ActivitiesPage() {
                     <TableHead>Tanggal Selesai</TableHead>
                     <TableHead>Tahun Akademik</TableHead>
                     <TableHead>Peran</TableHead>
-                    <TableHead className="text-center">Jumlah Anggota</TableHead>
-                    <TableHead className="text-center">Aksi</TableHead>
+                    <TableHead className="text-center">Anggota</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -475,111 +419,57 @@ export function ActivitiesPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredActivities.map((activity) => {
-                      const konfStatus = getKonfirmasiByDosen(user?.uuid || '').find(
-                        (k) => k.kegiatanId === activity.id
-                      );
-                      const anggotaKonf = getKonfirmasiByKegiatan(activity.id);
-                      const menungguCount = anggotaKonf.filter((k) => k.status === 'menunggu').length;
-                      const diterimaCount = anggotaKonf.filter((k) => k.status === 'diterima').length;
-                      const ditolakCount = anggotaKonf.filter((k) => k.status === 'ditolak').length;
-                      const totalAnggota = anggotaKonf.length > 0
-                        ? anggotaKonf.filter((k) => k.status !== 'ditolak').length + (activity.role === 'pencatat' ? 1 : 0)
-                        : '-';
-                      return (
-                        <TableRow key={activity.id}>
-                          <TableCell>
-                            <button
+                    filteredActivities.map((activity) => (
+                      <TableRow key={activity.id}>
+                        <TableCell>
+                          <button
+                            onClick={() => navigate(`/activities/${activity.id}`)}
+                            className="font-medium hover:underline text-left"
+                          >
+                            {activity.name}
+                          </button>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={jenisBadgeColors[activity.jenisTridharma]}>
+                            {jenisTridharmaLabels[activity.jenisTridharma]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{activity.kategori}</TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(activity.tanggalMulai), "dd MMM yyyy", { locale: localeId })}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(activity.tanggalSelesai), "dd MMM yyyy", { locale: localeId })}
+                        </TableCell>
+                        <TableCell className="text-sm">{activity.periode}</TableCell>
+                        <TableCell>
+                          <Badge variant={activity.role === 'pencatat' ? 'default' : 'secondary'}>
+                            {activity.role === 'pencatat' ? 'Pencatat' : 'Anggota'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center text-sm">
+                          {activity.anggotaCount || 0} Anggota
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => navigate(`/activities/${activity.id}`)}
-                              className="font-medium hover:underline text-left"
                             >
-                              {activity.name}
-                            </button>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={jenisBadgeColors[activity.jenisTridharma]}>
-                              {jenisTridharmaLabels[activity.jenisTridharma]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm">{activity.kategori}</TableCell>
-                          <TableCell className="text-sm">
-                            {activity.tanggalMulai
-                              ? new Date(activity.tanggalMulai).toLocaleDateString('id-ID')
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {activity.tanggalSelesai
-                              ? new Date(activity.tanggalSelesai).toLocaleDateString('id-ID')
-                              : '-'}
-                          </TableCell>
-                          <TableCell className="text-sm">{activity.periode}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <Badge variant={activity.role === 'pencatat' ? 'default' : 'secondary'}>
-                                {activity.role === 'pencatat' ? 'Pembuat' : 'Anggota'}
-                              </Badge>
-                              {activity.role === 'pencatat' && anggotaKonf.length > 0 && (
-                                <div className="flex gap-1">
-                                  {menungguCount > 0 && (
-                                    <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/20 text-xs px-1.5 py-0 h-5">
-                                      {menungguCount} menunggu
-                                    </Badge>
-                                  )}
-                                  {diterimaCount > 0 && (
-                                    <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 text-xs px-1.5 py-0 h-5">
-                                      {diterimaCount} diterima
-                                    </Badge>
-                                  )}
-                                  {ditolakCount > 0 && (
-                                    <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 text-xs px-1.5 py-0 h-5">
-                                      {ditolakCount} ditolak
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                              {konfStatus && konfStatus.status === 'diterima' && activity.role === 'anggota' && (
-                                <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
-                                  <UserCheck className="w-3 h-3 mr-1" />
-                                  Dikonfirmasi
-                                </Badge>
-                              )}
-                              {konfStatus && konfStatus.status === 'ditolak' && (
-                                <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-                                  <UserX className="w-3 h-3 mr-1" />
-                                  Ditolak
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center text-sm">
-                            {totalAnggota}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => navigate(`/activities/${activity.id}`)}
-                                title="Lihat Detail"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  const link = `${window.location.origin}/activities/${activity.id}`;
-                                  navigator.clipboard.writeText(link).then(() => toast.success('Link disalin'));
-                                }}
-                                title="Salin Link"
-                              >
-                                <Share2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleShare(activity)}
+                            >
+                              <Share2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
@@ -588,16 +478,31 @@ export function ActivitiesPage() {
             {!isLoading && (
               <div className="text-sm text-muted-foreground">
                 Menampilkan {filteredActivities.length} dari {counts[activeTab as keyof typeof counts]} kegiatan
-                {undangan.length > 0 && (
-                  <span className="ml-2 text-amber-600">
-                    (+{undangan.length} undangan menunggu)
-                  </span>
-                )}
               </div>
             )}
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Bagikan Kegiatan Ini</DialogTitle>
+            <DialogDescription>
+              Link ini akan menampilkan detail kegiatan <strong>{selectedActivity?.name}</strong> beserta dokumen buktinya.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input value={shareLink} readOnly className="font-mono text-sm" />
+              <Button onClick={copyShareLink} size="icon">
+                <Copy className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

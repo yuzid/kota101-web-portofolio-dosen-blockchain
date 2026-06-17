@@ -141,4 +141,81 @@ export class ActivityController {
       res.status(status).json({ status: 'error', error: error.message });
     }
   };
+
+  getPendingConfirmations = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const pending = await this.activityService.getPendingConfirmations(dosenId);
+      res.status(200).json({ status: 'success', data: pending });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  acceptParticipation = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      await this.activityService.acceptParticipation(req.params.partisipasiId as string, dosenId);
+      res.status(200).json({ status: 'success', message: 'Partisipasi diterima.' });
+    } catch (error: any) {
+      res.status(400).json({ status: 'error', error: error.message });
+    }
+  };
+
+  rejectParticipation = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      await this.activityService.rejectParticipation(req.params.partisipasiId as string, dosenId);
+      res.status(200).json({ status: 'success', message: 'Partisipasi ditolak.' });
+    } catch (error: any) {
+      res.status(400).json({ status: 'error', error: error.message });
+    }
+  };
+
+  addMember = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      const { anggota_id } = req.body;
+      if (!anggota_id) {
+        res.status(400).json({ status: 'error', error: 'anggota_id wajib diisi.' });
+        return;
+      }
+      await this.activityService.addMember(req.params.id as string, dosenId, anggota_id);
+      res.status(201).json({ status: 'success', message: 'Anggota berhasil ditambahkan.' });
+    } catch (error: any) {
+      const status = error.message.includes('Akses ditolak') ? 403 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  removeMember = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      await this.activityService.removeMember(req.params.id as string, dosenId, req.params.anggotaId as string);
+      res.status(200).json({ status: 'success', message: 'Anggota berhasil dihapus.' });
+    } catch (error: any) {
+      const status = error.message.includes('Akses ditolak') ? 403 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
 }

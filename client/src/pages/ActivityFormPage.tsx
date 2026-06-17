@@ -49,21 +49,18 @@ import {
   Search,
   FileText,
   Trash2,
-  Highlighter,
   Plus,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { createKonfirmasi, deleteKonfirmasi } from "../lib/kegiatanKonfirmasi";
-import { useNotifications } from "../contexts/NotificationContext";
 
 interface Dosen {
   id: string;
-  email: string;
   name: string;
   nidn?: string;
   programStudi: string;
@@ -79,7 +76,7 @@ interface Document {
 }
 
 const kategoriByJenis: Record<string, string[]> = {
-  pengajaran: [
+  pendidikan: [
     "Mengajar",
     "Pembimbing TA",
     "Pembimbing PKL",
@@ -108,7 +105,6 @@ export function ActivityFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addNotification } = useNotifications();
   const isEdit = Boolean(id);
 
   const [formData, setFormData] = useState({
@@ -121,27 +117,21 @@ export function ActivityFormPage() {
     semester: "",
     sumberDana: "",
     biaya: "",
+    jenisBukti: "MASING_MASING" as "MASING_MASING" | "BERSAMA",
   });
 
-  const [jenisBukti, setJenisBukti] = useState<'masing-masing' | 'bersama'>('masing-masing');
   const [anggota, setAnggota] = useState<Dosen[]>([]);
   const [searchAnggota, setSearchAnggota] = useState("");
-  const [searchAnggotaFocused, setSearchAnggotaFocused] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [lampiran, setLampiran] = useState<Document[]>([]);
   const [availableDosen, setAvailableDosen] = useState<Dosen[]>([]);
   const [availableDocs, setAvailableDocs] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadFileName, setUploadFileName] = useState('');
-  const [uploadJenis, setUploadJenis] = useState('');
-  const [uploadTanggal, setUploadTanggal] = useState<Date | undefined>(undefined);
-  const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const originalAnggotaIds = useRef<string[]>([]);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -161,7 +151,6 @@ export function ActivityFormPage() {
       if (result.status === 'success') {
         const mapped = result.data.map((u: any) => ({
           id: u.id,
-          email: u.email,
           name: u.dosen?.nama || u.email,
           nidn: u.dosen?.nidn || u.dosen?.nip,
           programStudi: u.dosen?.program_studi?.nama_prodi || 'Tidak ada prodi'
@@ -185,7 +174,7 @@ export function ActivityFormPage() {
           name: d.name,
           jenis: d.jenis,
           tanggal: d.tanggal,
-          uploadedBy: user?.uuid,
+          uploadedBy: user?.id,
           uploadedByName: user?.name
         }));
         setAvailableDocs(mapped);
@@ -214,22 +203,20 @@ export function ActivityFormPage() {
           semester: act.semester,
           sumberDana: act.sumberDana || "",
           biaya: act.biaya?.toString() || "",
+          jenisBukti: act.jenisBukti || "MASING_MASING",
         });
 
-        // Set anggota (exclude current user / pencatat)
         const members = act.dosenTerlibat
-          .filter((d: any) => !d.isPencatat)
+          .filter((d: any) => d.id !== user?.id)
           .map((d: any) => ({
             id: d.id,
             name: d.name,
             nidn: d.nidn,
-            programStudi: "" // Backend doesn't return prodi in detail currently
+            programStudi: ""
           }));
         setAnggota(members);
-        originalAnggotaIds.current = members.map((m: any) => m.id);
 
-        // Set lampiran
-        const docs = act.dosenTerlibat.flatMap((d: any) => 
+        const docs = act.dosenTerlibat.flatMap((d: any) =>
           d.dokumen.map((doc: any) => ({
             id: doc.id,
             name: doc.name,
@@ -250,7 +237,6 @@ export function ActivityFormPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.namaKegiatan.trim()) {
       newErrors.namaKegiatan = "Nama kegiatan wajib diisi";
     }
@@ -280,7 +266,6 @@ export function ActivityFormPage() {
     if (!formData.semester) {
       newErrors.semester = "Semester wajib dipilih";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -295,15 +280,16 @@ export function ActivityFormPage() {
     try {
       const payload = {
         ...formData,
-        jenisBukti,
+        tanggalMulai: formData.tanggalMulai?.toISOString(),
+        tanggalSelesai: formData.tanggalSelesai?.toISOString(),
         anggota_ids: anggota.map(a => a.id),
-        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id)
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.id).map(l => l.id)
       };
 
-      const url = isEdit 
+      const url = isEdit
         ? `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`
         : `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`;
-      
+
       const response = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: {
@@ -315,41 +301,6 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
-        const kegiatanId = result.data?.id || id || '';
-        if (!isEdit) {
-          createKonfirmasi(
-            kegiatanId,
-            anggota.map(a => a.id),
-            user?.uuid || '',
-            user?.name || '',
-            formData.namaKegiatan
-          );
-          if (anggota.length > 0) {
-            addNotification({
-              type: 'member_added',
-              title: 'Undangan Kegiatan Terkirim',
-              description: `Undangan kegiatan "${formData.namaKegiatan}" telah dikirim ke ${anggota.length} dosen.`,
-              actor: user?.name,
-              priority: 'medium',
-              category: 'Kegiatan',
-            });
-          }
-        } else {
-          const currentIds = anggota.map(a => a.id);
-          const newIds = currentIds.filter(id => !originalAnggotaIds.current.includes(id));
-          const removedIds = originalAnggotaIds.current.filter(id => !currentIds.includes(id));
-
-          if (newIds.length > 0) {
-            createKonfirmasi(
-              kegiatanId,
-              newIds,
-              user?.uuid || '',
-              user?.name || '',
-              formData.namaKegiatan
-            );
-          }
-          removedIds.forEach(id => deleteKonfirmasi(kegiatanId, id));
-        }
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
       } else {
@@ -388,6 +339,7 @@ export function ActivityFormPage() {
       setAnggota([...anggota, dosen]);
     }
     setSearchAnggota("");
+    setShowDropdown(false);
   };
 
   const handleRemoveAnggota = (dosenId: string) => {
@@ -398,8 +350,7 @@ export function ActivityFormPage() {
     (d) =>
       d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
       !anggota.find((a) => a.id === d.id) &&
-      d.email !== user?.email &&
-      d.id !== user?.uuid
+      d.id !== user?.id
   );
 
   const handleAddDoc = (doc: Document) => {
@@ -413,52 +364,42 @@ export function ActivityFormPage() {
     setLampiran(lampiran.filter(l => l.id !== docId));
   };
 
-  const handleUploadDoc = async () => {
-    if (!uploadFile || !uploadFileName.trim() || !uploadJenis || !uploadTanggal) {
-      toast.error("Lengkapi nama, jenis, tanggal, dan pilih file.");
-      return;
-    }
+  const handleUploadFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.docx';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
 
-    setIsUploading(true);
-    try {
       const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('nama', uploadFileName.trim());
-      formData.append('jenis_dokumen', uploadJenis);
-      formData.append('tanggal_dokumen', format(uploadTanggal, 'yyyy-MM-dd'));
+      formData.append('file', file);
+      formData.append('nama', file.name.replace(/\.[^/.]+$/, ""));
+      formData.append('jenis_dokumen', 'BUKTI_PENDUKUNG_LAIN');
+      formData.append('tanggal_dokumen', new Date().toISOString().split('T')[0]);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/upload`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-
-      const result = await response.json();
-      if (result.status === 'success') {
-        const newDoc: Document = {
-          id: result.data?.id || `doc-${Date.now()}`,
-          name: uploadFileName.trim(),
-          jenis: uploadJenis,
-          tanggal: uploadTanggal.toISOString(),
-          uploadedBy: user?.uuid || '',
-          uploadedByName: user?.name || '',
-        };
-        setLampiran([...lampiran, newDoc]);
-        setAvailableDocs([...availableDocs, newDoc]);
-        setShowUploadDialog(false);
-        setUploadFile(null);
-        setUploadFileName('');
-        setUploadJenis('');
-        setUploadTanggal(undefined);
-        toast.success("Dokumen berhasil diupload.");
-      } else {
-        toast.error(result.error || 'Gagal mengupload dokumen');
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          toast.success('Dokumen berhasil diupload');
+          fetchMyDocuments();
+        } else {
+          toast.error(result.error || 'Gagal upload dokumen');
+        }
+      } catch (error) {
+        toast.error('Gagal upload dokumen');
       }
-    } catch (error) {
-      toast.error('Terjadi kesalahan saat mengupload');
-    } finally {
-      setIsUploading(false);
-    }
+    };
+    input.click();
+  };
+
+  const handleFocusSearch = () => {
+    setShowDropdown(true);
   };
 
   const getInitials = (name?: string) => {
@@ -487,7 +428,6 @@ export function ActivityFormPage() {
           </div>
         )}
 
-        {/* Section 1: Informasi Kegiatan */}
         <Card>
           <CardHeader>
             <CardTitle>Informasi Kegiatan</CardTitle>
@@ -534,14 +474,10 @@ export function ActivityFormPage() {
                     <SelectValue placeholder="Pilih jenis tridharma" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pengajaran">Pendidikan</SelectItem>
+                    <SelectItem value="pendidikan">Pendidikan</SelectItem>
                     <SelectItem value="penelitian">Penelitian</SelectItem>
-                    <SelectItem value="pengabdian">
-                      Pengabdian kepada Masyarakat
-                    </SelectItem>
-                    <SelectItem value="tugas_tambahan">
-                      Tugas Tambahan
-                    </SelectItem>
+                    <SelectItem value="pengabdian">Pengabdian kepada Masyarakat</SelectItem>
+                    <SelectItem value="tugas_tambahan">Tugas Tambahan</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.jenisTridharma && (
@@ -574,7 +510,7 @@ export function ActivityFormPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {formData.jenisTridharma &&
-                      kategoriByJenis[formData.jenisTridharma].map((kat) => (
+                      kategoriByJenis[formData.jenisTridharma]?.map((kat) => (
                         <SelectItem key={kat} value={kat}>
                           {kat}
                         </SelectItem>
@@ -731,9 +667,7 @@ export function ActivityFormPage() {
                   <SelectContent>
                     <SelectItem value="DIPA POLBAN">DIPA POLBAN</SelectItem>
                     <SelectItem value="Mandiri">Mandiri</SelectItem>
-                    <SelectItem value="Hibah Eksternal">
-                      Hibah Eksternal
-                    </SelectItem>
+                    <SelectItem value="Hibah Eksternal">Hibah Eksternal</SelectItem>
                     <SelectItem value="Lainnya">Lainnya</SelectItem>
                   </SelectContent>
                 </Select>
@@ -757,92 +691,11 @@ export function ActivityFormPage() {
           </CardContent>
         </Card>
 
-        {/* Section 2: Jenis Bukti Kegiatan */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Jenis Bukti Kegiatan</CardTitle>
-            <CardDescription>
-              Pilih bagaimana dokumen bukti dikelola untuk kegiatan bersama
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setJenisBukti('masing-masing')}
-                className={`relative rounded-lg border-2 p-4 text-left transition-all ${
-                  jenisBukti === 'masing-masing'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    jenisBukti === 'masing-masing' ? 'border-primary' : 'border-muted-foreground'
-                  }`}>
-                    {jenisBukti === 'masing-masing' && (
-                      <div className="w-3 h-3 rounded-full bg-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium">Bukti diunggah masing-masing</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Setiap dosen yang terlibat mengunggah dokumen buktinya sendiri.
-                      Dokumen tidak saling terhubung antar dosen.
-                    </p>
-                    <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                      <li>Status kelengkapan dihitung per dosen</li>
-                      <li>Dosen lain tidak bisa melihat dokumen pribadi</li>
-                    </ul>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setJenisBukti('bersama')}
-                className={`relative rounded-lg border-2 p-4 text-left transition-all ${
-                  jenisBukti === 'bersama'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-muted hover:border-muted-foreground/30'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`mt-1 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                    jenisBukti === 'bersama' ? 'border-primary' : 'border-muted-foreground'
-                  }`}>
-                    {jenisBukti === 'bersama' && (
-                      <div className="w-3 h-3 rounded-full bg-primary" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium">Bukti bersama</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Satu dokumen dipakai bersama oleh seluruh dosen yang terlibat.
-                      Cukup satu kali upload oleh pencatat kegiatan.
-                    </p>
-                    <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
-                      <li>Dokumen otomatis terhubung ke dosen yang menyetujui</li>
-                      <li>Dosen lain dapat melihat dokumen (read-only)</li>
-                      <li>Hanya uploader yang bisa edit/hapus</li>
-                    </ul>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Section 3: Dosen yang Terlibat */}
         <Card>
           <CardHeader>
             <CardTitle>Dosen yang Terlibat</CardTitle>
-            <CardDescription>
-              Tambahkan dosen lain untuk kegiatan bersama. Dosen yang ditambahkan harus mengonfirmasi keterlibatan mereka.
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Current User (Fixed) - Pencatat is also Anggota */}
             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Avatar>
@@ -858,30 +711,35 @@ export function ActivityFormPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Badge className="bg-blue-500">Pencatat</Badge>
-                <Badge variant="secondary">Anggota</Badge>
+                <Badge className="bg-blue-500">Pembuat</Badge>
               </div>
             </div>
 
-            {/* Search and Add Members */}
             <div className="space-y-2">
               <Label>Tambah Anggota Dosen (opsional)</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Klik untuk cari nama dosen..."
+                  ref={searchInputRef}
+                  placeholder="Cari nama dosen..."
                   value={searchAnggota}
-                  onChange={(e) => setSearchAnggota(e.target.value)}
-                  onFocus={() => setSearchAnggotaFocused(true)}
-                  onBlur={() => setTimeout(() => setSearchAnggotaFocused(false), 200)}
+                  onChange={(e) => {
+                    setSearchAnggota(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={handleFocusSearch}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                   className="pl-9"
                 />
-                {(searchAnggotaFocused || (searchAnggota && filteredDosen.length > 0)) && filteredDosen.length > 0 && (
+                {showDropdown && searchAnggota && filteredDosen.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 max-h-48 overflow-y-auto">
                     {filteredDosen.map((dosen) => (
                       <button
                         key={dosen.id}
-                        onMouseDown={(e) => { e.preventDefault(); handleAddAnggota(dosen); }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleAddAnggota(dosen);
+                        }}
                         className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
                       >
                         <Avatar>
@@ -902,22 +760,42 @@ export function ActivityFormPage() {
                         </div>
                       </button>
                     ))}
-                    {!searchAnggota && (
-                      <div className="p-2 text-xs text-muted-foreground text-center border-t">
-                        Ketik untuk memfilter hasil
-                      </div>
-                    )}
                   </div>
                 )}
-                {(searchAnggotaFocused || searchAnggota) && filteredDosen.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 p-4 text-sm text-muted-foreground text-center">
-                    {searchAnggota ? 'Tidak ada dosen ditemukan' : 'Semua dosen sudah ditambahkan'}
+                {showDropdown && !searchAnggota && filteredDosen.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 max-h-48 overflow-y-auto">
+                    {filteredDosen.map((dosen) => (
+                      <button
+                        key={dosen.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleAddAnggota(dosen);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
+                      >
+                        <Avatar>
+                          <AvatarFallback>
+                            {getInitials(dosen.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{dosen.name}</p>
+                          {dosen.nidn && (
+                            <p className="text-xs text-muted-foreground font-mono">
+                              ID/NIP: {dosen.nidn}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {dosen.programStudi}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Added Members */}
             {anggota.length > 0 && (
               <div className="space-y-2">
                 {anggota.map((d) => (
@@ -939,7 +817,7 @@ export function ActivityFormPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge>Anggota</Badge>
+                      <Badge variant="secondary">Anggota</Badge>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -955,113 +833,122 @@ export function ActivityFormPage() {
           </CardContent>
         </Card>
 
-        {/* Section 4: Lampiran Bukti */}
         <Card>
           <CardHeader>
-            <CardTitle>Lampiran Bukti Kegiatan</CardTitle>
+            <CardTitle>Jenis Bukti Kegiatan</CardTitle>
             <CardDescription>
-              {jenisBukti === 'bersama'
-                ? 'Upload satu dokumen bukti yang akan dipakai bersama oleh seluruh dosen yang terlibat'
-                : 'Setiap dosen yang terlibat mengunggah dokumen buktinya masing-masing'}
+              Pilih bagaimana bukti dokumen dikelola untuk kegiatan ini
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div
+                className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFormData({ ...formData, jenisBukti: "MASING_MASING" })}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary" : ""}`}>
+                    {formData.jenisBukti === "MASING_MASING" && (
+                      <div className="w-2 h-2 rounded-full bg-white m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Bukti Diunggah Masing-Masing</p>
+                    <p className="text-sm text-muted-foreground">
+                      Setiap dosen mengupload dokumen bukti secara mandiri
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div
+                className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFormData({ ...formData, jenisBukti: "BERSAMA" })}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary" : ""}`}>
+                    {formData.jenisBukti === "BERSAMA" && (
+                      <div className="w-2 h-2 rounded-full bg-white m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Bukti Bersama</p>
+                    <p className="text-sm text-muted-foreground">
+                      Satu dokumen yang digunakan bersama untuk seluruh anggota kegiatan
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dokumen Bukti Kegiatan</CardTitle>
+            <CardDescription>
+              {formData.jenisBukti === "BERSAMA"
+                ? "Upload satu dokumen yang akan digunakan bersama seluruh anggota"
+                : "Setiap dosen dapat mengupload dokumen bukti masing-masing"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {jenisBukti === 'bersama' && (
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-800 dark:text-blue-200">
-                <p className="font-medium">📄 Bukti bersama dipilih</p>
-                <p className="mt-1">
-                  Dokumen yang diupload akan otomatis terhubung ke seluruh dosen yang
-                  menyetujui keterlibatannya. Dosen lain dapat melihat dokumen ini
-                  (read-only).
-                </p>
-              </div>
-            )}
-            {/* Dokumen Anda heading (always visible) */}
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              Dokumen Anda{" "}
-              <Badge variant="outline">
-                {lampiran.filter((l) => l.uploadedBy === user?.uuid).length}
-              </Badge>
-            </h4>
-
-            {/* Upload/Pick Actions — placed right after Dokumen Anda heading */}
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setShowDocPicker(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Pilih dari Dokumen Saya
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setShowUploadDialog(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Unggah Dokumen Baru
-              </Button>
-            </div>
-
             {lampiran.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
-                <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
+              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Belum ada dokumen bukti yang diupload</p>
-                <p className="text-sm mt-1">
-                  {jenisBukti === 'bersama'
-                    ? 'Upload satu dokumen yang akan menjadi bukti bersama'
-                    : 'Setiap dosen yang terlibat harus mengupload dokumen bukti'}
-                </p>
               </div>
             ) : (
               <>
-                {/* Dokumen Saya list */}
-                {lampiran.filter((l) => l.uploadedBy === user?.uuid).length > 0 && (
-                  <div className="space-y-2">
-                    {lampiran
-                      .filter((l) => l.uploadedBy === user?.uuid)
-                      .map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-muted-foreground" />
-                            <div>
-                              <p className="font-medium text-sm">{doc.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {doc.jenis}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
-                            onClick={() => handleRemoveDoc(doc.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {/* Dokumen Anggota Lain (Read-only view) */}
-                {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length > 0 && (
-                  <div className="space-y-3 pt-4 border-t">
-                    <h4 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-                      Dokumen Anggota Lain{" "}
+                {lampiran.filter((l) => l.uploadedBy === user?.id).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      Dokumen Anda{" "}
                       <Badge variant="outline">
-                        {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length}
+                        {lampiran.filter((l) => l.uploadedBy === user?.id).length}
                       </Badge>
                     </h4>
                     <div className="space-y-2">
                       {lampiran
-                        .filter((l) => l.uploadedBy !== user?.uuid)
+                        .filter((l) => l.uploadedBy === user?.id)
+                        .map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                          >
+                            <div className="flex items-center gap-3">
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                              <div>
+                                <p className="font-medium text-sm">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {doc.jenis}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => handleRemoveDoc(doc.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {lampiran.filter((l) => l.uploadedBy !== user?.id).length > 0 && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                      Dokumen Anggota Lain{" "}
+                      <Badge variant="outline">
+                        {lampiran.filter((l) => l.uploadedBy !== user?.id).length}
+                      </Badge>
+                    </h4>
+                    <div className="space-y-2">
+                      {lampiran
+                        .filter((l) => l.uploadedBy !== user?.id)
                         .map((doc) => (
                           <div
                             key={doc.id}
@@ -1083,10 +970,30 @@ export function ActivityFormPage() {
                 )}
               </>
             )}
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowDocPicker(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Pilih dari Dokumen Saya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={handleUploadFile}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Unggah Dokumen Baru
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Footer Actions */}
         <div className="flex justify-between sticky bottom-6 bg-background p-4 border rounded-lg shadow-lg z-20">
           <div>
             {isEdit && (
@@ -1109,7 +1016,6 @@ export function ActivityFormPage() {
         </div>
       </div>
 
-      {/* Document Picker Dialog */}
       <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1138,124 +1044,13 @@ export function ActivityFormPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Unggah Dokumen Baru</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="upload-file">File *</Label>
-              <Input
-                id="upload-file"
-                type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setUploadFile(file);
-                    if (!uploadFileName) {
-                      setUploadFileName(file.name.replace(/\.[^/.]+$/, ''));
-                    }
-                  }
-                }}
-              />
-              {uploadFile && (
-                <p className="text-xs text-muted-foreground">
-                  {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="upload-nama">Nama Dokumen *</Label>
-              <Input
-                id="upload-nama"
-                placeholder="Nama dokumen"
-                value={uploadFileName}
-                onChange={(e) => setUploadFileName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="upload-jenis">Jenis Dokumen *</Label>
-              <Select value={uploadJenis} onValueChange={setUploadJenis}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih jenis dokumen" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">Surat Keputusan</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">Surat Tugas</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">Lembar Pengesahan</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">Kontrak Penelitian</SelectItem>
-                  <SelectItem value="SERTIFIKAT">Sertifikat</SelectItem>
-                  <SelectItem value="FOTO">Foto</SelectItem>
-                  <SelectItem value="LAPORAN">Laporan</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">Bukti Pendukung Lain</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tanggal Dokumen *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !uploadTanggal && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {uploadTanggal
-                      ? format(uploadTanggal, "dd MMMM yyyy", { locale: localeId })
-                      : "Pilih tanggal"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={uploadTanggal}
-                    onSelect={setUploadTanggal}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setShowUploadDialog(false);
-                  setUploadFile(null);
-                  setUploadFileName('');
-                  setUploadJenis('');
-                  setUploadTanggal(undefined);
-                }}
-              >
-                Batal
-              </Button>
-              <Button className="flex-1" onClick={handleUploadDoc} disabled={isUploading}>
-                {isUploading ? 'Mengupload...' : 'Upload'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
             <AlertDialogDescription>
               Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
-              asosiasinya akan dihapus. Dokumen bukti yang terlampir tidak akan
-              terhapus, tetapi asosiasi dengan kegiatan ini akan hilang.
+              asosiasinya akan dihapus.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
