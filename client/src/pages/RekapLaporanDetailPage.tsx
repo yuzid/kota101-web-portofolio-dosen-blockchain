@@ -121,7 +121,7 @@ export function RekapLaporanDetailPage() {
 
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
-      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pengajaran</Badge>;
+      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "PENELITIAN": return <Badge className="bg-green-500">Penelitian</Badge>;
       case "PENGABDIAN": return <Badge className="bg-purple-500">Pengabdian</Badge>;
       case "TUGAS_TAMBAHAN": return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;

@@ -200,6 +200,7 @@ model PartisipasiKegiatanTridharma {
   dosen_id              String            @db.Uuid
   kegiatan_tridharma_id String            @db.Uuid
   peran                 PeranTridharma
+  status                String                       @default("MENUNGGU_KONFIRMASI")
   dosen                 Dosen             @relation(fields: [dosen_id], references: [id])
   kegiatan_tridharma    KegiatanTridharma @relation(fields: [kegiatan_tridharma_id], references: [id])
 
@@ -216,6 +217,7 @@ model KegiatanTridharma {
   tanggal_selesai    DateTime                       @db.Date
   periode            String                         @db.VarChar(50)
   semester           String                         @db.VarChar(20)
+  jenis_bukti        String                       @default("MASING_MASING")
   tx_id              String                         @db.VarChar(255)
   dosen              Dosen                          @relation(fields: [dosen_id], references: [id])
   partisipasi        PartisipasiKegiatanTridharma[]

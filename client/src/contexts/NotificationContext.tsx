@@ -88,14 +88,27 @@ const getMockNotifications = (role: string): Notification[] => {
       {
         id: "2",
         type: "member_added",
-        title: "Ditambahkan sebagai Anggota Kegiatan",
+        title: "Undangan Kegiatan — Perlu Konfirmasi",
         description:
-          'Dr. Ahmad Fauzi menambahkan Anda sebagai anggota pada kegiatan "Penelitian Blockchain dalam Pendidikan".',
+          'Dr. Ahmad Fauzi mengundang Anda sebagai anggota pada kegiatan "Penelitian Blockchain dalam Pendidikan". Konfirmasi keterlibatan Anda.',
         actor: "Dr. Ahmad Fauzi",
         timestamp: "2026-05-15T14:30:00",
         isRead: false,
         relatedLink: "/activities/2",
-        priority: "medium",
+        priority: "high",
+        category: "Kegiatan",
+      },
+      {
+        id: "6",
+        type: "member_added",
+        title: "Undangan Kegiatan Baru",
+        description:
+          'Dr. Siti Nurhaliza mengundang Anda pada kegiatan "Pengabdian Masyarakat Desa Cikoneng". Silakan konfirmasi.',
+        actor: "Dr. Siti Nurhaliza",
+        timestamp: "2026-06-08T09:00:00",
+        isRead: false,
+        relatedLink: "/activities/6",
+        priority: "high",
         category: "Kegiatan",
       },
       {
@@ -168,7 +181,7 @@ const getMockNotifications = (role: string): Notification[] => {
         type: "activity",
         title: "Kegiatan Baru Ditambahkan",
         description:
-          'Dr. John Doe menambahkan kegiatan "Mata Kuliah Pemrograman Web" (Pengajaran - D4 TI).',
+          'Dr. John Doe menambahkan kegiatan "Mata Kuliah Pemrograman Web" (Pendidikan - D4 TI).',
         actor: "Dr. John Doe",
         timestamp: "2026-05-16T10:30:00",
         isRead: false,

@@ -11,6 +11,7 @@ export type UserRole =
 
 export interface User {
   id: string;
+  uuid: string;
   email: string;
   name: string; 
   roles: UserRole[];
@@ -30,10 +31,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
 const mapBackendUserToFrontend = (backendData: any): User => {
   const roles: UserRole[] = [];
   
-  // Normalisasi ke uppercase agar aman dari ketidaksesuaian case database
   const dbRole = backendData.role?.toUpperCase();
   
   if (dbRole === 'ADMIN') roles.push('administrator');
@@ -43,8 +52,12 @@ const mapBackendUserToFrontend = (backendData: any): User => {
   if (backendData.jabatan?.is_kajur) roles.push('kajur');
   if (backendData.jabatan?.is_kaprodi) roles.push('kaprodi');
 
+  const decoded = decodeJwtPayload(backendData.token);
+  const uuid = decoded?.id || backendData.email;
+
   return {
-    id: backendData.email, 
+    id: backendData.email,
+    uuid: uuid,
     email: backendData.email,
     name: backendData.name, 
     programStudi: backendData.programStudi || undefined,
@@ -61,7 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsed = JSON.parse(storedUser);
+      if (!parsed.uuid && parsed.token) {
+        const decoded = decodeJwtPayload(parsed.token);
+        parsed.uuid = decoded?.id || parsed.id;
+      }
+      setUser(parsed);
     }
     setIsLoading(false);
   }, []);
