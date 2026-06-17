@@ -20,6 +20,7 @@ router.post('/', asyncHandler(activityController.createActivity));
 router.put('/:id', asyncHandler(activityController.updateActivity));
 router.delete('/:id', asyncHandler(activityController.deleteActivity));
 router.post('/:id/lampiran', asyncHandler(activityController.addLampiran));
+router.delete('/:id/lampiran/:lampiranId', asyncHandler(activityController.deleteLampiran));
 router.post('/:id/anggota', asyncHandler(activityController.addMember));
 router.delete('/:id/anggota/:anggotaId', asyncHandler(activityController.removeMember));
 router.patch('/:id/partisipasi/:partisipasiId/terima', asyncHandler(activityController.acceptParticipation));

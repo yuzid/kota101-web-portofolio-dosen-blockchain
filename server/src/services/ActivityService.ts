@@ -108,7 +108,7 @@ export class ActivityService {
   async getAllActivities(dosenId: string) {
     const activities = await this.activityRepository.findAll(dosenId);
     return activities.map(act => {
-      const participantCount = act.partisipasi.length + 1;
+      const participantCount = act.partisipasi.length;
       return {
         id: act.id,
         name: act.nama_kegiatan,
@@ -150,7 +150,7 @@ export class ActivityService {
     }));
   }
 
-  async getActivityById(id: string) {
+  async getActivityById(id: string, dosenId?: string) {
     if (!this.isValidUUID(id)) throw new Error('Format ID tidak valid.');
 
     const activity = await this.activityRepository.findById(id);
@@ -164,6 +164,7 @@ export class ActivityService {
       isPencatat: true,
       isKetua: true,
       status: 'DITERIMA',
+      isCurrentUser: activity.dosen_id === dosenId,
       dokumen: []
     });
 
@@ -176,29 +177,55 @@ export class ActivityService {
           isPencatat: false,
           isKetua: p.peran === PeranTridharma.KETUA,
           status: p.status || 'MENUNGGU_KONFIRMASI',
+          isCurrentUser: p.dosen_id === dosenId,
           dokumen: []
         });
       }
     });
 
-    activity.lampiran_bukti.forEach((lb: any) => {
-      const docData = {
-        id: lb.dokumen.id,
-        name: lb.dokumen.nama,
-        jenis: lb.dokumen.jenis_dokumen,
-        tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
-        hasHighlight: lb.dokumen.kepemilikan.some((k: any) => k.highlights.length > 0)
-      };
+    const isBuktiBersama = activity.jenis_bukti === 'BERSAMA';
+    const dokumenBersama: any[] = [];
 
-      lb.dokumen.kepemilikan.forEach((k: any) => {
-        const ownerInActivity = dosenTerlibatMap.get(k.dosen_id);
-        if (ownerInActivity) {
-          ownerInActivity.dokumen.push(docData);
-        }
-      });
+    activity.lampiran_bukti.forEach((lb: any) => {
+      const firstKepemilikan = lb.dokumen.kepemilikan[0];
+      const uploaderId = firstKepemilikan?.dosen_id;
+      const uploaderMember = dosenTerlibatMap.get(uploaderId);
+      const uploaderName = uploaderMember?.name || 'Unknown';
+
+      if (isBuktiBersama) {
+        const currentUserHasHighlight = lb.dokumen.kepemilikan
+          .find((k: any) => k.dosen_id === dosenId)?.highlights?.length > 0;
+
+        dokumenBersama.push({
+          id: lb.dokumen.id,
+          name: lb.dokumen.nama,
+          jenis: lb.dokumen.jenis_dokumen,
+          tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
+          hasHighlight: currentUserHasHighlight,
+          uploadedBy: { id: uploaderId, name: uploaderName },
+          isUploader: dosenId === uploaderId,
+          lampiranId: lb.id,
+        });
+      } else {
+        lb.dokumen.kepemilikan.forEach((k: any) => {
+          const ownerInActivity = dosenTerlibatMap.get(k.dosen_id);
+          if (ownerInActivity) {
+            ownerInActivity.dokumen.push({
+              id: lb.dokumen.id,
+              name: lb.dokumen.nama,
+              jenis: lb.dokumen.jenis_dokumen,
+              tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
+              hasHighlight: k.highlights.length > 0,
+              isOwner: true,
+              uploadedBy: { id: uploaderId, name: uploaderName },
+              lampiranId: lb.id,
+            });
+          }
+        });
+      }
     });
 
-    return {
+    const result: any = {
       id: activity.id,
       namaKegiatan: activity.nama_kegiatan,
       jenisTridharma: activity.kategori_tridharma.toLowerCase() === 'pendidikan' ? 'pendidikan' : activity.kategori_tridharma.toLowerCase(),
@@ -207,13 +234,19 @@ export class ActivityService {
       tanggalSelesai: activity.tanggal_selesai.toISOString(),
       tahunAkademik: activity.periode,
       semester: activity.semester.toLowerCase(),
-      sumberDana: activity.sumber_dana || "",
-      biaya: activity.biaya ? Number(activity.biaya) : 0,
       programStudi: activity.dosen.program_studi?.nama_prodi || "Umum",
       dosenTerlibat: Array.from(dosenTerlibatMap.values()),
       statusKelengkapan: activity.lampiran_bukti.length > 0 ? 'lengkap' : 'tidak_lengkap',
       jenisBukti: activity.jenis_bukti || 'MASING_MASING',
+      currentUserId: dosenId,
+      isCurrentUserPencatat: activity.dosen_id === dosenId,
     };
+
+    if (isBuktiBersama) {
+      result.dokumenBersama = dokumenBersama;
+    }
+
+    return result;
   }
 
   async getAuditTrail(id: string) {
@@ -256,7 +289,7 @@ export class ActivityService {
     const {
       namaKegiatan, jenisTridharma, kategori, tanggalMulai,
       tanggalSelesai, tahunAkademik, semester, anggota_ids, lampiran_ids,
-      jenisBukti, sumberDana, biaya
+      jenisBukti
     } = data;
 
     const activityData: any = {
@@ -272,15 +305,14 @@ export class ActivityService {
     };
 
     if (jenisBukti) activityData.jenis_bukti = jenisBukti;
-    if (sumberDana) activityData.sumber_dana = String(sumberDana);
-    if (biaya !== undefined && biaya !== '') activityData.biaya = Number(biaya);
 
     const partisipasiData: any[] = [];
-    if (anggota_ids && Array.isArray(anggota_ids)) {
-      anggota_ids.forEach((id: string) => {
-        partisipasiData.push({ dosen_id: id, peran: PeranTridharma.ANGGOTA, status: 'MENUNGGU_KONFIRMASI' });
-      });
-    }
+    const filteredAnggotaIds = (anggota_ids && Array.isArray(anggota_ids))
+      ? anggota_ids.filter((id: string) => id !== dosenId)
+      : [];
+    filteredAnggotaIds.forEach((id: string) => {
+      partisipasiData.push({ dosen_id: id, peran: PeranTridharma.ANGGOTA, status: 'MENUNGGU_KONFIRMASI' });
+    });
 
     if (!partisipasiData.some(p => p.dosen_id === dosenId)) {
       partisipasiData.push({ dosen_id: dosenId, peran: PeranTridharma.KETUA, status: 'DITERIMA' });
@@ -318,7 +350,8 @@ export class ActivityService {
     const {
       namaKegiatan, jenisTridharma, kategori,
       tanggalMulai, tanggalSelesai, tahunAkademik, semester,
-      anggota_ids, lampiran_ids, jenisBukti, sumberDana, biaya
+      anggota_ids, lampiran_ids,
+      jenisBukti
     } = data;
 
     const updateData: any = {};
@@ -330,15 +363,15 @@ export class ActivityService {
     if (tahunAkademik) updateData.periode = String(tahunAkademik);
     if (semester) updateData.semester = String(semester).toUpperCase();
     if (jenisBukti) updateData.jenis_bukti = jenisBukti;
-    if (sumberDana) updateData.sumber_dana = String(sumberDana);
-    if (biaya !== undefined && biaya !== '') updateData.biaya = Number(biaya);
 
     await this.activityRepository.update(id, updateData);
 
     if (anggota_ids && Array.isArray(anggota_ids)) {
       const existingParticipations = activity.partisipasi;
       const existingIds = existingParticipations.map(p => p.dosen_id);
-      const newIds = anggota_ids.filter((aid: string) => !existingIds.includes(aid));
+      const newIds = anggota_ids
+        .filter((aid: string) => !existingIds.includes(aid))
+        .filter((aid: string) => aid !== dosenId);
 
       for (const newId of newIds) {
         await this.activityRepository.createParticipation({
@@ -387,12 +420,26 @@ export class ActivityService {
 
     const activity = await this.activityRepository.findById(id);
     if (!activity) throw new Error('Kegiatan tidak ditemukan.');
-    if (activity.dosen_id !== dosenId) throw new Error('Akses ditolak. Anda bukan pencatat kegiatan ini.');
+
+    const isCreator = activity.dosen_id === dosenId;
+    const isDiterimaMember = activity.partisipasi.some(
+      p => p.dosen_id === dosenId && p.status === 'DITERIMA'
+    );
+    if (!isCreator && !isDiterimaMember) {
+      throw new Error('Akses ditolak. Anda bukan anggota aktif kegiatan ini.');
+    }
 
     const lampiran = await this.activityRepository.createLampiran({
       kegiatan_id: id,
       dokumen_id: String(dokumen_id)
     });
+
+    if (activity.jenis_bukti === 'BERSAMA') {
+      const memberIds = await this.activityRepository.getDiterimaMemberIds(id);
+      for (const memberId of memberIds) {
+        await this.activityRepository.createKepemilikanIfNotExists(memberId, [dokumen_id]);
+      }
+    }
 
     let txId: string;
     try {
@@ -406,6 +453,32 @@ export class ActivityService {
 
     await this.activityRepository.updateTransactionId(id, txId);
     return lampiran;
+  }
+
+  async deleteLampiran(kegiatanId: string, lampiranId: string, dosenId: string) {
+    if (!this.isValidUUID(kegiatanId) || !this.isValidUUID(lampiranId)) throw new Error('Format ID tidak valid.');
+
+    const activity = await this.activityRepository.findById(kegiatanId);
+    if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+
+    const lampiran = activity.lampiran_bukti.find((lb: any) => lb.id === lampiranId);
+    if (!lampiran) throw new Error('Lampiran tidak ditemukan.');
+
+    const isUploader = lampiran.dokumen.kepemilikan.some((k: any) => k.dosen_id === dosenId);
+    if (!isUploader) throw new Error('Akses ditolak. Hanya uploader yang dapat menghapus dokumen.');
+
+    await this.activityRepository.deleteLampiran(lampiranId);
+
+    let txId: string;
+    try {
+      const updatedActivity = await this.activityRepository.findById(kegiatanId);
+      if (updatedActivity) {
+        txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_REMOVED');
+        await this.activityRepository.updateTransactionId(kegiatanId, txId);
+      }
+    } catch {
+      // ignore blockchain errors on delete
+    }
   }
 
   async getPendingConfirmations(dosenId: string) {
@@ -423,6 +496,18 @@ export class ActivityService {
     if (!this.isValidUUID(partisipasiId)) throw new Error('Format ID tidak valid.');
 
     const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA');
+
+    const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
+    if (partisipasi) {
+      const activity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+      if (activity && activity.jenis_bukti === 'BERSAMA') {
+        const docIds = await this.activityRepository.getActivityDocumentIds(activity.id);
+        if (docIds.length > 0) {
+          await this.activityRepository.createKepemilikanIfNotExists(dosenId, docIds);
+        }
+      }
+    }
+
     return updated;
   }
 

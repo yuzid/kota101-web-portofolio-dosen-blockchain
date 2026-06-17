@@ -28,22 +28,11 @@ enum PeranTridharma {
   ANGGOTA
 }
 
-enum StatusPartisipasi {
-  MENUNGGU_KONFIRMASI
-  DITERIMA
-  DITOLAK
-}
-
 enum KategoriTridharma {
   PENDIDIKAN
   PENELITIAN
   PENGABDIAN
   TUGAS_TAMBAHAN
-}
-
-enum JenisBukti {
-  MASING_MASING
-  BERSAMA
 }
 
 enum JenisKegiatan {
@@ -211,7 +200,7 @@ model PartisipasiKegiatanTridharma {
   dosen_id              String            @db.Uuid
   kegiatan_tridharma_id String            @db.Uuid
   peran                 PeranTridharma
-  status                StatusPartisipasi @default(MENUNGGU_KONFIRMASI)
+  status                String                       @default("MENUNGGU_KONFIRMASI")
   dosen                 Dosen             @relation(fields: [dosen_id], references: [id])
   kegiatan_tridharma    KegiatanTridharma @relation(fields: [kegiatan_tridharma_id], references: [id])
 
@@ -228,9 +217,7 @@ model KegiatanTridharma {
   tanggal_selesai    DateTime                       @db.Date
   periode            String                         @db.VarChar(50)
   semester           String                         @db.VarChar(20)
-  sumber_dana        String?                        @db.VarChar(100)
-  biaya              Decimal?                       @db.Decimal(18, 2)
-  jenis_bukti        JenisBukti                     @default(MASING_MASING)
+  jenis_bukti        String                       @default("MASING_MASING")
   tx_id              String                         @db.VarChar(255)
   dosen              Dosen                          @relation(fields: [dosen_id], references: [id])
   partisipasi        PartisipasiKegiatanTridharma[]

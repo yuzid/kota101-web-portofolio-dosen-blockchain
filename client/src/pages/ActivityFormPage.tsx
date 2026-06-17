@@ -115,8 +115,6 @@ export function ActivityFormPage() {
     tanggalSelesai: undefined as Date | undefined,
     tahunAkademik: "",
     semester: "",
-    sumberDana: "",
-    biaya: "",
     jenisBukti: "MASING_MASING" as "MASING_MASING" | "BERSAMA",
   });
 
@@ -201,13 +199,11 @@ export function ActivityFormPage() {
           tanggalSelesai: new Date(act.tanggalSelesai),
           tahunAkademik: act.tahunAkademik,
           semester: act.semester,
-          sumberDana: act.sumberDana || "",
-          biaya: act.biaya?.toString() || "",
           jenisBukti: act.jenisBukti || "MASING_MASING",
         });
 
         const members = act.dosenTerlibat
-          .filter((d: any) => d.id !== user?.id)
+          .filter((d: any) => d.id !== user?.uuid)
           .map((d: any) => ({
             id: d.id,
             name: d.name,
@@ -350,7 +346,7 @@ export function ActivityFormPage() {
     (d) =>
       d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
       !anggota.find((a) => a.id === d.id) &&
-      d.id !== user?.id
+      d.id !== user?.uuid
   );
 
   const handleAddDoc = (doc: Document) => {
@@ -652,42 +648,6 @@ export function ActivityFormPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sumber-dana">Sumber Dana</Label>
-                <Select
-                  value={formData.sumberDana}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, sumberDana: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih sumber dana (opsional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DIPA POLBAN">DIPA POLBAN</SelectItem>
-                    <SelectItem value="Mandiri">Mandiri</SelectItem>
-                    <SelectItem value="Hibah Eksternal">Hibah Eksternal</SelectItem>
-                    <SelectItem value="Lainnya">Lainnya</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">(opsional)</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="biaya">Biaya Kegiatan (Rp)</Label>
-                <Input
-                  id="biaya"
-                  type="number"
-                  placeholder="0"
-                  value={formData.biaya}
-                  onChange={(e) =>
-                    setFormData({ ...formData, biaya: e.target.value })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">(opsional)</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 

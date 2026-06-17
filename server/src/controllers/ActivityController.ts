@@ -54,7 +54,8 @@ export class ActivityController {
   getActivityById = async (req: AuthRequest, res: Response) => {
     try {
       const id = req.params.id as string;
-      const detail = await this.activityService.getActivityById(id);
+      const dosenId = req.user?.id;
+      const detail = await this.activityService.getActivityById(id, dosenId);
       res.status(200).json({ status: 'success', data: detail });
     } catch (error: any) {
       const status = error.message.includes('Format ID') ? 400 :
@@ -138,6 +139,26 @@ export class ActivityController {
       const status = error.message.includes('Akses ditolak') ? 403 :
                      error.message.includes('Format ID') ? 400 :
                      error.message === 'Kegiatan tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  deleteLampiran = async (req: AuthRequest, res: Response) => {
+    try {
+      const dosenId = req.user?.id;
+      if (!dosenId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+      await this.activityService.deleteLampiran(
+        req.params.id as string,
+        req.params.lampiranId as string,
+        dosenId,
+      );
+      res.status(200).json({ status: 'success', message: 'Dokumen berhasil dihapus.' });
+    } catch (error: any) {
+      const status = error.message.includes('Akses ditolak') ? 403 :
+                     error.message.includes('Format ID') ? 400 : 500;
       res.status(status).json({ status: 'error', error: error.message });
     }
   };

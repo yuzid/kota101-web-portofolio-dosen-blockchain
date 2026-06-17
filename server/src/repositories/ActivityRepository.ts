@@ -349,6 +349,12 @@ export class ActivityRepository {
     });
   }
 
+  async findParticipationById(id: string) {
+    return await prisma.partisipasiKegiatanTridharma.findUnique({
+      where: { id },
+    });
+  }
+
   async createParticipation(data: { dosen_id: string; kegiatan_tridharma_id: string; peran: string; status: string }) {
     return await prisma.partisipasiKegiatanTridharma.create({ data: data as any });
   }
@@ -360,5 +366,46 @@ export class ActivityRepository {
         kegiatan_tridharma_id: kegiatanId,
       },
     });
+  }
+
+  async getActivityDocumentIds(kegiatanId: string): Promise<string[]> {
+    const lampiran = await prisma.lampiranBukti.findMany({
+      where: { kegiatan_id: kegiatanId },
+      select: { dokumen_id: true }
+    });
+    return lampiran.map(l => l.dokumen_id);
+  }
+
+  async createKepemilikanIfNotExists(dosenId: string, dokumenIds: string[]) {
+    const existing = await prisma.kepemilikanDokumen.findMany({
+      where: { dosen_id: dosenId, dokumen_id: { in: dokumenIds } },
+      select: { dokumen_id: true }
+    });
+    const existingIds = new Set(existing.map(e => e.dokumen_id));
+    const newData = dokumenIds
+      .filter(id => !existingIds.has(id))
+      .map(dokumen_id => ({ dosen_id: dosenId, dokumen_id }));
+    if (newData.length > 0) {
+      await prisma.kepemilikanDokumen.createMany({ data: newData });
+    }
+  }
+
+  async getDiterimaMemberIds(kegiatanId: string): Promise<string[]> {
+    const activity = await prisma.kegiatanTridharma.findUnique({
+      where: { id: kegiatanId },
+      select: {
+        dosen_id: true,
+        partisipasi: {
+          where: { status: 'DITERIMA' },
+          select: { dosen_id: true }
+        }
+      }
+    });
+    if (!activity) return [];
+    const ids = [activity.dosen_id];
+    activity.partisipasi.forEach(p => {
+      if (!ids.includes(p.dosen_id)) ids.push(p.dosen_id);
+    });
+    return ids;
   }
 }
