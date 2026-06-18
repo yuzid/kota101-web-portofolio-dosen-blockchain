@@ -50,12 +50,10 @@ import {
   Clock,
   XCircle,
   Copy,
-  Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
-import { useAuth } from "../contexts/AuthContext";
 
 interface DosenDoc {
   id: string;
@@ -143,7 +141,6 @@ export function ActivityDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("detail");
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
@@ -153,8 +150,6 @@ export function ActivityDetailPage() {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState("");
-  const [showDocPicker, setShowDocPicker] = useState(false);
-  const [availableDocs, setAvailableDocs] = useState<Array<{ id: string; name: string; jenis: string }>>([]);
 
   const token = localStorage.getItem('token');
 
@@ -226,10 +221,9 @@ export function ActivityDetailPage() {
 
   if (!activity) return null;
 
+  const isCurrentUserMember = activity.dosenTerlibat.some(d => d.isCurrentUser);
   const isReadOnlyView =
-    !activity.isCurrentUserPencatat ||
-    user?.roles?.includes("kaprodi") ||
-    user?.roles?.includes("kajur") ||
+    !isCurrentUserMember ||
     location.pathname.includes("/ami-recap/");
 
   const handleEdit = () => {
@@ -267,112 +261,6 @@ export function ActivityDetailPage() {
       toast.success('Link berhasil disalin!');
     } catch (err) {
       toast.info(`Link: ${shareLink}`);
-    }
-  };
-
-  const handleTambahDokumen = async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        const mapped = result.data.map((d: any) => ({
-          id: d.id,
-          name: d.nama,
-          jenis: d.jenis_dokumen,
-        }));
-        setAvailableDocs(mapped);
-        setShowDocPicker(true);
-      } else {
-        toast.error('Gagal memuat daftar dokumen');
-      }
-    } catch {
-      toast.error('Terjadi kesalahan saat memuat dokumen');
-    }
-  };
-
-  const handleUploadDokumenBaru = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.pdf,.docx';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('nama', file.name.replace(/\.[^/.]+$/, ''));
-      formData.append('jenis_dokumen', 'BUKTI_PENDUKUNG_LAIN');
-      formData.append('tanggal_dokumen', new Date().toISOString().split('T')[0]);
-
-      const uploadRes = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/upload`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData,
-      });
-      const uploadResult = await uploadRes.json();
-      if (uploadResult.status !== 'success') {
-        toast.error(uploadResult.error || 'Gagal upload dokumen');
-        return;
-      }
-
-      const dokumenId = uploadResult.data.id;
-      const linkRes = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dokumen_id: dokumenId }),
-      });
-      const linkResult = await linkRes.json();
-      if (linkResult.status === 'success') {
-        toast.success('Dokumen berhasil diupload dan ditambahkan');
-        fetchActivityDetail();
-      } else {
-        toast.error(linkResult.error || 'Gagal menambahkan dokumen ke kegiatan');
-      }
-    };
-    input.click();
-  };
-
-  const handleLinkDokumen = async (dokumenId: string) => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dokumen_id: dokumenId })
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        toast.success('Dokumen berhasil ditambahkan');
-        setShowDocPicker(false);
-        fetchActivityDetail();
-      } else {
-        toast.error(result.error || 'Gagal menambahkan dokumen');
-      }
-    } catch {
-      toast.error('Terjadi kesalahan saat menambahkan dokumen');
-    }
-  };
-
-  const handleHapusDokumen = async (lampiranId: string, namaDokumen: string) => {
-    if (!confirm(`Hapus dokumen "${namaDokumen}" dari kegiatan ini?`)) return;
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran/${lampiranId}`,
-        {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-      const result = await response.json();
-      if (result.status === 'success') {
-        toast.success('Dokumen berhasil dihapus');
-        fetchActivityDetail();
-      } else {
-        toast.error(result.error || 'Gagal menghapus dokumen');
-      }
-    } catch (error) {
-      toast.error('Terjadi kesalahan saat menghapus dokumen');
     }
   };
 
@@ -458,16 +346,16 @@ export function ActivityDetailPage() {
               Bagikan
             </Button>
             {!isReadOnlyView && (
-              <>
-                <Button variant="outline" onClick={handleEdit}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-                <Button variant="destructive" onClick={handleDelete}>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Hapus
-                </Button>
-              </>
+              <Button variant="outline" onClick={handleEdit}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+            {activity.isCurrentUserPencatat && !location.pathname.includes("/ami-recap/") && (
+              <Button variant="destructive" onClick={handleDelete}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Hapus
+              </Button>
             )}
           </div>
         </div>
@@ -555,21 +443,7 @@ export function ActivityDetailPage() {
             {activity.jenisBukti === 'BERSAMA' && (
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Dokumen Bersama</CardTitle>
-                    {!isReadOnlyView && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={handleUploadDokumenBaru}>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Dokumen Baru
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleTambahDokumen}>
-                          <FileText className="w-4 h-4 mr-2" />
-                          Pilih dari Dokumen Saya
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <CardTitle>Dokumen Bersama</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
@@ -622,15 +496,6 @@ export function ActivityDetailPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            {doc.isUploader && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleHapusDokumen(doc.lampiranId!, doc.name)}
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -658,20 +523,8 @@ export function ActivityDetailPage() {
                 {activity.jenisBukti === 'MASING_MASING' && (
                   <div className="border rounded-lg p-4 bg-muted/20 space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Setiap dosen dapat mengupload dokumen bukti masing-masing
+                      Setiap dosen memiliki dokumen bukti masing-masing
                     </p>
-                    {!isReadOnlyView && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={handleUploadDokumenBaru}>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Dokumen Baru
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleTambahDokumen}>
-                          <FileText className="w-4 h-4 mr-2" />
-                          Pilih dari Dokumen Saya
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -949,37 +802,7 @@ export function ActivityDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Pilih Dokumen</DialogTitle>
-            <DialogDescription>
-              Pilih dokumen yang sudah diupload untuk ditambahkan ke kegiatan ini
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-64 overflow-y-auto space-y-2">
-            {availableDocs.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Belum ada dokumen. Upload dokumen terlebih dahulu.
-              </p>
-            ) : (
-              availableDocs.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => handleLinkDokumen(doc.id)}
-                  className="w-full flex items-center gap-3 p-3 border rounded-lg hover:bg-accent transition-colors text-left"
-                >
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{doc.name}</p>
-                    <p className="text-xs text-muted-foreground">{doc.jenis}</p>
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </MainLayout>
   );
 }

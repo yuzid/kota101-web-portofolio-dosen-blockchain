@@ -345,7 +345,12 @@ export class ActivityService {
 
     const activity = await this.activityRepository.findById(id);
     if (!activity) throw new Error('Kegiatan tidak ditemukan.');
-    if (activity.dosen_id !== dosenId) throw new Error('Akses ditolak. Anda bukan pencatat kegiatan ini.');
+
+    const isCreator = activity.dosen_id === dosenId;
+    const isDiterimaMember = activity.partisipasi.some(
+      p => p.dosen_id === dosenId && p.status === 'DITERIMA'
+    );
+    if (!isCreator && !isDiterimaMember) throw new Error('Akses ditolak. Anda bukan anggota kegiatan ini.');
 
     const {
       namaKegiatan, jenisTridharma, kategori,
@@ -379,6 +384,20 @@ export class ActivityService {
           kegiatan_tridharma_id: id,
           peran: 'ANGGOTA',
           status: 'MENUNGGU_KONFIRMASI',
+        });
+      }
+    }
+
+    if (lampiran_ids && Array.isArray(lampiran_ids)) {
+      const existingDocIds = activity.lampiran_bukti.map((l: any) => l.dokumen_id);
+
+      const toAdd = lampiran_ids.filter(
+        (docId: string) => !existingDocIds.includes(docId)
+      );
+      for (const docId of toAdd) {
+        await this.activityRepository.createLampiran({
+          kegiatan_id: id,
+          dokumen_id: docId,
         });
       }
     }
