@@ -143,7 +143,9 @@ export function ActivityFormPage() {
   const [availableDocs, setAvailableDocs] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [removeAnggotaId, setRemoveAnggotaId] = useState<string | null>(null);
+  const [removeDocId, setRemoveDocId] = useState<string | null>(null);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCurrentUserPencatat, setIsCurrentUserPencatat] = useState(false);
@@ -303,12 +305,16 @@ export function ActivityFormPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!validateForm()) {
       toast.error("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
+    setShowSubmitConfirm(true);
+  };
 
+  const confirmSubmit = async () => {
+    setShowSubmitConfirm(false);
     setIsLoading(true);
     try {
       const payload = {
@@ -393,7 +399,9 @@ export function ActivityFormPage() {
     setShowDocPicker(false);
   };
 
-  const handleRemoveDoc = async (docId: string) => {
+  const confirmRemoveDoc = async () => {
+    const docId = removeDocId;
+    if (!docId) return;
     const doc = lampiran.find(l => l.id === docId);
     if (doc?.lampiranId && isEdit) {
       try {
@@ -406,6 +414,7 @@ export function ActivityFormPage() {
       }
     }
     setLampiran(lampiran.filter(l => l.id !== docId));
+    setRemoveDocId(null);
   };
 
   const handleUploadFile = () => {
@@ -415,6 +424,11 @@ export function ActivityFormPage() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
+
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
+        return;
+      }
 
       const formData = new FormData();
       formData.append('file', file);
@@ -466,6 +480,7 @@ export function ActivityFormPage() {
   };
 
   const anggotaToRemove = removeAnggotaId ? anggota.find(a => a.id === removeAnggotaId) : null;
+  const docToRemove = removeDocId ? lampiran.find(l => l.id === removeDocId) : null;
 
   return (
     <MainLayout
@@ -975,7 +990,7 @@ export function ActivityFormPage() {
                               variant="ghost"
                               size="sm"
                               className="text-destructive"
-                              onClick={() => handleRemoveDoc(doc.id)}
+                              onClick={() => setRemoveDocId(doc.id)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -1088,6 +1103,43 @@ export function ActivityFormPage() {
               className="bg-destructive hover:bg-destructive/90"
             >
               Keluarkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!removeDocId} onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus dokumen <strong>{docToRemove?.name}</strong> dari kegiatan ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveDoc}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin {isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan <strong>{formData.namaKegiatan}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmit}>
+              {isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

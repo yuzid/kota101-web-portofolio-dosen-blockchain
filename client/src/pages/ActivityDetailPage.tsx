@@ -31,6 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Input } from "../components/ui/input";
 import {
   ArrowLeft,
@@ -150,6 +160,7 @@ export function ActivityDetailPage() {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -230,8 +241,12 @@ export function ActivityDetailPage() {
     navigate(`/activities/${id}/edit`);
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Hapus kegiatan "${activity.namaKegiatan}"?`)) return;
+  const handleDelete = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteDialog(false);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
@@ -802,6 +817,22 @@ export function ActivityDetailPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus kegiatan <strong>{activity?.namaKegiatan}</strong>? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </MainLayout>
   );

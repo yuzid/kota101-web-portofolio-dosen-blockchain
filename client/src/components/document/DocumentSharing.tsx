@@ -13,6 +13,16 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +52,8 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
   const [sharePermission, setSharePermission] = useState<'view' | 'comment' | 'edit'>('view');
   const [linkSharing, setLinkSharing] = useState(false);
   const [linkExpiry, setLinkExpiry] = useState<string>('7d');
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
   const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([
     {
       id: '1',
@@ -85,8 +97,16 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
   };
 
   const handleRemoveShare = (userId: string) => {
-    setSharedUsers(sharedUsers.filter((u) => u.id !== userId));
+    setRemoveTargetId(userId);
+    setShowRemoveDialog(true);
+  };
+
+  const confirmRemoveShare = () => {
+    if (!removeTargetId) return;
+    setSharedUsers(sharedUsers.filter((u) => u.id !== removeTargetId));
     toast.success('Akses dibatalkan');
+    setShowRemoveDialog(false);
+    setRemoveTargetId(null);
   };
 
   const handleUpdatePermission = (userId: string, permission: 'view' | 'comment' | 'edit') => {
@@ -108,6 +128,8 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
       description: 'Siapapun dengan link ini dapat mengakses dokumen',
     });
   };
+
+  const removeTargetUser = removeTargetId ? sharedUsers.find(u => u.id === removeTargetId) : null;
 
   const getInitials = (name: string) => {
     return name
@@ -137,6 +159,24 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
         <Share2 className="w-4 h-4" />
         {!iconOnly && <span className="ml-2">Bagikan</span>}
       </Button>
+
+      {/* Remove Share Confirmation */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Akses?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus akses <strong>{removeTargetUser?.name}</strong> ({removeTargetUser?.email}) dari dokumen ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveShare} className="bg-destructive hover:bg-destructive/90">
+              Hapus Akses
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl">

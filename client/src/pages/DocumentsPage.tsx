@@ -33,11 +33,10 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Card, CardContent } from "../components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -63,7 +62,6 @@ import {
   Plus,
   Search,
   Eye,
-  Edit,
   Trash2,
   Highlighter,
   FileText,
@@ -73,6 +71,9 @@ import {
   List,
   MoreVertical,
   Share2,
+  Check,
+  Clock,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -88,15 +89,24 @@ interface Document {
   hasHighlight: boolean;
 }
 
+interface PendingRequest {
+  id: string;
+  dokumenId: string;
+  namaDokumen: string;
+  jenisDokumen: string;
+  tanggalDistribusi: string;
+  status: string;
+  pengirim: string;
+}
+
 export function DocumentsPage() {
   const navigate = useNavigate();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [activeTab, setActiveTab] = useState("semua");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterJenis, setFilterJenis] = useState("all");
-  
-  // FIX 1: Mengembalikan State filterDateRange agar aplikasi tidak crash/error undefined
   const [filterDateRange, setFilterDateRange] = useState<{ from?: Date; to?: Date }>({});
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -116,6 +126,7 @@ export function DocumentsPage() {
 
   useEffect(() => {
     fetchDosenDocuments();
+    fetchPendingRequests();
   }, [activeTab, searchTerm, filterJenis]);
 
   const fetchDosenDocuments = async () => {
@@ -133,13 +144,63 @@ export function DocumentsPage() {
     }
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/permintaan`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        setPendingRequests(result.data);
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
+  const handleAccept = async (dokumenId: string) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${dokumenId}/terima`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Dokumen berhasil diterima.");
+        setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
+        fetchDosenDocuments();
+      } else {
+        toast.error(result.error || "Gagal menerima dokumen.");
+      }
+    } catch {
+      toast.error("Gagal menerima dokumen.");
+    }
+  };
+
+  const handleReject = async (dokumenId: string) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${dokumenId}/tolak`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Dokumen ditolak.");
+        setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
+      } else {
+        toast.error(result.error || "Gagal menolak dokumen.");
+      }
+    } catch {
+      toast.error("Gagal menolak dokumen.");
+    }
+  };
+
   const handleFilesSelected = (files: File[]) => {
     if (files.length > 0) {
       setSelectedFile(files[0]);
     }
   };
 
-  // Logic Penyaringan Data di Sisi Client
   const filteredDocuments = documents.filter((doc) => {
     const matchesTab =
       activeTab === "semua" ||
@@ -203,7 +264,7 @@ export function DocumentsPage() {
       setShowUploadDialog(false);
       setSelectedFile(null);
       setUploadForm({ name: "", jenis: "", tanggal: undefined, addHighlight: false });
-      
+
       if (uploadForm.addHighlight) {
         toast.success("Dokumen disimpan. Membuka layar penandaan (Highlight)...");
         navigate(`/documents/${result.data.id}/preview`, { state: { allowHighlight: true } });
@@ -239,10 +300,6 @@ export function DocumentsPage() {
     }
   };
 
-  const handleShareFromDropdown = (doc: Document) => {
-    toast.info("Klik tombol Bagikan untuk membagikan dokumen");
-  };
-
   const getAsalBadge = (asal: string) => {
     if (asal === "tu") {
       return <Badge className="bg-blue-500">Dari TU</Badge>;
@@ -259,6 +316,68 @@ export function DocumentsPage() {
       ]}
     >
       <div className="space-y-4">
+        {/* Permintaan Dokumen Section */}
+        {pendingRequests.length > 0 && (
+          <Card className="border-yellow-200 bg-yellow-50/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                Permintaan Dokumen
+                <Badge variant="secondary" className="ml-1">{pendingRequests.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="flex items-center justify-between p-3 bg-white border rounded-lg"
+                >
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <FileText className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{req.namaDokumen}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Dibagikan oleh {req.pengirim}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">
+                          {req.jenisDokumen}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(req.tanggalDistribusi), "dd MMM yyyy")}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-xs text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">
+                          <Clock className="w-3 h-3" />
+                          Menunggu Konfirmasi
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-4 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => handleAccept(req.dokumenId)}
+                    >
+                      <Check className="w-4 h-4 mr-1" /> Terima
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={() => handleReject(req.dokumenId)}
+                    >
+                      <X className="w-4 h-4 mr-1" /> Tolak
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -296,7 +415,6 @@ export function DocumentsPage() {
           </div>
 
           <TabsContent value={activeTab} className="space-y-4 mt-4">
-            {/* Filters */}
             <div className="flex flex-wrap gap-3">
               <div className="flex-1 min-w-[250px]">
                 <div className="relative">
@@ -310,7 +428,6 @@ export function DocumentsPage() {
                 </div>
               </div>
 
-              {/* FIX 2: Menyelaraskan value Item dengan ENUM database backend agar filter bekerja */}
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-[200px]"><SelectValue placeholder="Jenis Dokumen" /></SelectTrigger>
                 <SelectContent>
@@ -377,8 +494,8 @@ export function DocumentsPage() {
                                   <Eye className="w-4 h-4 mr-2" /> Lihat Detail
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleShareFromDropdown(doc)}>
-                                  <Share2 className="w-4 h-4 mr-2" /> Bagikan
+                                <DropdownMenuItem onClick={() => navigate(`/documents/${doc.id}/preview`)}>
+                                  <Download className="w-4 h-4 mr-2" /> Unduh
                                 </DropdownMenuItem>
                                 {doc.asal === "dosen" && (
                                   <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">
@@ -451,7 +568,6 @@ export function DocumentsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="doc-jenis">Jenis Dokumen Bukti *</Label>
-              {/* FIX 3: Menyelaraskan Select Upload Form dengan Enum Database */}
               <Select value={uploadForm.jenis} onValueChange={(value) => setUploadForm({ ...uploadForm, jenis: value })}>
                 <SelectTrigger><SelectValue placeholder="Pilih jenis dokumen" /></SelectTrigger>
                 <SelectContent>
@@ -495,7 +611,6 @@ export function DocumentsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>Batal</Button>
-            {/* FIX 4: Menambahkan atribut disabled={isSubmitting} agar tidak terjadi spam submit */}
             <Button onClick={handleUpload} disabled={isSubmitting}>
               {isSubmitting ? "Menyimpan..." : "Simpan Dokumen"}
             </Button>

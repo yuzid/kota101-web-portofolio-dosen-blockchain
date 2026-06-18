@@ -108,6 +108,8 @@ export function ManageAccountsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [submitMode, setSubmitMode] = useState<'add' | 'edit' | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -150,7 +152,7 @@ export function ManageAccountsPage() {
             nidn: u.dosen?.nidn,
             roles: userRoles,
             mainRole: u.role.toLowerCase(), // Store original role for filtering/editing
-            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'Jurusan TKI' : 'Sistem'),
+            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'JTK' : 'Sistem'),
             programStudiId: u.dosen?.program_studi?.id,
             jurusanId: u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
             status: 'active' as const,
@@ -240,12 +242,19 @@ export function ManageAccountsPage() {
     return true;
   };
 
-  const handleSubmitAdd = async () => {
+  const handleSubmitAdd = () => {
     if (!formData.name || !formData.username || !formData.password || !formData.role) {
       toast.error('Semua field wajib diisi');
       return;
     }
+    setSubmitMode('add');
+    setShowSubmitConfirm(true);
+  };
+
+  const confirmSubmitAdd = async () => {
+    setShowSubmitConfirm(false);
     setIsSubmitting(true);
+    const token = localStorage.getItem('token');
     try {
       const payload = {
         email: formData.username,
@@ -277,12 +286,20 @@ export function ManageAccountsPage() {
     }
   };
 
-  const handleSubmitEdit = async () => {
+  const handleSubmitEdit = () => {
     if (!selectedAccount || !formData.name || !formData.role) {
       toast.error('Field yang wajib tidak boleh kosong');
       return;
     }
+    setSubmitMode('edit');
+    setShowSubmitConfirm(true);
+  };
+
+  const confirmSubmitEdit = async () => {
+    if (!selectedAccount) return;
+    setShowSubmitConfirm(false);
     setIsSubmitting(true);
+    const token = localStorage.getItem('token');
     try {
       const payload: any = {
         nama: formData.name,
@@ -790,6 +807,27 @@ export function ManageAccountsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Submit Confirmation */}
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
+            <AlertDialogDescription>
+              {submitMode === 'add'
+                ? `Apakah Anda yakin ingin membuat akun ${formData.name} (${formData.username})?`
+                : `Apakah Anda yakin ingin menyimpan perubahan untuk akun ${formData.name}?`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={submitMode === 'add' ? confirmSubmitAdd : confirmSubmitEdit}>
+              {submitMode === 'add' ? 'Buat Akun' : 'Simpan Perubahan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Deactivate/Activate Confirmation */}
       <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>

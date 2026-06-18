@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import path from 'path';
 import authRoutes from './routes/authRoutes';
 import adminUserRoutes from './routes/admin/userRoutes';
@@ -14,6 +15,11 @@ import akademikRoleRoutes from './routes/dosen/akademikRoleRoutes';
 
 
 const app = express();
+app.use(cors({
+  origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  credentials: true,
+  exposedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 // ── Public Routes (Unauthenticated) ──

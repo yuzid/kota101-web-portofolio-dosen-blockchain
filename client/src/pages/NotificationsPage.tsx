@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import {
@@ -64,6 +74,9 @@ export function NotificationsPage() {
   const [filterType, setFilterType] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [showSettings, setShowSettings] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
 
   // Group notifications by date
   const groupedNotifications = useMemo(() => {
@@ -125,13 +138,26 @@ export function NotificationsPage() {
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    deleteNotification(id);
+    setDeleteTargetId(id);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTargetId) return;
+    deleteNotification(deleteTargetId);
     toast.success('Notifikasi dihapus');
+    setShowDeleteDialog(false);
+    setDeleteTargetId(null);
   };
 
   const handleDeleteAll = () => {
+    setShowDeleteAllDialog(true);
+  };
+
+  const confirmDeleteAll = () => {
     deleteAll();
     toast.success('Semua notifikasi dihapus');
+    setShowDeleteAllDialog(false);
   };
 
   const getTimeAgo = (timestamp: string) => {
@@ -349,6 +375,42 @@ export function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Single Notification Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Notifikasi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus notifikasi ini? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Notifications Confirmation */}
+      <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Semua Notifikasi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus seluruh notifikasi? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteAll} className="bg-destructive hover:bg-destructive/90">
+              Hapus Semua
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Settings Dialog */}
       <Dialog open={showSettings} onOpenChange={setShowSettings}>

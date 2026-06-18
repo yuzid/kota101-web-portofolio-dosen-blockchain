@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,18 +23,20 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
 import {
@@ -41,47 +44,87 @@ import {
   Search,
   FileText,
   Eye,
-  MoreVertical,
   Trash2,
+  Check,
+  X,
+  Clock,
+  Save,
+  Send,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
-interface DistributedDocument {
+interface DistribusiItem {
+  id: string;
+  dosen_id: string;
+  status: string;
+  tanggal_distribusi: string;
+  tanggal_keputusan: string | null;
+  dosen: { nama: string; nip: string; nidn: string };
+  kepemilikan: { id: string } | null;
+}
+
+interface Document {
   id: string;
   nama: string;
   jenis_dokumen: string;
   tanggal_upload: string;
   file_path: string;
-  kepemilikan: {
-    dosen: {
-      nama: string;
-      nip: string;
-    };
-  }[];
+  sumber_dokumen: string;
+  distribusi: DistribusiItem[];
 }
 
 interface Dosen {
-  id: string; // ID User / ID Dosen murni
+  id: string;
   nama: string;
   nip: string;
-  program_studi?: {
-    id: string;
-    nama_prodi: string;
-  };
+  program_studi?: { id: string; nama_prodi: string };
 }
 
+const statusBadge: Record<string, string> = {
+  MENUNGGU_KONFIRMASI: "bg-yellow-100 text-yellow-800",
+  DISETUJUI: "bg-green-100 text-green-800",
+  DITOLAK: "bg-red-100 text-red-800",
+};
+
+const statusLabel: Record<string, string> = {
+  MENUNGGU_KONFIRMASI: "Menunggu Konfirmasi",
+  DISETUJUI: "Disetujui",
+  DITOLAK: "Ditolak",
+};
+
+const statusIcon: Record<string, React.ReactNode> = {
+  MENUNGGU_KONFIRMASI: <Clock className="w-3.5 h-3.5" />,
+  DISETUJUI: <Check className="w-3.5 h-3.5" />,
+  DITOLAK: <X className="w-3.5 h-3.5" />,
+};
+
+const statusSummary = (distribusi: DistribusiItem[]) => {
+  if (!distribusi || distribusi.length === 0) return "-";
+  const disetujui = distribusi.filter(d => d.status === "DISETUJUI").length;
+  const ditolak = distribusi.filter(d => d.status === "DITOLAK").length;
+  const menunggu = distribusi.filter(d => d.status === "MENUNGGU_KONFIRMASI").length;
+  return (
+    <div className="flex gap-1.5 flex-wrap">
+      {disetujui > 0 && <Badge className="bg-green-100 text-green-800 border-0 text-xs">{disetujui} ✓</Badge>}
+      {ditolak > 0 && <Badge className="bg-red-100 text-red-800 border-0 text-xs">{ditolak} ✗</Badge>}
+      {menunggu > 0 && <Badge className="bg-yellow-100 text-yellow-800 border-0 text-xs">{menunggu} ⏳</Badge>}
+    </div>
+  );
+};
+
 export function DocumentDistributionPage() {
-  const [documents, setDocuments] = useState<DistributedDocument[]>([]);
+  const navigate = useNavigate();
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [allDosen, setAllDosen] = useState<Dosen[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<DistributedDocument | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // State baru untuk memfilter list dosen berdasarkan prodi di dalam modal
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+
   const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
+  const [recipientSearch, setRecipientSearch] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +134,8 @@ export function DocumentDistributionPage() {
     file: null as File | null,
     recipients: [] as string[],
   });
+
+  const [submitAction, setSubmitAction] = useState<"draft" | "distribute" | null>(null);
 
   const token = localStorage.getItem("token");
 
@@ -104,15 +149,15 @@ export function DocumentDistributionPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const dataDosen = await resDosen.json();
-      
+
       if (dataDosen.status === "success") {
         const listDosen = dataDosen.data
           .filter((u: any) => u.dosen !== null)
           .map((u: any) => ({
-            id: u.id, // FIX: Menggunakan u.id (Top-Level ID User) agar ID tidak undefined dan tidak bug klik semua
+            id: u.id,
             nama: u.dosen.nama,
             nip: u.dosen.nip,
-            program_studi: u.dosen.program_studi, 
+            program_studi: u.dosen.program_studi,
           }));
         setAllDosen(listDosen);
       }
@@ -129,81 +174,37 @@ export function DocumentDistributionPage() {
     }
   };
 
-  // Mendapatkan daftar prodi unik dari data dosen yang ada untuk dropdown filter
-  const uniqueProdis = Array.from(
-    new Map(
-      allDosen
-        .filter((d) => d.program_studi)
-        .map((d) => [d.program_studi!.id, d.program_studi])
-    ).values()
+  const uniqueProdis = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          allDosen
+            .filter((d) => d.program_studi)
+            .map((d) => [d.program_studi!.id, d.program_studi])
+        ).values()
+      ),
+    [allDosen]
   );
 
-  // Memfilter dosen yang akan ditampilkan di checkbox berdasarkan prodi yang dipilih
-  const filteredDosenForUpload = allDosen.filter((dosen) => {
+  const filteredDosenByProdi = allDosen.filter((dosen) => {
     if (selectedProdiId === "all") return true;
     return dosen.program_studi?.id === selectedProdiId;
   });
 
+  const searchedDosen = filteredDosenByProdi.filter((dosen) =>
+    dosen.nama.toLowerCase().includes(recipientSearch.toLowerCase())
+  );
+
+  const sortedDosen = useMemo(() => {
+    const selected = new Set(uploadForm.recipients);
+    const withSelected = searchedDosen.filter((d) => selected.has(d.id));
+    const withoutSelected = searchedDosen.filter((d) => !selected.has(d.id));
+    return [...withSelected, ...withoutSelected];
+  }, [searchedDosen, uploadForm.recipients]);
+
   const filteredDocuments = documents.filter((doc) =>
     doc.nama.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const handleUpload = async () => {
-    if (!uploadForm.name || !uploadForm.jenis || !uploadForm.file) {
-      toast.error("Nama, Jenis, dan File dokumen wajib diisi!");
-      return;
-    }
-    if (uploadForm.recipients.length === 0) {
-      toast.error("Pilih minimal satu dosen penerima!");
-      return;
-    }
-
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.append("nama", uploadForm.name);
-    formData.append("jenis_dokumen", uploadForm.jenis); 
-    formData.append("tanggal_upload", new Date().toISOString());
-    formData.append("file", uploadForm.file);
-    formData.append("dosen_penerima_ids", JSON.stringify(uploadForm.recipients));
-
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
-
-      toast.success("Dokumen administratif berhasil didistribusikan!");
-      setShowUploadDialog(false);
-      setUploadForm({ name: "", jenis: "", file: null, recipients: [] });
-      setSelectedProdiId("all");
-      fetchData(); 
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan sistem.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (doc: DistributedDocument) => {
-    if (!window.confirm(`Hapus dokumen "${doc.nama}"?`)) return;
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${doc.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
-
-      toast.success("Dokumen berhasil dihapus.");
-      fetchData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menghapus.");
-    }
-  };
 
   const toggleRecipient = (dosenId: string) => {
     setUploadForm((prev) => ({
@@ -214,20 +215,85 @@ export function DocumentDistributionPage() {
     }));
   };
 
-  const toggleAllFilteredRecipients = () => {
-    const filteredIds = filteredDosenForUpload.map((d) => d.id);
-    const allSelected = filteredIds.every((id) => uploadForm.recipients.includes(id));
+  const handleAction = (action: "draft" | "distribute") => {
+    if (!uploadForm.name || !uploadForm.jenis || !uploadForm.file) {
+      toast.error("Nama, Jenis, dan File dokumen wajib diisi!");
+      return;
+    }
+    if (uploadForm.file.size > 20 * 1024 * 1024) {
+      toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
+      return;
+    }
+    if (action === "distribute" && uploadForm.recipients.length === 0) {
+      toast.error("Pilih minimal satu dosen penerima!");
+      return;
+    }
+    setSubmitAction(action);
+    setShowUploadDialog(false);
+  };
 
-    if (allSelected) {
-      setUploadForm((prev) => ({
-        ...prev,
-        recipients: prev.recipients.filter((id) => !filteredIds.includes(id)),
-      }));
-    } else {
-      setUploadForm((prev) => ({
-        ...prev,
-        recipients: Array.from(new Set([...prev.recipients, ...filteredIds])),
-      }));
+  const confirmSubmit = async () => {
+    if (!uploadForm.file || !submitAction) return;
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append("nama", uploadForm.name);
+    formData.append("jenis_dokumen", uploadForm.jenis);
+    formData.append("tanggal_upload", new Date().toISOString().split("T")[0]);
+    formData.append("file", uploadForm.file);
+    formData.append("dosen_penerima_ids", JSON.stringify(uploadForm.recipients));
+
+    const endpoint =
+      submitAction === "draft"
+        ? `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/draft`
+        : `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribute`;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok || result.status === "error") throw new Error(result.error);
+
+      toast.success(
+        submitAction === "draft"
+          ? "Dokumen berhasil disimpan sebagai Draft."
+          : "Dokumen berhasil didistribusikan!"
+      );
+      setShowUploadDialog(false);
+      setUploadForm({ name: "", jenis: "", file: null, recipients: [] });
+      setSelectedProdiId("all");
+      setRecipientSearch("");
+      setSubmitAction(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan sistem.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = (doc: Document) => {
+    setDeleteTarget(doc);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setShowDeleteDialog(false);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${deleteTarget.id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (!response.ok || result.status === "error") throw new Error(result.error);
+      toast.success("Dokumen berhasil dihapus.");
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menghapus.");
     }
   };
 
@@ -273,13 +339,14 @@ export function DocumentDistributionPage() {
                   <TableHead>Nama Dokumen</TableHead>
                   <TableHead>Jenis</TableHead>
                   <TableHead>Tanggal Upload</TableHead>
+                  <TableHead>Status Distribusi</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDocuments.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       Tidak ada dokumen administratif.
                     </TableCell>
                   </TableRow>
@@ -288,22 +355,28 @@ export function DocumentDistributionPage() {
                     <TableRow key={doc.id}>
                       <TableCell className="font-medium">{doc.nama}</TableCell>
                       <TableCell><Badge variant="secondary">{doc.jenis_dokumen}</Badge></TableCell>
-                      <TableCell className="text-sm">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
+                      <TableCell className="text-sm">
+                        {format(new Date(doc.tanggal_upload), "dd MMM yyyy")}
+                      </TableCell>
+                      <TableCell>{statusSummary(doc.distribusi)}</TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm"><MoreVertical className="w-4 h-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDetailDialog(true); }}>
-                              <Eye className="w-4 h-4 mr-2" /> Lihat Detail
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-destructive">
-                              <Trash2 className="w-4 h-4 mr-2" /> Hapus
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/document-distribution/${doc.id}`)}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(doc)}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -314,7 +387,6 @@ export function DocumentDistributionPage() {
         </Card>
       </div>
 
-      {/* Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -333,7 +405,10 @@ export function DocumentDistributionPage() {
 
             <div className="space-y-2">
               <Label>Jenis Dokumen *</Label>
-              <Select value={uploadForm.jenis} onValueChange={(val) => setUploadForm({ ...uploadForm, jenis: val })}>
+              <Select
+                value={uploadForm.jenis}
+                onValueChange={(val) => setUploadForm({ ...uploadForm, jenis: val })}
+              >
                 <SelectTrigger><SelectValue placeholder="Pilih jenis dokumen" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
@@ -348,20 +423,16 @@ export function DocumentDistributionPage() {
               </Select>
             </div>
 
-
-
-               
-
             <div className="space-y-2">
               <Label>File Dokumen (PDF/DOCX) *</Label>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
                 accept=".pdf,.docx"
                 onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })}
               />
-              <div 
+              <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent/50 transition-colors"
               >
@@ -372,9 +443,10 @@ export function DocumentDistributionPage() {
               </div>
             </div>
 
-            {/* BARU: Dropdown Filter Program Studi Sebelum Checkbox List */}
             <div className="space-y-2 bg-muted p-3 rounded-lg border">
-              <Label className="text-xs font-semibold uppercase tracking-wider">Filter Program Studi Dosen</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider">
+                Filter Program Studi Dosen
+              </Label>
               <Select value={selectedProdiId} onValueChange={setSelectedProdiId}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Pilih Program Studi" />
@@ -390,90 +462,142 @@ export function DocumentDistributionPage() {
               </Select>
             </div>
 
-            {/* Checkbox List Dosen Terfilter */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Pilih Penerima Dokumen *</Label>
-                <Button variant="outline" size="sm" onClick={toggleAllFilteredRecipients}>
-                  Pilih / Hapus Semua Terfilter
-                </Button>
+              <Label>Pilih Penerima Dokumen</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari dosen..."
+                  value={recipientSearch}
+                  onChange={(e) => setRecipientSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-              <div className="border rounded-lg p-3 space-y-2 max-h-[200px] overflow-y-auto bg-background">
-                {filteredDosenForUpload.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">Tidak ada dosen di prodi ini.</p>
+
+              {uploadForm.recipients.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 py-1">
+                  {uploadForm.recipients.map((id) => {
+                    const d = allDosen.find((d) => d.id === id);
+                    return d ? (
+                      <Badge
+                        key={id}
+                        variant="secondary"
+                        className="cursor-pointer gap-1"
+                        onClick={() => toggleRecipient(id)}
+                      >
+                        {d.nama}
+                        <X className="w-3 h-3" />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+
+              <div className="border rounded-lg max-h-[240px] overflow-y-auto bg-background">
+                {sortedDosen.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-6">
+                    {recipientSearch
+                      ? "Tidak ada dosen yang cocok dengan pencarian."
+                      : "Tidak ada dosen di prodi ini."}
+                  </p>
                 ) : (
-                  filteredDosenForUpload.map((dosen) => (
-                    <div key={dosen.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`dosen-${dosen.id}`}
-                        checked={uploadForm.recipients.includes(dosen.id)}
-                        onCheckedChange={() => toggleRecipient(dosen.id)}
-                      />
-                      <Label htmlFor={`dosen-${dosen.id}`} className="flex-1 cursor-pointer text-sm">
-                        {dosen.nama} (NIP: {dosen.nip}) {selectedProdiId === "all" && dosen.program_studi ? `[${dosen.program_studi.nama_prodi}]` : ""}
-                      </Label>
-                    </div>
-                  ))
+                  sortedDosen.map((dosen) => {
+                    const isSelected = uploadForm.recipients.includes(dosen.id);
+                    return (
+                      <div
+                        key={dosen.id}
+                        className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/50 transition-colors ${
+                          isSelected ? "bg-primary/5 border-l-2 border-primary" : ""
+                        }`}
+                        onClick={() => toggleRecipient(dosen.id)}
+                      >
+                        <Checkbox checked={isSelected} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{dosen.nama}</p>
+                          <p className="text-xs text-muted-foreground">
+                            NIP: {dosen.nip}
+                            {selectedProdiId === "all" && dosen.program_studi
+                              ? ` [${dosen.program_studi.nama_prodi}]`
+                              : ""}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {uploadForm.recipients.length} dosen total dipilih dari seluruh prodi.
+                {uploadForm.recipients.length} dosen dipilih
               </p>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>Batal</Button>
-            <Button onClick={handleUpload} disabled={isSubmitting}>
-              {isSubmitting ? "Mengunggah..." : "Upload & Distribusikan"}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>
+              Batal
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => handleAction("draft")}
+              disabled={isSubmitting}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {isSubmitting && submitAction === "draft" ? "Menyimpan..." : "Simpan sebagai Draft"}
+            </Button>
+            <Button
+              onClick={() => handleAction("distribute")}
+              disabled={isSubmitting}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {isSubmitting && submitAction === "distribute" ? "Mendistribusikan..." : "Distribusikan"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>Detail Dokumen Administratif</DialogTitle></DialogHeader>
-          {selectedDocument && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm text-muted-foreground">Nama Dokumen</Label>
-                <p className="font-semibold text-base">{selectedDocument.nama}</p>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Jenis Dokumen</Label>
-                <p><Badge variant="secondary">{selectedDocument.jenis_dokumen}</Badge></p>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Penerima Dokumen</Label>
-                <div className="mt-2 border rounded-lg p-3 max-h-[200px] overflow-y-auto bg-muted/30">
-                  {selectedDocument.kepemilikan && selectedDocument.kepemilikan.length > 0 ? (
-                    <ul className="space-y-1">
-                      {selectedDocument.kepemilikan.map((k, idx) => (
-                        <li key={idx} className="text-sm">
-                          • {k.dosen.nama} <span className="text-muted-foreground text-xs">(NIP: {k.dosen.nip})</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Tidak ada data penerima.</p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">Lokasi S3 Storage</Label>
-                <p className="text-xs break-all text-blue-600 underline">
-                  <a href={selectedDocument.file_path} target="_blank" rel="noreferrer">{selectedDocument.file_path}</a>
-                </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>Tutup</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus dokumen <strong>{deleteTarget?.nama}</strong>?
+              Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Submit Confirmation */}
+      <AlertDialog
+        open={submitAction !== null}
+        onOpenChange={(open) => { if (!open) setSubmitAction(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {submitAction === "draft" ? "Simpan sebagai Draft?" : "Konfirmasi Distribusi"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {submitAction === "draft"
+                ? `Dokumen "${uploadForm.name}" akan disimpan sebagai Draft dan tidak akan dikirim ke dosen mana pun.`
+                : `Apakah Anda yakin ingin mendistribusikan dokumen "${uploadForm.name}" ke ${uploadForm.recipients.length} dosen?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmit}>
+              {submitAction === "draft" ? "Simpan Draft" : "Ya, Distribusikan"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
