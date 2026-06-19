@@ -39,6 +39,20 @@ export class DocumentRepository {
     });
   }
 
+  async findByHashFile(hashFile: string) {
+    return await prisma.dokumen.findFirst({
+      where: {
+        hash_file: hashFile,
+        deleted_at: null,
+      },
+      select: {
+        id: true,
+        file_path: true,
+      },
+      orderBy: { tanggal_upload: 'asc' },
+    });
+  }
+
   async findPreviewById(id: string) {
     return await prisma.dokumen.findUnique({
       where: { id },

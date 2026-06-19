@@ -145,6 +145,13 @@ export class DocumentService {
     }
   }
 
+  private async getExistingFilePathOrUpload(file: Express.Multer.File, hashFile: string, folder: string) {
+    const existingDocument = await this.documentRepository.findByHashFile(hashFile);
+    if (existingDocument) return existingDocument.file_path;
+
+    return await this.fileStorageService.uploadFile(file, folder);
+  }
+
   async getDosenDocuments(dosenId: string, query: any) {
     const { tab, search, jenis } = query;
     let whereClause: any = {
@@ -199,7 +206,7 @@ export class DocumentService {
     if (!file || !nama || !jenis_dokumen || !tanggal_dokumen) throw new Error('Semua komponen data formulir wajib diisi.');
 
     const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.fileStorageService.uploadFile(file, `dosen_uploads/${dosenId}`);
+    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, `dosen_uploads/${dosenId}`);
 
     return await this.documentRepository.create({
       nama,
@@ -219,7 +226,7 @@ export class DocumentService {
     if (targetDosenIds.length === 0) throw new Error('Minimal pilih satu dosen penerima.');
 
     const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.fileStorageService.uploadFile(file, 'documents');
+    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, 'documents');
 
     return await this.documentRepository.create({
       nama,
