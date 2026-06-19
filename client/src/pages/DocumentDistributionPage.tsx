@@ -58,6 +58,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ListFilter,
+  UserPlus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -599,44 +600,60 @@ export function DocumentDistributionPage() {
             <Separator />
 
             {/* Pilih Penerima */}
-            <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-medium">Pilih penerima</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Pilih dosen yang akan menerima dokumen ini</p>
+            <div className="border rounded-xl overflow-hidden">
+              {/* ── Header ── */}
+              <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <h3 className="text-sm font-medium">Pilih penerima</h3>
+                  <p className="text-[11px] text-muted-foreground">Pilih dosen yang akan menerima dokumen ini</p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <ListFilter className="w-4 h-4 text-muted-foreground shrink-0" />
-                <Select value={selectedProdiId} onValueChange={setSelectedProdiId}>
-                  <SelectTrigger className="bg-background h-9 text-sm flex-1">
-                    <SelectValue placeholder="Filter Program Studi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Program Studi</SelectItem>
-                    {uniqueProdis.map((prodi) => (<SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>))}
-                  </SelectContent>
-                </Select>
+              {/* ── Filter Controls ── */}
+              <div className="px-4 pt-3 pb-2 border-b">
+                <div className="grid grid-cols-[55fr_45fr] gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input placeholder="Cari dosen..." value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} className="pl-9" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <ListFilter className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <Select value={selectedProdiId} onValueChange={setSelectedProdiId}>
+                      <SelectTrigger className="bg-background h-9 text-sm w-full min-w-0">
+                        <SelectValue placeholder="Filter Prodi" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Program Studi</SelectItem>
+                        {uniqueProdis.map((prodi) => (<SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Cari dosen..." value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} className="pl-9" />
-              </div>
-
+              {/* ── Selected Chips ── */}
               {uploadForm.recipients.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {uploadForm.recipients.map((id) => {
-                    const d = allDosen.find(d => d.id === id);
-                    return d ? (
-                      <Badge key={id} variant="secondary" className="cursor-pointer gap-1 text-xs" onClick={() => toggleRecipient(id)}>
-                        {d.nama}<X className="w-3 h-3" />
-                      </Badge>
-                    ) : null;
-                  })}
+                <div className="px-4 py-2 border-b bg-blue-50/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-blue-700">{uploadForm.recipients.length} dosen dipilih</span>
+                    <button onClick={() => setUploadForm({ ...uploadForm, recipients: [] })} className="text-[11px] text-blue-600 hover:underline">Hapus semua</button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {uploadForm.recipients.map((id) => {
+                      const d = allDosen.find(d => d.id === id);
+                      return d ? (
+                        <Badge key={id} variant="secondary" className="cursor-pointer gap-1 text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200" onClick={() => toggleRecipient(id)}>
+                          {d.nama}<X className="w-3 h-3" />
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
               )}
 
-              <div className="border rounded-lg max-h-[220px] overflow-y-auto bg-background">
+              {/* ── Daftar Dosen ── */}
+              <div className="max-h-[220px] overflow-y-auto bg-background">
                 {sortedDosen.length === 0 ? (
                   <p className="text-xs text-muted-foreground text-center py-6">{recipientSearch ? "Tidak ada dosen yang cocok." : "Tidak ada dosen di prodi ini."}</p>
                 ) : sortedDosen.map((dosen) => {
@@ -644,7 +661,7 @@ export function DocumentDistributionPage() {
                   return (
                     <div
                       key={dosen.id}
-                      className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-accent/50 transition-colors ${isSelected ? "bg-primary/5 border-l-2 border-primary" : ""}`}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${isSelected ? "bg-indigo-50/50 border-l-2 border-l-indigo-500" : "hover:bg-gray-50/50"}`}
                       onClick={() => toggleRecipient(dosen.id)}
                     >
                       <Checkbox checked={isSelected} />
@@ -659,7 +676,6 @@ export function DocumentDistributionPage() {
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground">{uploadForm.recipients.length} dosen dipilih</p>
             </div>
           </div>
 
