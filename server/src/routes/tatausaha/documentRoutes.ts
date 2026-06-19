@@ -38,8 +38,8 @@ router.post('/draft', upload.single('file'), asyncHandler(documentController.sav
 router.post('/distribute', upload.single('file'), asyncHandler(documentController.distributeDocument));
 router.put('/:id/metadata', asyncHandler(documentController.updateMetadata));
 router.put('/:id/replace-file', upload.single('file'), asyncHandler(documentController.replaceFile));
-router.patch('/:dokumenId/distribusi/:distribusiId/resend', asyncHandler(documentController.resendDistribution));
-router.delete('/:dokumenId/distribusi/:distribusiId', asyncHandler(documentController.removeRecipient));
+router.patch('/distribusi/:id/resend', asyncHandler(documentController.resendDistribution));
+router.delete('/distribusi/:id', asyncHandler(documentController.deleteDistribution));
 router.delete('/:id', asyncHandler(documentController.deleteDocument));
 
 export default router;

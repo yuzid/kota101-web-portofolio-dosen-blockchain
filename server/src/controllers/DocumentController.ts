@@ -279,16 +279,24 @@ export class DocumentController {
 
   resendDistribution = async (req: AuthRequest, res: Response) => {
     try {
-      const result = await this.distributionService.resendDistribution(req.params.distribusiId as string);
+      if (!req.user) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+      const result = await this.distributionService.resendDistribution(req.user.id, req.params.id as string);
       res.json({ status: 'success', message: result.message });
     } catch (error: any) {
       res.status(400).json({ status: 'error', error: error.message });
     }
   };
 
-  removeRecipient = async (req: AuthRequest, res: Response) => {
+  deleteDistribution = async (req: AuthRequest, res: Response) => {
     try {
-      const result = await this.distributionService.removeRecipient(req.params.distribusiId as string);
+      if (!req.user) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+      const result = await this.distributionService.deleteDistribution(req.user.id, req.params.id as string);
       res.json({ status: 'success', message: result.message });
     } catch (error: any) {
       res.status(400).json({ status: 'error', error: error.message });

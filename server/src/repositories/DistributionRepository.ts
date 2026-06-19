@@ -132,7 +132,7 @@ export class DistributionRepository {
     });
   }
 
-  async deleteById(id: string) {
+  async delete(id: string) {
     return await prisma.distribusiDokumen.delete({
       where: { id },
     });

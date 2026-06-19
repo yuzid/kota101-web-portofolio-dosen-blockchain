@@ -172,21 +172,19 @@ export class DocumentDistributionService {
     return { message: 'Dokumen berhasil ditolak.' };
   }
 
-  async resendDistribution(distribusiId: string) {
+  async resendDistribution(tuUserId: string, distribusiId: string) {
     const distribusi = await this.distributionRepository.findById(distribusiId);
     if (!distribusi) throw new Error('Distribusi tidak ditemukan.');
 
     await this.distributionRepository.resetStatus(distribusiId);
-
     return { message: 'Dokumen berhasil dikirim ulang.' };
   }
 
-  async removeRecipient(distribusiId: string) {
+  async deleteDistribution(tuUserId: string, distribusiId: string) {
     const distribusi = await this.distributionRepository.findById(distribusiId);
     if (!distribusi) throw new Error('Distribusi tidak ditemukan.');
 
-    await this.distributionRepository.deleteById(distribusiId);
-
+    await this.distributionRepository.delete(distribusiId);
     return { message: 'Penerima berhasil dihapus.' };
   }
 }

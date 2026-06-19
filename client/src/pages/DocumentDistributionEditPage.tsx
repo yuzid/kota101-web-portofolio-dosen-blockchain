@@ -32,7 +32,6 @@ import {
   Upload,
   Loader2,
   FileText,
-  Download,
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,13 +52,13 @@ export function DocumentDistributionEditPage() {
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [existingFileName, setExistingFileName] = useState("");
 
   const [formData, setFormData] = useState({
     nama: "",
     jenis_dokumen: "",
     tanggal_upload: "",
   });
+  const [existingFile, setExistingFile] = useState<string | null>(null);
   const [newFile, setNewFile] = useState<File | null>(null);
   const [hasFileChange, setHasFileChange] = useState(false);
 
@@ -84,8 +83,7 @@ export function DocumentDistributionEditPage() {
           jenis_dokumen: d.jenis_dokumen,
           tanggal_upload: d.tanggal_upload?.split("T")[0] || "",
         });
-        const parts = (d.file_path || "").split("/");
-        setExistingFileName(parts[parts.length - 1] || d.nama || "");
+        setExistingFile(d.file_path);
       } else {
         toast.error("Gagal memuat data dokumen");
         navigate("/document-distribution");
@@ -250,40 +248,38 @@ export function DocumentDistributionEditPage() {
                 onChange={(e) => setFormData({ ...formData, tanggal_upload: e.target.value })}
               />
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>File Dokumen</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Existing File Display */}
-            <div className="border rounded-lg p-4 bg-muted/30">
-              <p className="text-sm text-muted-foreground mb-2">File Saat Ini</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <FileText className="w-8 h-8 text-blue-600 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{existingFileName || formData.nama}</p>
-                    <p className="text-xs text-muted-foreground">PDF / DOCX</p>
+            <div className="space-y-2">
+              <Label>File Dokumen</Label>
+
+              {existingFile && !hasFileChange && (
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-accent/30">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{formData.nama || "File"}.{existingFile.split('.').pop()}</p>
+                    <a
+                      href={`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Lihat file
+                    </a>
                   </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0 ml-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => id && navigate(`/document-distribution/${id}`)}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-1" /> Lihat Detail
-                  </Button>
-                </div>
-              </div>
-            </div>
+              )}
 
-            {/* File Replacement */}
-            <div className="space-y-2">
-              <Label>Ganti File Dokumen</Label>
+              {hasFileChange && newFile && (
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-yellow-50">
+                  <FileText className="w-5 h-5 text-yellow-600" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{newFile.name}</p>
+                    <p className="text-xs text-yellow-600">File baru akan menggantikan file lama</p>
+                  </div>
+                </div>
+              )}
+
+              <Label className="text-sm text-muted-foreground">Ganti File</Label>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -297,11 +293,8 @@ export function DocumentDistributionEditPage() {
               >
                 <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                 <p className="text-sm font-medium">
-                  {newFile ? newFile.name : "Klik untuk memilih file baru"}
+                  Klik untuk memilih file baru
                 </p>
-                {hasFileChange && (
-                  <p className="text-xs text-yellow-600 mt-1">File akan diganti setelah disimpan</p>
-                )}
               </div>
             </div>
           </CardContent>
