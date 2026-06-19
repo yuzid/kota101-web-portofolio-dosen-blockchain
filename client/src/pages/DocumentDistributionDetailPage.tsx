@@ -103,8 +103,6 @@ export function DocumentDistributionDetailPage() {
   const [copied, setCopied] = useState(false);
   const token = localStorage.getItem("token");
 
-  const shareUrl = `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`;
-
   useEffect(() => {
     fetchDetail();
   }, [id]);
@@ -234,8 +232,9 @@ export function DocumentDistributionDetailPage() {
   };
 
   const handleCopyLink = async () => {
+    const link = doc?.file_path || `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`;
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(link);
       setCopied(true);
       toast.success("Link berhasil disalin");
       setTimeout(() => setCopied(false), 2000);
@@ -340,7 +339,9 @@ export function DocumentDistributionDetailPage() {
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-muted-foreground mb-1">Link dokumen</p>
-                    <p className="text-sm font-mono text-foreground truncate">{shareUrl}</p>
+                    <p className="text-sm font-mono text-foreground truncate">
+                      {doc?.file_path || `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`}
+                    </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={handleCopyLink} className="shrink-0">
                     {copied ? (
