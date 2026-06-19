@@ -1,15 +1,25 @@
 # server/Dockerfile
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm install
-COPY . .
+COPY server/ .
+RUN npx prisma generate && npm run build
+
+# Build frontend
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm install
+COPY client/ .
 RUN npm run build
 
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
+COPY server/package*.json ./
 RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/client/dist ./client/dist
 EXPOSE 3000
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]

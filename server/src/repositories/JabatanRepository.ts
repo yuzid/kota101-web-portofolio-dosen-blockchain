@@ -108,6 +108,9 @@ export class JabatanRepository {
   }
 
   async findDosenById(id: string) {
-    return await prisma.dosen.findUnique({ where: { id } });
+    return await prisma.dosen.findUnique({
+      where: { id },
+      include: { program_studi: { select: { id: true, nama_prodi: true, jurusan_id: true } } },
+    });
   }
 }

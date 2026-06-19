@@ -108,6 +108,8 @@ export function ManageAccountsPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [submitMode, setSubmitMode] = useState<'add' | 'edit' | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -150,7 +152,7 @@ export function ManageAccountsPage() {
             nidn: u.dosen?.nidn,
             roles: userRoles,
             mainRole: u.role.toLowerCase(), // Store original role for filtering/editing
-            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'Jurusan TKI' : 'Sistem'),
+            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'JTK' : 'Sistem'),
             programStudiId: u.dosen?.program_studi?.id,
             jurusanId: u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
             status: 'active' as const,
@@ -233,19 +235,26 @@ export function ManageAccountsPage() {
   const checkUsernameAvailability = (username: string, excludeId?: string) => {
     const exists = accounts.some(acc => acc.username === username && acc.id !== excludeId);
     if (exists) {
-      setUsernameError('Username ini sudah digunakan');
+      setUsernameError('Email ini sudah digunakan');
       return false;
     }
     setUsernameError('');
     return true;
   };
 
-  const handleSubmitAdd = async () => {
+  const handleSubmitAdd = () => {
     if (!formData.name || !formData.username || !formData.password || !formData.role) {
       toast.error('Semua field wajib diisi');
       return;
     }
+    setSubmitMode('add');
+    setShowSubmitConfirm(true);
+  };
+
+  const confirmSubmitAdd = async () => {
+    setShowSubmitConfirm(false);
     setIsSubmitting(true);
+    const token = localStorage.getItem('token');
     try {
       const payload = {
         email: formData.username,
@@ -277,12 +286,20 @@ export function ManageAccountsPage() {
     }
   };
 
-  const handleSubmitEdit = async () => {
+  const handleSubmitEdit = () => {
     if (!selectedAccount || !formData.name || !formData.role) {
       toast.error('Field yang wajib tidak boleh kosong');
       return;
     }
+    setSubmitMode('edit');
+    setShowSubmitConfirm(true);
+  };
+
+  const confirmSubmitEdit = async () => {
+    if (!selectedAccount) return;
+    setShowSubmitConfirm(false);
     setIsSubmitting(true);
+    const token = localStorage.getItem('token');
     try {
       const payload: any = {
         nama: formData.name,
@@ -343,7 +360,7 @@ export function ManageAccountsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Cari nama atau username..."
+                placeholder="Cari nama atau email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -359,8 +376,7 @@ export function ManageAccountsPage() {
               <SelectItem value="all">Semua Role</SelectItem>
               <SelectItem value="dosen">Dosen</SelectItem>
               <SelectItem value="admin_tu">Admin TU</SelectItem>
-              <SelectItem value="kaprodi">Kaprodi</SelectItem>
-              <SelectItem value="kajur">Kajur</SelectItem>
+              <SelectItem value="administrator">Administrator</SelectItem>
             </SelectContent>
           </Select>
 
@@ -416,7 +432,7 @@ export function ManageAccountsPage() {
               <TableRow>
                 <TableHead className="w-12">No</TableHead>
                 <TableHead>Nama Lengkap</TableHead>
-                <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Program Studi / Unit</TableHead>
                 <TableHead>Status</TableHead>
@@ -521,16 +537,16 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-username">Username *</Label>
+              <Label htmlFor="add-email">Email *</Label>
               <Input
-                id="add-username"
+                id="add-email"
                 value={formData.username}
                 onChange={(e) => {
                   setFormData({ ...formData, username: e.target.value });
                   setUsernameError('');
                 }}
                 onBlur={() => formData.username && checkUsernameAvailability(formData.username)}
-                placeholder="Masukkan username (email)"
+                placeholder="Masukkan email"
               />
               {usernameError && (
                 <p className="text-sm text-destructive">{usernameError}</p>
@@ -538,7 +554,7 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-nip">NIP</Label>
+              <Label htmlFor="add-nip">NIP *</Label>
               <Input
                 id="add-nip"
                 value={formData.nip}
@@ -548,14 +564,67 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-nidn">NIDN</Label>
-              <Input
-                id="add-nidn"
-                value={formData.nidn}
-                onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
-                placeholder="Masukkan NIDN (opsional untuk dosen)"
-              />
+              <Label htmlFor="add-role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dosen">Dosen</SelectItem>
+                  <SelectItem value="admin_tu">Admin TU</SelectItem>
+                  <SelectItem value="administrator">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-nidn">NIDN *</Label>
+                <Input
+                  id="add-nidn"
+                  value={formData.nidn}
+                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  placeholder="Masukkan NIDN"
+                />
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-jurusan">Jurusan *</Label>
+                <Select
+                  value={formData.jurusanId}
+                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurusans.map((j: any) => (
+                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="add-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih program studi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis
+                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="add-password">Password Awal *</Label>
@@ -576,37 +645,6 @@ export function ManageAccountsPage() {
                 </button>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="kaprodi">Kaprodi</SelectItem>
-                  <SelectItem value="kajur">Kajur</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
-                <Label htmlFor="add-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih program studi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prodis.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
 
             {formData.role === 'admin_tu' && (
               <div className="space-y-2">
@@ -655,18 +693,18 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-username">Username</Label>
+              <Label htmlFor="edit-email">Email</Label>
               <Input
-                id="edit-username"
+                id="edit-email"
                 value={formData.username}
                 disabled
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Username tidak dapat diubah</p>
+              <p className="text-xs text-muted-foreground">Email tidak dapat diubah</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-nip">NIP</Label>
+              <Label htmlFor="edit-nip">NIP *</Label>
               <Input
                 id="edit-nip"
                 value={formData.nip}
@@ -675,17 +713,67 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-nidn">NIDN</Label>
-              <Input
-                id="edit-nidn"
-                value={formData.nidn}
-                onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
-                placeholder="Masukkan NIDN (opsional)"
-              />
-              <p className="text-xs text-muted-foreground">
-                (opsional, khusus untuk dosen)
-              </p>
+              <Label htmlFor="edit-role">Role *</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dosen">Dosen</SelectItem>
+                  <SelectItem value="admin_tu">Admin TU</SelectItem>
+                  <SelectItem value="administrator">Administrator</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-nidn">NIDN *</Label>
+                <Input
+                  id="edit-nidn"
+                  value={formData.nidn}
+                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  placeholder="Masukkan NIDN"
+                />
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-jurusan">Jurusan *</Label>
+                <Select
+                  value={formData.jurusanId}
+                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jurusan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {jurusans.map((j: any) => (
+                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {formData.role === 'dosen' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-prodi">Program Studi *</Label>
+                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prodis
+                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-password">Reset Password (opsional)</Label>
@@ -706,37 +794,6 @@ export function ManageAccountsPage() {
                 </button>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="kaprodi">Kaprodi</SelectItem>
-                  <SelectItem value="kajur">Kajur</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prodis.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
           <DialogFooter>
@@ -751,6 +808,27 @@ export function ManageAccountsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Submit Confirmation */}
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
+            <AlertDialogDescription>
+              {submitMode === 'add'
+                ? `Apakah Anda yakin ingin membuat akun ${formData.name} (${formData.username})?`
+                : `Apakah Anda yakin ingin menyimpan perubahan untuk akun ${formData.name}?`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={submitMode === 'add' ? confirmSubmitAdd : confirmSubmitEdit}>
+              {submitMode === 'add' ? 'Buat Akun' : 'Simpan Perubahan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Deactivate/Activate Confirmation */}
       <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
         <AlertDialogContent>
@@ -761,13 +839,13 @@ export function ManageAccountsPage() {
             <AlertDialogDescription>
               {selectedAccount?.status === 'active' ? (
                 <>
-                  Akun <strong>{selectedAccount?.name}</strong> (username: <code>{selectedAccount?.username}</code>) akan dinonaktifkan.
+                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan dinonaktifkan.
                   Pengguna ini tidak akan bisa login dan seluruh sesi aktifnya akan langsung diakhiri.
                   Akun dapat diaktifkan kembali kapan saja.
                 </>
               ) : (
                 <>
-                  Akun <strong>{selectedAccount?.name}</strong> (username: <code>{selectedAccount?.username}</code>) akan diaktifkan kembali
+                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan diaktifkan kembali
                   dan pengguna dapat login ke sistem.
                 </>
               )}

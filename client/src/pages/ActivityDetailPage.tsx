@@ -25,9 +25,18 @@ import {
   TableRow,
 } from "../components/ui/table";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+import {
   ArrowLeft,
   Calendar,
-  DollarSign,
   Users,
   FileText,
   CheckCircle,
@@ -39,11 +48,38 @@ import {
   Share2,
   History as HistoryIcon,
   Loader2,
+  Clock,
+  XCircle,
+  Copy,
+  GraduationCap,
+  BookOpen,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
-import { useAuth } from "../contexts/AuthContext";
+
+interface DosenDoc {
+  id: string;
+  name: string;
+  jenis: string;
+  tanggalUpload: string;
+  hasHighlight: boolean;
+  isOwner?: boolean;
+  uploadedBy?: { id: string; name: string };
+  lampiranId?: string;
+}
+
+interface SharedDoc {
+  id: string;
+  name: string;
+  jenis: string;
+  tanggalUpload: string;
+  hasHighlight: boolean;
+  uploadedBy: { id: string; name: string };
+  isUploader: boolean;
+  lampiranId?: string;
+}
 
 interface DosenBukti {
   id: string;
@@ -51,13 +87,9 @@ interface DosenBukti {
   nidn: string;
   isPencatat: boolean;
   isKetua: boolean;
-  dokumen: {
-    id: string;
-    name: string;
-    jenis: string;
-    tanggalUpload: string;
-    hasHighlight: boolean;
-  }[];
+  status: "MENUNGGU_KONFIRMASI" | "DITERIMA" | "DITOLAK";
+  isCurrentUser?: boolean;
+  dokumen: DosenDoc[];
 }
 
 interface ActivityDetail {
@@ -69,11 +101,13 @@ interface ActivityDetail {
   tanggalSelesai: string;
   tahunAkademik: string;
   semester: string;
-  sumberDana: string;
-  biaya: number;
   programStudi: string;
   dosenTerlibat: DosenBukti[];
   statusKelengkapan: "lengkap" | "tidak_lengkap";
+  jenisBukti: "MASING_MASING" | "BERSAMA";
+  dokumenBersama?: SharedDoc[];
+  currentUserId?: string;
+  isCurrentUserPencatat?: boolean;
 }
 
 interface ActivityLog {
@@ -89,11 +123,47 @@ interface ActivityLog {
   blockHeight: number | null;
 }
 
+const statusBadge: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+  MENUNGGU_KONFIRMASI: {
+    label: "Menunggu Konfirmasi",
+    className: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    icon: <Clock className="w-3 h-3" />,
+  },
+  DITERIMA: {
+    label: "Diterima",
+    className: "bg-green-100 text-green-800 border-green-300",
+    icon: <CheckCircle className="w-3 h-3" />,
+  },
+  DITOLAK: {
+    label: "Ditolak",
+    className: "bg-red-100 text-red-800 border-red-300",
+    icon: <XCircle className="w-3 h-3" />,
+  },
+};
+
+const jenisColor: Record<string, string> = {
+  pendidikan: "border-l-blue-500",
+  penelitian: "border-l-green-500",
+  pengabdian: "border-l-purple-500",
+  tugas_tambahan: "border-l-orange-500",
+};
+const jenisBadge: Record<string, string> = {
+  pendidikan: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100",
+  penelitian: "bg-green-100 text-green-800 border-green-200 hover:bg-green-100",
+  pengabdian: "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100",
+  tugas_tambahan: "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100",
+};
+const jenisIcon: Record<string, React.ReactNode> = {
+  pendidikan: <GraduationCap className="w-4 h-4" />,
+  penelitian: <BookOpen className="w-4 h-4" />,
+  pengabdian: <Users className="w-4 h-4" />,
+  tugas_tambahan: <FileText className="w-4 h-4" />,
+};
+
 export function ActivityDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("detail");
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
@@ -101,20 +171,21 @@ export function ActivityDetailPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [showShare, setShowShare] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const token = localStorage.getItem('token');
 
   useEffect(() => {
-    if (id) {
-      fetchActivityDetail();
-    }
+    if (id) fetchActivityDetail();
   }, [id]);
 
   const fetchActivityDetail = async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
@@ -123,7 +194,7 @@ export function ActivityDetailPage() {
         toast.error(result.error || 'Gagal mengambil detail kegiatan');
         navigate('/activities');
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan koneksi ke server');
     } finally {
       setIsLoading(false);
@@ -132,20 +203,17 @@ export function ActivityDetailPage() {
 
   const fetchAuditTrail = async () => {
     if (!id || auditLoaded || isAuditLoading) return;
-
     setIsAuditLoading(true);
     setAuditError(null);
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/audit-trail`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       const result = await response.json();
-
       if (!response.ok || result.status !== 'success') {
         throw new Error(result.error || 'Gagal mengambil riwayat blockchain');
       }
-
       setLogs(result.data);
       setAuditLoaded(true);
     } catch (error) {
@@ -157,45 +225,27 @@ export function ActivityDetailPage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    if (value === 'riwayat') {
-      void fetchAuditTrail();
+    if (value === 'riwayat') fetchAuditTrail();
+  };
+
+  const handleCopyLink = async () => {
+    const link = `${window.location.origin}/activities/${id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success('Link berhasil disalin!');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.info(`Link: ${link}`);
     }
   };
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Memuat Detail..." breadcrumbs={[{ label: "Kegiatan Tridharma", path: "/activities" }, { label: "Detail" }]}>
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground">Mengambil data kegiatan...</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (!activity) return null;
-
-  // Check if current user is the pencatat
-  const isPencatat = activity.dosenTerlibat.find(d => d.isPencatat)?.id === user?.id;
-
-  // Check if this is read-only view
-  const isReadOnlyView =
-    !isPencatat ||
-    user?.roles?.includes("kaprodi") ||
-    user?.roles?.includes("kajur") ||
-    location.pathname.includes("/ami-recap/");
-
-  const handleEdit = () => {
-    navigate(`/activities/${id}/edit`);
-  };
-
-  const handleDelete = async () => {
-    if (!confirm(`Hapus kegiatan "${activity.namaKegiatan}"?`)) return;
-    
+  const confirmDelete = async () => {
+    setShowDeleteDialog(false);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
@@ -204,67 +254,40 @@ export function ActivityDetailPage() {
       } else {
         toast.error(result.error || 'Gagal menghapus kegiatan');
       }
-    } catch (error) {
+    } catch {
       toast.error('Terjadi kesalahan saat menghapus kegiatan');
     }
   };
 
-  const handleShare = () => {
-    const link = window.location.href;
-    navigator.clipboard
-      .writeText(link)
-      .then(() => toast.success("Link berhasil disalin"))
-      .catch(() => toast.error("Gagal menyalin link"));
-  };
-
-  const getJenisBadge = (jenis: string) => {
-    switch (jenis.toLowerCase()) {
-      case "pengajaran":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
-      case "penelitian":
-        return <Badge className="bg-green-500">Penelitian</Badge>;
-      case "pengabdian":
-        return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case "tugas_tambahan":
-        return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
-      default:
-        return <Badge variant="secondary">{jenis}</Badge>;
-    }
-  };
-
-  const getKelengkapanBadge = (status: string) => {
-    if (status === "lengkap") {
-      return (
-        <Badge className="bg-green-500 text-white">
-          <CheckCircle className="w-4 h-4 mr-1" />
-          Dokumen Lengkap
-        </Badge>
-      );
-    }
-    return (
-      <Badge className="bg-red-500 text-white">
-        <AlertCircle className="w-4 h-4 mr-1" />
-        Dokumen Tidak Lengkap
-      </Badge>
-    );
-  };
-
   const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .substring(0, 2);
+    return name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2);
   };
 
-  const formatRupiah = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  if (isLoading) {
+    return (
+      <MainLayout title="Detail Kegiatan" breadcrumbs={[{ label: "Kegiatan Tridharma", path: "/activities" }, { label: "Detail" }]}>
+        <div className="space-y-4 max-w-5xl mx-auto">
+          <div className="h-10 w-32 bg-muted rounded-lg animate-pulse" />
+          <div className="h-32 bg-muted rounded-xl animate-pulse" />
+          <div className="h-8 w-64 bg-muted rounded-lg animate-pulse" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-20 bg-muted rounded-xl animate-pulse" />
+            <div className="h-20 bg-muted rounded-xl animate-pulse" />
+            <div className="h-20 bg-muted rounded-xl animate-pulse" />
+            <div className="h-20 bg-muted rounded-xl animate-pulse" />
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!activity) return null;
+
+  const isCurrentUserMember = activity.dosenTerlibat.some(d => d.isCurrentUser);
+  const isReadOnlyView = !isCurrentUserMember || location.pathname.includes("/ami-recap/");
+  const shareLink = `${window.location.origin}/activities/${id}`;
+
+  const jType = activity.jenisTridharma?.toLowerCase() || "";
 
   return (
     <MainLayout
@@ -275,267 +298,240 @@ export function ActivityDetailPage() {
         { label: "Detail Kegiatan" },
       ]}
     >
-      <div className="space-y-6 max-w-5xl">
-        {/* Back Button + Actions */}
+      <div className="space-y-6 max-w-5xl mx-auto">
+        {/* ── Top Bar ── */}
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Kembali
+          <Button variant="ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
           </Button>
-
-          {!isReadOnlyView && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleShare}>
-                <Share2 className="w-4 h-4 mr-2" />
-                Bagikan
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowShare(!showShare)} className={showShare ? "bg-accent" : ""}>
+              <Share2 className="w-4 h-4 mr-1.5" /> Bagikan
+            </Button>
+            {!isReadOnlyView && (
+              <Button variant="outline" size="sm" onClick={() => navigate(`/activities/${id}/edit`)}>
+                <Edit className="w-4 h-4 mr-1.5" /> Edit
               </Button>
-              <Button variant="outline" onClick={handleEdit}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
+            )}
+            {activity.isCurrentUserPencatat && !location.pathname.includes("/ami-recap/") && (
+              <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="w-4 h-4 mr-1.5" /> Hapus
               </Button>
-              <Button variant="destructive" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Hapus
-              </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Header Card */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <div className="flex items-center gap-2">
-                  {getJenisBadge(activity.jenisTridharma)}
-                  <Badge variant="secondary">{activity.kategori}</Badge>
+        {/* ── Share Section ── */}
+        {showShare && (
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground mb-1">Bagikan link kegiatan ini</p>
+                  <p className="text-sm font-mono text-foreground truncate">{shareLink}</p>
                 </div>
-                <h2 className="text-2xl font-bold">{activity.namaKegiatan}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {activity.programStudi}
-                </p>
+                <Button variant="outline" size="sm" onClick={handleCopyLink} className="shrink-0">
+                  {copied ? (
+                    <><Check className="w-4 h-4 mr-1 text-green-600" /> Tersalin</>
+                  ) : (
+                    <><Copy className="w-4 h-4 mr-1" /> Salin</>
+                  )}
+                </Button>
               </div>
-              <div>{getKelengkapanBadge(activity.statusKelengkapan)}</div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Hero Card ── */}
+        <Card className={`overflow-hidden border-l-4 ${jenisColor[jType] || "border-l-gray-300"}`}>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3 flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={jenisBadge[jType] || ""}>
+                    {jenisIcon[jType]} <span className="ml-1 capitalize">{activity.jenisTridharma?.replace("_", " ") || "-"}</span>
+                  </Badge>
+                  <Badge variant="secondary">{activity.kategori}</Badge>
+                  {getKelengkapanBadge(activity.statusKelengkapan)}
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight">{activity.namaKegiatan}</h1>
+                <p className="text-sm text-muted-foreground">{activity.programStudi}</p>
+              </div>
             </div>
-          </CardHeader>
+          </CardContent>
         </Card>
 
-        {/* Tabs */}
+        {/* ── Tabs ── */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList>
+          <TabsList className="w-full sm:w-auto grid grid-cols-2 sm:flex">
             <TabsTrigger value="detail">
-              <FileText className="w-4 h-4 mr-2" />
-              Detail Kegiatan
+              <FileText className="w-4 h-4 mr-2" /> Detail Kegiatan
             </TabsTrigger>
             <TabsTrigger value="riwayat">
-              <HistoryIcon className="w-4 h-4 mr-2" />
-              Riwayat
+              <HistoryIcon className="w-4 h-4 mr-2" /> Riwayat Blockchain
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: Detail */}
           <TabsContent value="detail" className="space-y-6 mt-4">
-            {/* Informasi Kegiatan */}
+            {/* ── Info Grid ── */}
             <Card>
-              <CardHeader>
-                <CardTitle>Informasi Kegiatan</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Informasi Kegiatan</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Tanggal Mulai
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>
-                        {format(new Date(activity.tanggalMulai), "dd MMMM yyyy", { locale: localeId })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Tanggal Selesai
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span>
-                        {format(new Date(activity.tanggalSelesai), "dd MMMM yyyy", { locale: localeId })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Tahun Akademik
-                    </label>
-                    <p className="font-medium">{activity.tahunAkademik}</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Semester
-                    </label>
-                    <p className="font-medium capitalize">
-                      {activity.semester}
-                    </p>
-                  </div>
-
-                  {activity.sumberDana && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Sumber Dana
-                      </label>
-                      <p className="font-medium">{activity.sumberDana}</p>
-                    </div>
-                  )}
-
-                  {activity.biaya > 0 && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Biaya Kegiatan
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          {formatRupiah(activity.biaya)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Mulai" value={format(new Date(activity.tanggalMulai), "dd MMMM yyyy", { locale: localeId })} />
+                  <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Selesai" value={format(new Date(activity.tanggalSelesai), "dd MMMM yyyy", { locale: localeId })} />
+                  <InfoItem icon={<GraduationCap className="w-4 h-4" />} label="Tahun Akademik" value={activity.tahunAkademik} />
+                  <InfoItem icon={<BookOpen className="w-4 h-4" />} label="Semester" value={activity.semester} />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Dosen Terlibat & Bukti Dokumen */}
+            {/* ── Dokumen Bersama ── */}
+            {activity.jenisBukti === 'BERSAMA' && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    Dokumen Bersama
+                    <Badge variant="secondary" className="text-xs">
+                      {activity.dokumenBersama?.length || 0} file
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activity.dokumenBersama && activity.dokumenBersama.length > 0 ? (
+                    <div className="space-y-2">
+                      {activity.dokumenBersama.map((doc) => (
+                        <FileRow key={doc.id} doc={doc} activity={activity} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center py-8 text-muted-foreground">
+                      <FileText className="w-8 h-8 mb-2 opacity-30" />
+                      <p className="text-sm">Belum ada dokumen bersama</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Dosen Terlibat ── */}
             <Card>
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle>Dosen Terlibat & Bukti Dokumen</CardTitle>
-                  <Badge variant="outline">
-                    <Users className="w-4 h-4 mr-1" />
-                    {activity.dosenTerlibat.length} Dosen
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    Dosen Terlibat
+                  </CardTitle>
+                  <Badge variant="outline" className="text-xs">
+                    {activity.dosenTerlibat.length} dosen
                   </Badge>
                 </div>
+                {activity.jenisBukti === 'MASING_MASING' && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Setiap dosen memiliki dokumen bukti masing-masing
+                  </p>
+                )}
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-3">
                 {activity.dosenTerlibat.map((dosen) => (
-                  <div
-                    key={dosen.id}
-                    className="border rounded-lg p-4 space-y-4"
-                  >
-                    {/* Dosen Info */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
+                  <div key={dosen.id} className="border rounded-xl overflow-hidden">
+                    {/* Dosen header */}
+                    <div className="flex items-center justify-between p-4 bg-muted/20 border-b">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="h-10 w-10 ring-2 ring-background shrink-0">
+                          <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
                             {getInitials(dosen.name)}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{dosen.name}</p>
-                            {dosen.isPencatat && (
-                              <Badge className="bg-blue-500">Pencatat</Badge>
-                            )}
-                            {dosen.isKetua && (
-                              <Badge className="bg-purple-500">Ketua</Badge>
-                            )}
-                            {!dosen.isKetua && (
-                              <Badge variant="secondary">Anggota</Badge>
-                            )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium text-sm truncate">{dosen.name}</span>
+                            {dosen.isPencatat && <Badge className="bg-blue-500 text-xs h-5">Pembuat</Badge>}
+                            {dosen.isKetua && !dosen.isPencatat && <Badge className="bg-purple-500 text-xs h-5">Ketua</Badge>}
                           </div>
-                          <p className="text-sm text-muted-foreground font-mono">
-                            {dosen.nidn ? `NIDN/NIP: ${dosen.nidn}` : 'Data identitas tidak tersedia'}
-                          </p>
+                          {dosen.nidn && (
+                            <p className="text-xs text-muted-foreground font-mono mt-0.5">NIDN: {dosen.nidn}</p>
+                          )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        {dosen.dokumen.length > 0 ? (
-                          <Badge className="bg-green-500">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            {dosen.dokumen.length} Dokumen
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-500">
-                            <AlertCircle className="w-3 h-3 mr-1" />
-                            Belum Upload
-                          </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {getStatusBadge(dosen.status || "MENUNGGU_KONFIRMASI")}
+                        {activity.jenisBukti !== 'BERSAMA' && (
+                          dosen.dokumen.length > 0 ? (
+                            <Badge className="bg-green-500 text-xs whitespace-nowrap">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              {dosen.dokumen.length} dokumen
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-muted-foreground whitespace-nowrap">
+                              Belum upload
+                            </Badge>
+                          )
                         )}
                       </div>
                     </div>
 
-                    {/* Dokumen List */}
-                    {dosen.dokumen.length > 0 ? (
-                      <div className="space-y-2 pl-12">
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Dokumen Bukti:
-                        </label>
-                        {dosen.dokumen.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-                          >
-                            <div className="flex items-center gap-3 flex-1">
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="font-medium text-sm">
-                                  {doc.name}
-                                </p>
-                                <div className="flex gap-2 mt-1">
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {doc.jenis}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground">
-                                    Upload:{" "}
-                                    {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
-                                  </span>
+                    {/* Dokumen list per dosen */}
+                    {activity.jenisBukti !== 'BERSAMA' && (
+                      <div className="p-4 space-y-2">
+                        {dosen.dokumen.length > 0 ? (
+                          dosen.dokumen.map((doc) => {
+                            const isOwner = 'isOwner' in doc ? (doc as any).isOwner : true;
+                            const uploadedBy = (doc as any).uploadedBy;
+                            return (
+                              <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm truncate">{doc.name}</p>
+                                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{doc.jenis}</Badge>
+                                      {!isOwner && uploadedBy && (
+                                        <span className="text-xs text-muted-foreground">Upload: {uploadedBy.name}</span>
+                                      )}
+                                      <span className="text-xs text-muted-foreground">
+                                        {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {doc.hasHighlight && <Highlighter className="w-4 h-4 text-yellow-500" />}
+                                  <Button variant="ghost" size="sm" onClick={() =>
+                                    navigate(`/documents/${doc.id}/preview`, {
+                                      state: {
+                                        activityId: activity.id,
+                                        breadcrumbs: [
+                                          { label: "Beranda", path: "/dashboard" },
+                                          { label: "Kegiatan Tridharma", path: "/activities" },
+                                          { label: activity.namaKegiatan, path: `/activities/${id}` },
+                                          { label: doc.name },
+                                        ],
+                                      },
+                                    })
+                                  }>
+                                    <Eye className="w-4 h-4" />
+                                  </Button>
                                 </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {doc.hasHighlight && (
-                                <Highlighter className="w-4 h-4 text-yellow-500" />
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  navigate(`/documents/${doc.id}/preview`, {
-                                    state: {
-                                      activityId: activity.id,
-                                      breadcrumbs: [
-                                        {
-                                          label: "Beranda",
-                                          path: "/dashboard",
-                                        },
-                                        {
-                                          label: "Kegiatan Tridharma",
-                                          path: "/activities",
-                                        },
-                                        {
-                                          label: activity.namaKegiatan,
-                                          path: `/activities/${id}`,
-                                        },
-                                        { label: doc.name },
-                                      ],
-                                    },
-                                  })
-                                }
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="pl-12 text-sm text-muted-foreground italic">
-                        Dosen ini belum mengupload dokumen bukti
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            {dosen.status === "DITERIMA"
+                              ? dosen.isCurrentUser
+                                ? "Anda belum mengupload dokumen bukti"
+                                : "Dosen ini belum mengupload dokumen bukti"
+                              : dosen.status === "MENUNGGU_KONFIRMASI"
+                              ? dosen.isCurrentUser
+                                ? "Anda belum konfirmasi keikutsertaan"
+                                : "Menunggu konfirmasi dosen"
+                              : "Dosen telah menolak keikutsertaan"}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -543,51 +539,44 @@ export function ActivityDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Summary */}
-            <Card className="bg-muted/30">
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Total Dosen Terlibat
-                    </p>
-                    <p className="text-2xl font-bold">
-                      {activity.dosenTerlibat.length}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Total Dokumen Bukti
-                    </p>
-                    <p className="text-2xl font-bold">
-                      {activity.dosenTerlibat.reduce(
-                        (sum, d) => sum + d.dokumen.length,
-                        0
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      Dosen Belum Upload
-                    </p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {
-                        activity.dosenTerlibat.filter(
-                          (d) => d.dokumen.length === 0
-                        ).length
-                      }
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* ── Summary Stats ── */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SummaryCard
+                icon={<Users className="w-5 h-5 text-blue-600" />}
+                label="Total Dosen Terlibat"
+                value={activity.dosenTerlibat.length.toString()}
+                bg="bg-blue-50 border-blue-200"
+              />
+              <SummaryCard
+                icon={<FileText className="w-5 h-5 text-green-600" />}
+                label={activity.jenisBukti === 'BERSAMA' ? "Total Dokumen Bersama" : "Total Dokumen Bukti"}
+                value={
+                  activity.jenisBukti === 'BERSAMA'
+                    ? (activity.dokumenBersama?.length || 0).toString()
+                    : activity.dosenTerlibat.reduce((s, d) => s + d.dokumen.length, 0).toString()
+                }
+                bg="bg-green-50 border-green-200"
+              />
+              <SummaryCard
+                icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
+                label={activity.jenisBukti === 'BERSAMA' ? "Status Dokumen" : "Dosen Belum Upload"}
+                value={
+                  activity.jenisBukti === 'BERSAMA'
+                    ? (activity.dokumenBersama && activity.dokumenBersama.length > 0 ? "Ada" : "Kosong")
+                    : activity.dosenTerlibat.filter(d => d.dokumen.length === 0 && d.status === "DITERIMA").length.toString()
+                }
+                bg="bg-amber-50 border-amber-200"
+              />
+            </div>
           </TabsContent>
 
-          {/* Tab: Riwayat */}
           <TabsContent value="riwayat" className="space-y-4 mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Riwayat Aktivitas</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <HistoryIcon className="w-4 h-4 text-muted-foreground" />
+                  Riwayat Blockchain
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {isAuditLoading ? (
@@ -599,12 +588,10 @@ export function ActivityDetailPage() {
                   <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
                     <AlertCircle className="w-10 h-10 text-destructive" />
                     <p className="text-sm text-destructive">{auditError}</p>
-                    <Button variant="outline" onClick={() => void fetchAuditTrail()}>
-                      Coba Lagi
-                    </Button>
+                    <Button variant="outline" onClick={() => fetchAuditTrail()}>Coba Lagi</Button>
                   </div>
                 ) : logs.length > 0 ? (
-                  <div className="border rounded-lg">
+                  <div className="border rounded-lg overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -618,31 +605,23 @@ export function ActivityDetailPage() {
                       <TableBody>
                         {logs.map((log) => (
                           <TableRow key={log.id}>
-                            <TableCell className="text-sm">
+                            <TableCell className="text-sm whitespace-nowrap">
                               {format(new Date(log.timestamp), "dd MMM yyyy HH:mm", { locale: localeId })}
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary">
-                                {log.action.replaceAll("_", " ")}
-                              </Badge>
+                              <Badge variant="secondary">{log.action.replaceAll("_", " ")}</Badge>
                             </TableCell>
                             <TableCell className="text-sm">{log.actor}</TableCell>
                             <TableCell>
                               <div className="space-y-1">
-                                <p className="font-mono text-xs" title={log.txId}>
-                                  {log.txId.slice(0, 12)}...
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {log.documentCount} dokumen pendukung
-                                </p>
+                                <p className="font-mono text-xs" title={log.txId}>{log.txId.slice(0, 12)}...</p>
+                                <p className="text-xs text-muted-foreground">{log.documentCount} dokumen</p>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-1 text-sm">
                                 <p>#{log.blockHeight ?? "-"}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {log.confirmations} konfirmasi
-                                </p>
+                                <p className="text-xs text-muted-foreground">{log.confirmations} konfirmasi</p>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -651,9 +630,9 @@ export function ActivityDetailPage() {
                     </Table>
                   </div>
                 ) : (
-                  <div className="text-center py-10 text-muted-foreground">
-                    <HistoryIcon className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                    <p>Belum ada riwayat tercatat untuk kegiatan ini.</p>
+                  <div className="flex flex-col items-center py-10 text-muted-foreground">
+                    <HistoryIcon className="w-10 h-10 mb-2 opacity-20" />
+                    <p className="text-sm">Belum ada riwayat tercatat untuk kegiatan ini.</p>
                   </div>
                 )}
               </CardContent>
@@ -661,6 +640,120 @@ export function ActivityDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus kegiatan <strong>{activity?.namaKegiatan}</strong>? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Hapus</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
+  );
+}
+
+/* ── Helper Components ── */
+
+function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+      <div className="p-2 rounded-lg bg-background border shrink-0 text-muted-foreground">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium capitalize mt-0.5">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ icon, label, value, bg }: { icon: React.ReactNode; label: string; value: string; bg: string }) {
+  return (
+    <div className={`rounded-xl border p-4 ${bg}`}>
+      <div className="flex items-center gap-3">
+        {icon}
+        <div>
+          <p className="text-2xl font-bold">{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FileRow({ doc, activity }: { doc: SharedDoc; activity: ActivityDetail }) {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  return (
+    <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="p-2 rounded-lg bg-blue-50 border border-blue-100 shrink-0">
+          <FileText className="w-4 h-4 text-blue-600" />
+        </div>
+        <div className="min-w-0">
+          <p className="font-medium text-sm truncate">{doc.name}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{doc.jenis}</Badge>
+            <span className="text-xs text-muted-foreground">Upload: {doc.uploadedBy.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {doc.hasHighlight && <Highlighter className="w-4 h-4 text-yellow-500" />}
+        <Button variant="ghost" size="sm" onClick={() =>
+          navigate(`/documents/${doc.id}/preview`, {
+            state: {
+              activityId: activity.id,
+              breadcrumbs: [
+                { label: "Beranda", path: "/dashboard" },
+                { label: "Kegiatan Tridharma", path: "/activities" },
+                { label: activity.namaKegiatan, path: `/activities/${id}` },
+                { label: doc.name },
+              ],
+            },
+          })
+        }>
+          <Eye className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function getKelengkapanBadge(status: string) {
+  if (status === "lengkap") {
+    return (
+      <Badge className="bg-green-500 text-white text-xs">
+        <CheckCircle className="w-3 h-3 mr-1" />
+        Dokumen Lengkap
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-red-500 text-white text-xs">
+      <AlertCircle className="w-3 h-3 mr-1" />
+      Dokumen Tidak Lengkap
+    </Badge>
+  );
+}
+
+function getStatusBadge(status: string) {
+  const s = statusBadge[status];
+  if (!s) return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  return (
+    <Badge variant="outline" className={`${s.className} text-xs`}>
+      <span className="flex items-center gap-1">{s.icon}{s.label}</span>
+    </Badge>
   );
 }

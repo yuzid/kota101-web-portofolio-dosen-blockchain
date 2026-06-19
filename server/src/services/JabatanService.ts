@@ -41,10 +41,16 @@ export class JabatanService {
   }
 
   async updateKajur(id: string, data: any) {
-    const { periode_mulai, periode_selesai, dosen_id } = data;
+    const { periode_mulai, periode_selesai, dosen_id, jurusan_id } = data;
     const existing = await this.jabatanRepository.findKajurById(id);
     if (!existing) throw new Error('Jabatan tidak ditemukan.');
 
+    if (dosen_id && dosen_id !== existing.dosen_id) {
+      const dosen = await this.jabatanRepository.findDosenById(dosen_id);
+      if (!dosen) throw new Error('Dosen tidak ditemukan.');
+    }
+
+    const targetJurusanId = jurusan_id || existing.jurusan_id;
     const mulai = periode_mulai ? new Date(periode_mulai) : existing.periode_mulai;
     const selesai = periode_selesai ? new Date(periode_selesai) : existing.periode_selesai;
 
@@ -52,11 +58,12 @@ export class JabatanService {
       throw new Error('periode_mulai harus sebelum periode_selesai.');
     }
 
-    const overlap = await this.jabatanRepository.findOverlapKajur(existing.jurusan_id, mulai, selesai, id);
+    const overlap = await this.jabatanRepository.findOverlapKajur(targetJurusanId, mulai, selesai, id);
     if (overlap) throw new Error('Jurusan ini sudah memiliki Kajur aktif pada periode tersebut.');
 
     return await this.jabatanRepository.updateKajur(id, {
       ...(dosen_id && { dosen_id }),
+      ...(jurusan_id && { jurusan_id }),
       periode_mulai: mulai,
       periode_selesai: selesai,
     });
@@ -102,10 +109,16 @@ export class JabatanService {
   }
 
   async updateKaprodi(id: string, data: any) {
-    const { periode_mulai, periode_selesai, dosen_id } = data;
+    const { periode_mulai, periode_selesai, dosen_id, program_studi_id } = data;
     const existing = await this.jabatanRepository.findKaprodiById(id);
     if (!existing) throw new Error('Jabatan tidak ditemukan.');
 
+    if (dosen_id && dosen_id !== existing.dosen_id) {
+      const dosen = await this.jabatanRepository.findDosenById(dosen_id);
+      if (!dosen) throw new Error('Dosen tidak ditemukan.');
+    }
+
+    const targetProdiId = program_studi_id || existing.program_studi_id;
     const mulai = periode_mulai ? new Date(periode_mulai) : existing.periode_mulai;
     const selesai = periode_selesai ? new Date(periode_selesai) : existing.periode_selesai;
 
@@ -113,11 +126,12 @@ export class JabatanService {
       throw new Error('periode_mulai harus sebelum periode_selesai.');
     }
 
-    const overlap = await this.jabatanRepository.findOverlapKaprodi(existing.program_studi_id, mulai, selesai, id);
+    const overlap = await this.jabatanRepository.findOverlapKaprodi(targetProdiId, mulai, selesai, id);
     if (overlap) throw new Error('Program studi ini sudah memiliki Kaprodi aktif pada periode tersebut.');
 
     return await this.jabatanRepository.updateKaprodi(id, {
       ...(dosen_id && { dosen_id }),
+      ...(program_studi_id && { program_studi_id }),
       periode_mulai: mulai,
       periode_selesai: selesai,
     });

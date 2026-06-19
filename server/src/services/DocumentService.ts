@@ -250,6 +250,21 @@ export class DocumentService {
     });
   }
 
+  async replaceFile(id: string, file: Express.Multer.File) {
+    const existing = await this.documentRepository.findById(id);
+    if (!existing) throw new Error('Dokumen tidak ditemukan.');
+
+    const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const filePath = await this.fileStorageService.uploadFile(file, 'documents');
+
+    await this.documentRepository.update(id, {
+      file_path: filePath,
+      hash_file: hashFile,
+    });
+
+    return { id, file_path: filePath, hash_file: hashFile };
+  }
+
   async deleteDocument(id: string, currentUser: any) {
     const targetDoc = await this.documentRepository.findById(id);
     if (!targetDoc) throw new Error('Dokumen tidak ditemukan.');

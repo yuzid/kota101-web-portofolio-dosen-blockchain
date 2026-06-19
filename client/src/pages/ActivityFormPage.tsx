@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
@@ -49,9 +49,9 @@ import {
   Search,
   FileText,
   Trash2,
-  Highlighter,
   Plus,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -64,6 +64,7 @@ interface Dosen {
   name: string;
   nidn?: string;
   programStudi: string;
+  isPencatat?: boolean;
 }
 
 interface Document {
@@ -73,10 +74,26 @@ interface Document {
   tanggal: string;
   uploadedBy: string;
   uploadedByName: string;
+  lampiranId?: string;
 }
 
+const enumKategoriToLabel: Record<string, string> = {
+  PENGAJARAN: "Mengajar",
+  BIMBINGAN_MAHASISWA: "Pembimbing TA",
+  PEMBINAAN_MAHASISWA: "Pembimbing TA",
+  PENGUJIAN_MAHASISWA: "Pembimbing TA",
+  BAHAN_AJAR: "Pengembangan Kurikulum",
+  PENELITIAN: "Penelitian Mandiri",
+  PUBLIKASI_KARYA: "Publikasi Jurnal",
+  PATEN: "Penelitian Mandiri",
+  PENGABDIAN: "Pengabdian Kepada Masyarakat",
+  PEMBICARA: "Pengabdian Kepada Masyarakat",
+  PENGELOLA_JURNAL: "Publikasi Jurnal",
+  TUGAS_TAMBAHAN: "Koordinator Laboratorium",
+};
+
 const kategoriByJenis: Record<string, string[]> = {
-  pengajaran: [
+  pendidikan: [
     "Mengajar",
     "Pembimbing TA",
     "Pembimbing PKL",
@@ -115,20 +132,26 @@ export function ActivityFormPage() {
     tanggalSelesai: undefined as Date | undefined,
     tahunAkademik: "",
     semester: "",
-    sumberDana: "",
-    biaya: "",
+    jenisBukti: "MASING_MASING" as "MASING_MASING" | "BERSAMA",
   });
 
   const [anggota, setAnggota] = useState<Dosen[]>([]);
   const [searchAnggota, setSearchAnggota] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [lampiran, setLampiran] = useState<Document[]>([]);
   const [availableDosen, setAvailableDosen] = useState<Dosen[]>([]);
   const [availableDocs, setAvailableDocs] = useState<Document[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [removeAnggotaId, setRemoveAnggotaId] = useState<string | null>(null);
+  const [removeDocId, setRemoveDocId] = useState<string | null>(null);
   const [showDocPicker, setShowDocPicker] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isCurrentUserPencatat, setIsCurrentUserPencatat] = useState(false);
+  const [pencatatId, setPencatatId] = useState<string | null>(null);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -171,7 +194,7 @@ export function ActivityFormPage() {
           name: d.name,
           jenis: d.jenis,
           tanggal: d.tanggal,
-          uploadedBy: user?.id,
+          uploadedBy: user?.uuid,
           uploadedByName: user?.name
         }));
         setAvailableDocs(mapped);
@@ -190,41 +213,55 @@ export function ActivityFormPage() {
       const result = await response.json();
       if (result.status === 'success') {
         const act = result.data;
+        const mappedKategori = enumKategoriToLabel[act.kategori] || act.kategori;
         setFormData({
           namaKegiatan: act.namaKegiatan,
           jenisTridharma: act.jenisTridharma,
-          kategori: act.kategori,
+          kategori: mappedKategori,
           tanggalMulai: new Date(act.tanggalMulai),
           tanggalSelesai: new Date(act.tanggalSelesai),
           tahunAkademik: act.tahunAkademik,
           semester: act.semester,
-          sumberDana: act.sumberDana || "",
-          biaya: act.biaya?.toString() || "",
+          jenisBukti: act.jenisBukti || "MASING_MASING",
         });
 
-        // Set anggota (exclude current user)
+        setIsCurrentUserPencatat(act.isCurrentUserPencatat);
+
+        const creatorId = act.dosenTerlibat.find((d: any) => d.isPencatat)?.id || null;
+        setPencatatId(creatorId);
+
         const members = act.dosenTerlibat
-          .filter((d: any) => d.id !== user?.id)
+          .filter((d: any) => d.id !== user?.uuid)
           .map((d: any) => ({
             id: d.id,
             name: d.name,
             nidn: d.nidn,
-            programStudi: "" // Backend doesn't return prodi in detail currently
+            programStudi: d.programStudi || "",
+            isPencatat: d.isPencatat || false,
           }));
         setAnggota(members);
 
-        // Set lampiran
-        const docs = act.dosenTerlibat.flatMap((d: any) => 
+        const docs = act.dosenTerlibat.flatMap((d: any) =>
           d.dokumen.map((doc: any) => ({
             id: doc.id,
             name: doc.name,
             jenis: doc.jenis,
             tanggal: doc.tanggalUpload,
             uploadedBy: d.id,
-            uploadedByName: d.name
+            uploadedByName: d.name,
+            lampiranId: doc.lampiranId
           }))
         );
-        setLampiran(docs);
+        const bersamDocs = (act.dokumenBersama || []).map((doc: any) => ({
+          id: doc.id,
+          name: doc.name,
+          jenis: doc.jenis,
+          tanggal: doc.tanggalUpload,
+          uploadedBy: doc.uploadedBy.id,
+          uploadedByName: doc.uploadedBy.name,
+          lampiranId: doc.lampiranId
+        }));
+        setLampiran([...docs, ...bersamDocs]);
       }
     } catch (error) {
       toast.error('Gagal memuat data kegiatan');
@@ -235,7 +272,6 @@ export function ActivityFormPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-
     if (!formData.namaKegiatan.trim()) {
       newErrors.namaKegiatan = "Nama kegiatan wajib diisi";
     }
@@ -265,29 +301,34 @@ export function ActivityFormPage() {
     if (!formData.semester) {
       newErrors.semester = "Semester wajib dipilih";
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!validateForm()) {
       toast.error("Mohon lengkapi semua field yang wajib diisi");
       return;
     }
+    setShowSubmitConfirm(true);
+  };
 
+  const confirmSubmit = async () => {
+    setShowSubmitConfirm(false);
     setIsLoading(true);
     try {
       const payload = {
         ...formData,
-        anggota_ids: anggota.map(a => a.id),
-        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.id).map(l => l.id)
+        tanggalMulai: formData.tanggalMulai?.toISOString(),
+        tanggalSelesai: formData.tanggalSelesai?.toISOString(),
+        anggota_ids: anggota.filter(a => a.id !== pencatatId).map(a => a.id),
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id)
       };
 
-      const url = isEdit 
+      const url = isEdit
         ? `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`
         : `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`;
-      
+
       const response = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: {
@@ -337,6 +378,7 @@ export function ActivityFormPage() {
       setAnggota([...anggota, dosen]);
     }
     setSearchAnggota("");
+    setShowDropdown(false);
   };
 
   const handleRemoveAnggota = (dosenId: string) => {
@@ -347,7 +389,7 @@ export function ActivityFormPage() {
     (d) =>
       d.name.toLowerCase().includes(searchAnggota.toLowerCase()) &&
       !anggota.find((a) => a.id === d.id) &&
-      d.id !== user?.id
+      d.id !== user?.uuid
   );
 
   const handleAddDoc = (doc: Document) => {
@@ -357,8 +399,74 @@ export function ActivityFormPage() {
     setShowDocPicker(false);
   };
 
-  const handleRemoveDoc = (docId: string) => {
+  const confirmRemoveDoc = async () => {
+    const docId = removeDocId;
+    if (!docId) return;
+    const doc = lampiran.find(l => l.id === docId);
+    if (doc?.lampiranId && isEdit) {
+      try {
+        await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran/${doc.lampiranId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch {
+        // silently fail, doc will still be removed from local state
+      }
+    }
     setLampiran(lampiran.filter(l => l.id !== docId));
+    setRemoveDocId(null);
+  };
+
+  const handleUploadFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.docx';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      if (file.size > 20 * 1024 * 1024) {
+        toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('nama', file.name.replace(/\.[^/.]+$/, ""));
+      formData.append('jenis_dokumen', 'BUKTI_PENDUKUNG_LAIN');
+      formData.append('tanggal_dokumen', new Date().toISOString().split('T')[0]);
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData,
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          const newDoc: Document = {
+            id: result.data.id,
+            name: file.name.replace(/\.[^/.]+$/, ""),
+            jenis: 'BUKTI_PENDUKUNG_LAIN',
+            tanggal: new Date().toISOString().split('T')[0],
+            uploadedBy: user?.uuid || '',
+            uploadedByName: user?.name || ''
+          };
+          setLampiran([...lampiran, newDoc]);
+          fetchMyDocuments();
+          toast.success('Dokumen berhasil diupload');
+        } else {
+          toast.error(result.error || 'Gagal upload dokumen');
+        }
+      } catch (error) {
+        toast.error('Gagal upload dokumen');
+      }
+    };
+    input.click();
+  };
+
+  const handleFocusSearch = () => {
+    setShowDropdown(true);
   };
 
   const getInitials = (name?: string) => {
@@ -370,6 +478,9 @@ export function ActivityFormPage() {
       .toUpperCase()
       .substring(0, 2);
   };
+
+  const anggotaToRemove = removeAnggotaId ? anggota.find(a => a.id === removeAnggotaId) : null;
+  const docToRemove = removeDocId ? lampiran.find(l => l.id === removeDocId) : null;
 
   return (
     <MainLayout
@@ -387,7 +498,6 @@ export function ActivityFormPage() {
           </div>
         )}
 
-        {/* Section 1: Informasi Kegiatan */}
         <Card>
           <CardHeader>
             <CardTitle>Informasi Kegiatan</CardTitle>
@@ -434,14 +544,10 @@ export function ActivityFormPage() {
                     <SelectValue placeholder="Pilih jenis tridharma" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pengajaran">Pengajaran</SelectItem>
+                    <SelectItem value="pendidikan">Pendidikan</SelectItem>
                     <SelectItem value="penelitian">Penelitian</SelectItem>
-                    <SelectItem value="pengabdian">
-                      Pengabdian kepada Masyarakat
-                    </SelectItem>
-                    <SelectItem value="tugas_tambahan">
-                      Tugas Tambahan
-                    </SelectItem>
+                    <SelectItem value="pengabdian">Pengabdian kepada Masyarakat</SelectItem>
+                    <SelectItem value="tugas_tambahan">Tugas Tambahan</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.jenisTridharma && (
@@ -474,7 +580,7 @@ export function ActivityFormPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {formData.jenisTridharma &&
-                      kategoriByJenis[formData.jenisTridharma].map((kat) => (
+                      kategoriByJenis[formData.jenisTridharma]?.map((kat) => (
                         <SelectItem key={kat} value={kat}>
                           {kat}
                         </SelectItem>
@@ -616,54 +722,14 @@ export function ActivityFormPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sumber-dana">Sumber Dana</Label>
-                <Select
-                  value={formData.sumberDana}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, sumberDana: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih sumber dana (opsional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="DIPA POLBAN">DIPA POLBAN</SelectItem>
-                    <SelectItem value="Mandiri">Mandiri</SelectItem>
-                    <SelectItem value="Hibah Eksternal">
-                      Hibah Eksternal
-                    </SelectItem>
-                    <SelectItem value="Lainnya">Lainnya</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">(opsional)</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="biaya">Biaya Kegiatan (Rp)</Label>
-                <Input
-                  id="biaya"
-                  type="number"
-                  placeholder="0"
-                  value={formData.biaya}
-                  onChange={(e) =>
-                    setFormData({ ...formData, biaya: e.target.value })
-                  }
-                />
-                <p className="text-xs text-muted-foreground">(opsional)</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Section 2: Dosen yang Terlibat */}
         <Card>
           <CardHeader>
             <CardTitle>Dosen yang Terlibat</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Current User (Fixed) - Pencatat is also Anggota */}
             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Avatar>
@@ -679,28 +745,68 @@ export function ActivityFormPage() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Badge className="bg-blue-500">Pencatat</Badge>
-                <Badge variant="secondary">Anggota</Badge>
+                {isCurrentUserPencatat && (
+                  <Badge className="bg-blue-500">Pembuat</Badge>
+                )}
               </div>
             </div>
 
-            {/* Search and Add Members */}
             <div className="space-y-2">
               <Label>Tambah Anggota Dosen (opsional)</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
+                  ref={searchInputRef}
                   placeholder="Cari nama dosen..."
                   value={searchAnggota}
-                  onChange={(e) => setSearchAnggota(e.target.value)}
+                  onChange={(e) => {
+                    setSearchAnggota(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={handleFocusSearch}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                   className="pl-9"
                 />
-                {searchAnggota && filteredDosen.length > 0 && (
+                {showDropdown && searchAnggota && filteredDosen.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 max-h-48 overflow-y-auto">
                     {filteredDosen.map((dosen) => (
                       <button
                         key={dosen.id}
-                        onClick={() => handleAddAnggota(dosen)}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleAddAnggota(dosen);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
+                      >
+                        <Avatar>
+                          <AvatarFallback>
+                            {getInitials(dosen.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-sm">{dosen.name}</p>
+                          {dosen.nidn && (
+                            <p className="text-xs text-muted-foreground font-mono">
+                              ID/NIP: {dosen.nidn}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {dosen.programStudi}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showDropdown && !searchAnggota && filteredDosen.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 border rounded-lg bg-background shadow-lg z-10 max-h-48 overflow-y-auto">
+                    {filteredDosen.map((dosen) => (
+                      <button
+                        key={dosen.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleAddAnggota(dosen);
+                        }}
                         className="w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left"
                       >
                         <Avatar>
@@ -726,7 +832,6 @@ export function ActivityFormPage() {
               </div>
             </div>
 
-            {/* Added Members */}
             {anggota.length > 0 && (
               <div className="space-y-2">
                 {anggota.map((d) => (
@@ -748,14 +853,20 @@ export function ActivityFormPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Anggota</Badge>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveAnggota(d.id)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                      {d.isPencatat ? (
+                        <Badge className="bg-blue-500">Pembuat</Badge>
+                      ) : (
+                        <Badge variant="secondary">Anggota</Badge>
+                      )}
+                      {!d.isPencatat && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRemoveAnggotaId(d.id)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -764,37 +875,103 @@ export function ActivityFormPage() {
           </CardContent>
         </Card>
 
-        {/* Section 3: Lampiran Bukti */}
         <Card>
           <CardHeader>
-            <CardTitle>Lampiran Bukti Kegiatan</CardTitle>
+            <CardTitle>Jenis Bukti Kegiatan</CardTitle>
             <CardDescription>
-              Lampirkan dokumen pendukung untuk memverifikasi kegiatan ini
+              Pilih bagaimana bukti dokumen dikelola untuk kegiatan ini
             </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div
+                className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFormData({ ...formData, jenisBukti: "MASING_MASING" })}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary" : ""}`}>
+                    {formData.jenisBukti === "MASING_MASING" && (
+                      <div className="w-2 h-2 rounded-full bg-white m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Bukti Diunggah Masing-Masing</p>
+                    <p className="text-sm text-muted-foreground">
+                      Setiap dosen mengupload dokumen bukti secara mandiri
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div
+                className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary/5" : ""}`}
+                onClick={() => setFormData({ ...formData, jenisBukti: "BERSAMA" })}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary" : ""}`}>
+                    {formData.jenisBukti === "BERSAMA" && (
+                      <div className="w-2 h-2 rounded-full bg-white m-0.5" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium">Bukti Bersama</p>
+                    <p className="text-sm text-muted-foreground">
+                      Satu dokumen yang digunakan bersama untuk seluruh anggota kegiatan
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dokumen Bukti Kegiatan</CardTitle>
+            <CardDescription>
+              {formData.jenisBukti === "BERSAMA"
+                ? "Upload satu dokumen yang akan digunakan bersama seluruh anggota"
+                : "Setiap dosen dapat mengupload dokumen bukti masing-masing"}
+            </CardDescription>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowDocPicker(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Pilih dari Dokumen Saya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={handleUploadFile}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Unggah Dokumen Baru
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {lampiran.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>Belum ada dokumen bukti yang diupload</p>
-                <p className="text-sm mt-1">
-                  Setiap dosen yang terlibat harus mengupload dokumen bukti
-                </p>
               </div>
             ) : (
               <>
-                {/* Dokumen Saya */}
-                {lampiran.filter((l) => l.uploadedBy === user?.id).length > 0 && (
+                {lampiran.filter((l) => l.uploadedBy === user?.uuid).length > 0 && (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold flex items-center gap-2">
                       Dokumen Anda{" "}
                       <Badge variant="outline">
-                        {lampiran.filter((l) => l.uploadedBy === user?.id).length}
+                        {lampiran.filter((l) => l.uploadedBy === user?.uuid).length}
                       </Badge>
                     </h4>
                     <div className="space-y-2">
                       {lampiran
-                        .filter((l) => l.uploadedBy === user?.id)
+                        .filter((l) => l.uploadedBy === user?.uuid)
                         .map((doc) => (
                           <div
                             key={doc.id}
@@ -813,7 +990,7 @@ export function ActivityFormPage() {
                               variant="ghost"
                               size="sm"
                               className="text-destructive"
-                              onClick={() => handleRemoveDoc(doc.id)}
+                              onClick={() => setRemoveDocId(doc.id)}
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -823,18 +1000,17 @@ export function ActivityFormPage() {
                   </div>
                 )}
 
-                {/* Dokumen Anggota Lain (Read-only view) */}
-                {lampiran.filter((l) => l.uploadedBy !== user?.id).length > 0 && (
+                {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length > 0 && (
                   <div className="space-y-3 pt-4 border-t">
                     <h4 className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
                       Dokumen Anggota Lain{" "}
                       <Badge variant="outline">
-                        {lampiran.filter((l) => l.uploadedBy !== user?.id).length}
+                        {lampiran.filter((l) => l.uploadedBy !== user?.uuid).length}
                       </Badge>
                     </h4>
                     <div className="space-y-2">
                       {lampiran
-                        .filter((l) => l.uploadedBy !== user?.id)
+                        .filter((l) => l.uploadedBy !== user?.uuid)
                         .map((doc) => (
                           <div
                             key={doc.id}
@@ -856,32 +1032,9 @@ export function ActivityFormPage() {
                 )}
               </>
             )}
-
-            {/* Upload/Pick Actions always visible for the recorder */}
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setShowDocPicker(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Pilih dari Dokumen Saya
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => navigate("/documents")}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Unggah Dokumen Baru
-              </Button>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Footer Actions */}
         <div className="flex justify-between sticky bottom-6 bg-background p-4 border rounded-lg shadow-lg z-20">
           <div>
             {isEdit && (
@@ -904,7 +1057,6 @@ export function ActivityFormPage() {
         </div>
       </div>
 
-      {/* Document Picker Dialog */}
       <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -933,15 +1085,73 @@ export function ActivityFormPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!removeAnggotaId} onOpenChange={(open) => { if (!open) setRemoveAnggotaId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Keluarkan Anggota?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin mengeluarkan <strong>{anggotaToRemove?.name}</strong> dari kegiatan ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeAnggotaId) handleRemoveAnggota(removeAnggotaId);
+                setRemoveAnggotaId(null);
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Keluarkan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!removeDocId} onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus dokumen <strong>{docToRemove?.name}</strong> dari kegiatan ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemoveDoc}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin {isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan <strong>{formData.namaKegiatan}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmit}>
+              {isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
             <AlertDialogDescription>
               Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
-              asosiasinya akan dihapus. Dokumen bukti yang terlampir tidak akan
-              terhapus, tetapi asosiasi dengan kegiatan ini akan hilang.
+              asosiasinya akan dihapus.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

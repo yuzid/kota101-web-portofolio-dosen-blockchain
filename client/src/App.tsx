@@ -17,6 +17,26 @@ const ManageAccountsPage = lazy(() =>
     default: m.ManageAccountsPage,
   }))
 );
+const AkademikJurusanPage = lazy(() =>
+  import("./pages/AkademikJurusanPage").then((m) => ({
+    default: m.AkademikJurusanPage,
+  }))
+);
+const AkademikProdiPage = lazy(() =>
+  import("./pages/AkademikProdiPage").then((m) => ({
+    default: m.AkademikProdiPage,
+  }))
+);
+const JabatanKajurPage = lazy(() =>
+  import("./pages/JabatanKajurPage").then((m) => ({
+    default: m.JabatanKajurPage,
+  }))
+);
+const JabatanKaprodiPage = lazy(() =>
+  import("./pages/JabatanKaprodiPage").then((m) => ({
+    default: m.JabatanKaprodiPage,
+  }))
+);
 const ActivitiesPage = lazy(() =>
   import("./pages/ActivitiesPage").then((m) => ({ default: m.ActivitiesPage }))
 );
@@ -43,6 +63,16 @@ const DocumentDistributionPage = lazy(() =>
     default: m.DocumentDistributionPage,
   }))
 );
+const DocumentDistributionDetailPage = lazy(() =>
+  import("./pages/DocumentDistributionDetailPage").then((m) => ({
+    default: m.DocumentDistributionDetailPage,
+  }))
+);
+const DocumentDistributionEditPage = lazy(() =>
+  import("./pages/DocumentDistributionEditPage").then((m) => ({
+    default: m.DocumentDistributionEditPage,
+  }))
+);
 const FileManagementPage = lazy(() =>
   import("./pages/FileManagementPage").then((m) => ({
     default: m.FileManagementPage,
@@ -59,6 +89,26 @@ const AMIActivityDetailPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("./pages/NotificationsPage").then((m) => ({
     default: m.NotificationsPage,
+  }))
+);
+const AcademicRoleActivitiesPage = lazy(() =>
+  import("./pages/AcademicRoleActivitiesPage").then((m) => ({
+    default: m.AcademicRoleActivitiesPage,
+  }))
+);
+const LaporanRekapitulasiPage = lazy(() =>
+  import("./pages/LaporanRekapitulasiPage").then((m) => ({
+    default: m.LaporanRekapitulasiPage,
+  }))
+);
+const RekapLaporanDetailPage = lazy(() =>
+  import("./pages/RekapLaporanDetailPage").then((m) => ({
+    default: m.RekapLaporanDetailPage,
+  }))
+);
+const RekapLaporanEditPage = lazy(() =>
+  import("./pages/RekapLaporanEditPage").then((m) => ({
+    default: m.RekapLaporanEditPage,
   }))
 );
 
@@ -79,12 +129,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
-
-  const isAdminOnly =
-    user.roles.includes("administrator") && user.roles.length === 1;
-  if (isAdminOnly && window.location.pathname === "/dashboard") {
-    return <Navigate to="/manage-accounts" replace />;
-  }
 
   return <>{children}</>;
 }
@@ -130,6 +174,42 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ManageAccountsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Akademik */}
+        <Route
+          path="/admin/akademik/jurusan"
+          element={
+            <ProtectedRoute>
+              <AkademikJurusanPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/akademik/prodi"
+          element={
+            <ProtectedRoute>
+              <AkademikProdiPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Jabatan */}
+        <Route
+          path="/admin/jabatan/kajur"
+          element={
+            <ProtectedRoute>
+              <JabatanKajurPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/jabatan/kaprodi"
+          element={
+            <ProtectedRoute>
+              <JabatanKaprodiPage />
             </ProtectedRoute>
           }
         />
@@ -193,6 +273,22 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/document-distribution/:id"
+          element={
+            <ProtectedRoute>
+              <DocumentDistributionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document-distribution/:id/edit"
+          element={
+            <ProtectedRoute>
+              <DocumentDistributionEditPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Files */}
         <Route
@@ -228,6 +324,72 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Academic Role Monitoring */}
+        <Route
+          path="/monitoring/jurusan"
+          element={
+            <ProtectedRoute>
+              <AcademicRoleActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/jurusan/rekap"
+          element={
+            <ProtectedRoute>
+              <LaporanRekapitulasiPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/jurusan/rekap/:id"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/jurusan/rekap/:id/edit"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanEditPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi"
+          element={
+            <ProtectedRoute>
+              <AcademicRoleActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap"
+          element={
+            <ProtectedRoute>
+              <LaporanRekapitulasiPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap/:id"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/rekap/:id/edit"
+          element={
+            <ProtectedRoute>
+              <RekapLaporanEditPage />
             </ProtectedRoute>
           }
         />
