@@ -218,7 +218,7 @@ export function DocumentDistributionDetailPage() {
         { label: doc.nama },
       ]}
     >
-      <div className="space-y-5 max-w-6xl mx-auto">
+      <div className="space-y-4 max-w-6xl mx-auto">
         {/* ── Topbar ── */}
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => navigate("/document-distribution")}>
@@ -238,9 +238,9 @@ export function DocumentDistributionDetailPage() {
         </div>
 
         {/* ── Two Column Layout ── */}
-        <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-6 space-y-5 lg:space-y-0">
+        <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-6 space-y-4 lg:space-y-0">
           {/* ════ LEFT COLUMN ════ */}
-          <div className="space-y-5 min-w-0">
+          <div className="space-y-4 min-w-0">
             {/* ── Info Card ── */}
             <Card>
               <CardContent className="pt-6">
@@ -260,7 +260,7 @@ export function DocumentDistributionDetailPage() {
                   </div>
                 </div>
 
-                <Separator className="my-5" />
+                <Separator className="my-4" />
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <MetaItem label="Diunggah oleh" value={doc.sumber_dokumen === "TATA_USAHA" ? "Staff Tata Usaha" : doc.sumber_dokumen} />
@@ -272,31 +272,31 @@ export function DocumentDistributionDetailPage() {
             </Card>
 
             {/* ── Preview Card ── */}
-            <Card className="overflow-hidden">
-              <div className="border-b border-border px-5 py-3 flex items-center justify-between bg-muted/20">
-                <div className="flex items-center gap-2">
+            <Card className="overflow-hidden gap-0">
+              <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-muted/20">
+                <div className="flex items-center gap-1.5">
                   <Eye className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Preview dokumen</span>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   {fileUrl && isPdf && (
                     <>
-                      <Button variant="ghost" size="sm" onClick={() => window.open(fileUrl, "_blank")} className="h-7 text-xs">
+                      <Button variant="ghost" size="sm" onClick={() => window.open(fileUrl, "_blank")} className="h-7 text-xs px-2">
                         <ExternalLink className="w-3.5 h-3.5 mr-1" /> Buka tab baru
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={handleDownload} className="h-7 text-xs">
+                      <Button variant="ghost" size="sm" onClick={handleDownload} className="h-7 text-xs px-2">
                         <Download className="w-3.5 h-3.5 mr-1" /> Unduh
                       </Button>
                     </>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setShowShare(!showShare)} className={`h-7 text-xs ${showShare ? "bg-accent" : ""}`}>
+                  <Button variant="ghost" size="sm" onClick={() => setShowShare(!showShare)} className={`h-7 text-xs px-2 ${showShare ? "bg-accent" : ""}`}>
                     <Share2 className="w-3.5 h-3.5 mr-1" /> Bagikan
                   </Button>
                 </div>
               </div>
 
               {showShare && (
-                <div className="px-5 py-3 border-b bg-muted/10">
+                <div className="px-4 py-2.5 border-b bg-muted/10">
                   <div className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] text-muted-foreground mb-0.5">Link dokumen</p>
@@ -317,7 +317,7 @@ export function DocumentDistributionDetailPage() {
                   </div>
                 ) : fileUrl && isPdf ? (
                   <div className="bg-gray-900/5">
-                    <div className="flex items-center justify-between px-5 py-2 bg-gray-900/10 border-b">
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-900/10 border-b">
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <FileText className="w-3.5 h-3.5" />
                         Dokumen PDF
@@ -348,16 +348,14 @@ export function DocumentDistributionDetailPage() {
           </div>
 
           {/* ════ RIGHT COLUMN (SIDEBAR) ════ */}
-          <div className="space-y-5 lg:sticky lg:top-4 lg:self-start">
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             {/* ── Ringkasan Distribusi ── */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <PieChart className="w-4 h-4 text-muted-foreground" />
-                  Ringkasan distribusi
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Card className="gap-0">
+              <div className="px-4 pt-4 pb-2 flex items-center gap-2 border-b border-border">
+                <PieChart className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Ringkasan distribusi</span>
+              </div>
+              <CardContent className="space-y-4 p-4">
                 <div className="grid grid-cols-2 gap-3">
                   <SideStat value={totalPenerima} label="Total Penerima" />
                   <SideStat value={disetujui} label="Disetujui" className="text-emerald-600" />
@@ -377,62 +375,58 @@ export function DocumentDistributionDetailPage() {
             </Card>
 
             {/* ── Daftar Penerima ── */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted-foreground" />
-                    Daftar penerima
-                  </CardTitle>
-                  <Badge variant="outline" className="text-xs font-normal">{totalPenerima}</Badge>
+            <Card className="gap-0">
+              <div className="px-4 pt-4 pb-2 flex items-center justify-between border-b border-border">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Daftar penerima</span>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                {totalPenerima === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-6 px-4">Belum ada penerima</p>
-                ) : (
-                  <div className="divide-y">
-                    {distribusi.map((d) => (
-                      <div key={d.id} className="flex items-center gap-3 px-4 py-3">
-                        <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarFallback className={`text-[10px] font-medium ${avatarStatusBg[d.status] || "bg-gray-100 text-gray-600"}`}>
-                            {getInitials(d.dosen.nama)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-medium truncate">{d.dosen.nama}</p>
-                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-normal ${statusBadgeClass[d.status] || ""}`}>
-                              {statusLabel[d.status] || d.status}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                            <span>{d.dosen.nip}</span>
-                            <span>·</span>
-                            <span>{format(new Date(d.tanggal_distribusi), "dd MMM", { locale: localeId })}</span>
-                          </div>
+                <Badge variant="outline" className="text-xs font-normal">{totalPenerima}</Badge>
+              </div>
+              {totalPenerima === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6 px-4">Belum ada penerima</p>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {distribusi.map((d) => (
+                    <div key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/50 transition-colors">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className={`text-[10px] font-medium ${avatarStatusBg[d.status] || "bg-gray-100 text-gray-600"}`}>
+                          {getInitials(d.dosen.nama)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium truncate">{d.dosen.nama}</p>
+                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-normal ${statusBadgeClass[d.status] || ""}`}>
+                            {statusLabel[d.status] || d.status}
+                          </Badge>
                         </div>
-                        {d.status === "DITOLAK" && (
-                          <div className="flex gap-0.5 shrink-0">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowResendDialog(d.id)} title="Kirim ulang">
-                              <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowRemoveDialog(d.id)} title="Hapus penerima">
-                              <UserMinus className="w-3.5 h-3.5 text-red-500" />
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                          <span>{d.dosen.nip}</span>
+                          <span>·</span>
+                          <span>{format(new Date(d.tanggal_distribusi), "dd MMM", { locale: localeId })}</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-                <Separator />
-                <div className="p-3">
-                  <Button variant="outline" size="sm" className="w-full text-xs gap-1.5" onClick={() => navigate(`/document-distribution/${id}/edit`)}>
-                    <UserPlus className="w-3.5 h-3.5" /> Tambah penerima
-                  </Button>
+                      {d.status === "DITOLAK" && (
+                        <div className="flex gap-0.5 shrink-0">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowResendDialog(d.id)} title="Kirim ulang">
+                            <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowRemoveDialog(d.id)} title="Hapus penerima">
+                            <UserMinus className="w-3.5 h-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </CardContent>
+              )}
+              <Separator />
+              <div className="p-3">
+                <Button variant="outline" size="sm" className="w-full text-xs gap-1.5" onClick={() => navigate(`/document-distribution/${id}/edit`)}>
+                  <UserPlus className="w-3.5 h-3.5" /> Tambah penerima
+                </Button>
+              </div>
             </Card>
           </div>
         </div>
