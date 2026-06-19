@@ -120,4 +120,21 @@ export class DistributionRepository {
       },
     });
   }
+
+  async resetStatus(id: string) {
+    return await prisma.distribusiDokumen.update({
+      where: { id },
+      data: {
+        status: 'MENUNGGU_KONFIRMASI',
+        tanggal_keputusan: null,
+        kepemilikan_id: null,
+      },
+    });
+  }
+
+  async deleteById(id: string) {
+    return await prisma.distribusiDokumen.delete({
+      where: { id },
+    });
+  }
 }

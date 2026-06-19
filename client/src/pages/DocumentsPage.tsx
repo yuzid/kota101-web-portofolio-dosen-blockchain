@@ -151,7 +151,15 @@ export function DocumentsPage() {
       });
       const result = await res.json();
       if (result.status === "success") {
-        setPendingRequests(result.data);
+        setPendingRequests((result.data || []).map((item: any) => ({
+          id: item.id,
+          dokumenId: item.dokumen_id,
+          namaDokumen: item.dokumen?.nama || '',
+          jenisDokumen: item.dokumen?.jenis_dokumen || '',
+          tanggalDistribusi: item.tanggal_distribusi,
+          status: item.status,
+          pengirim: item.didistribusikan_oleh?.tata_usaha?.nama || 'Tata Usaha',
+        })));
       }
     } catch {
       // silent fail

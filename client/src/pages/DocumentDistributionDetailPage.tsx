@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
@@ -31,6 +31,10 @@ import {
   Check,
   X,
   Clock,
+  Download,
+  RefreshCw,
+  UserX,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -88,11 +92,31 @@ export function DocumentDistributionDetailPage() {
   const [doc, setDoc] = useState<DokumenDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedDistribusi, setSelectedDistribusi] = useState<DistribusiItem | null>(null);
+  const [resendTarget, setResendTarget] = useState<DistribusiItem | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<DistribusiItem | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileType, setFileType] = useState<string>("");
+  const [fileName, setFileName] = useState<string>("");
+  const [previewLoading, setPreviewLoading] = useState(false);
   const token = localStorage.getItem("token");
+  const previewRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     fetchDetail();
   }, [id]);
+
+  useEffect(() => {
+    if (doc?.file_path) {
+      loadFilePreview();
+    }
+  }, [doc?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+    };
+  }, [fileUrl]);
 
   const fetchDetail = async () => {
     setLoading(true);
@@ -116,6 +140,29 @@ export function DocumentDistributionDetailPage() {
     }
   };
 
+  const loadFilePreview = async () => {
+    if (!id) return;
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/content`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error("Gagal memuat file");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setFileUrl(url);
+      setFileType(res.headers.get("Content-Type") || "");
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename\*=UTF-8''(.+)/);
+      setFileName(match ? decodeURIComponent(match[1]) : "dokumen");
+    } catch {
+      setFileUrl(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handleDelete = async () => {
     setShowDeleteDialog(false);
     try {
@@ -135,6 +182,54 @@ export function DocumentDistributionDetailPage() {
     }
   };
 
+  const handleResend = async () => {
+    if (!resendTarget || !id) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/distribusi/${resendTarget.id}/resend`,
+        { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Dokumen berhasil dikirim ulang.");
+        setResendTarget(null);
+        fetchDetail();
+      } else {
+        toast.error(result.error || "Gagal mengirim ulang.");
+      }
+    } catch {
+      toast.error("Gagal mengirim ulang.");
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!removeTarget || !id) return;
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/distribusi/${removeTarget.id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Penerima berhasil dihapus.");
+        setRemoveTarget(null);
+        fetchDetail();
+      } else {
+        toast.error(result.error || "Gagal menghapus penerima.");
+      }
+    } catch {
+      toast.error("Gagal menghapus penerima.");
+    }
+  };
+
+  const handleDownload = () => {
+    if (!fileUrl) return;
+    const a = document.createElement("a");
+    a.href = fileUrl;
+    a.download = fileName || "dokumen";
+    a.click();
+  };
+
   if (loading) {
     return (
       <MainLayout title="Detail Dokumen" breadcrumbs={[{ label: "Detail Dokumen" }]}>
@@ -147,6 +242,8 @@ export function DocumentDistributionDetailPage() {
 
   if (!doc) return null;
 
+  const isPDF = fileType === "application/pdf";
+
   return (
     <MainLayout
       title="Detail Dokumen"
@@ -156,7 +253,7 @@ export function DocumentDistributionDetailPage() {
         { label: doc.nama },
       ]}
     >
-      <div className="space-y-6 max-w-5xl">
+      <div className="space-y-6 max-w-6xl">
         <div className="flex items-center justify-between">
           <Button variant="ghost" onClick={() => navigate("/document-distribution")}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
@@ -171,37 +268,74 @@ export function DocumentDistributionDetailPage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3">
-              <FileText className="w-6 h-6 text-muted-foreground" />
-              {doc.nama}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Jenis Dokumen</p>
-                <Badge variant="secondary" className="mt-1">{doc.jenis_dokumen}</Badge>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-muted-foreground" />
+                {doc.nama}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">Jenis Dokumen</p>
+                  <Badge variant="secondary" className="mt-1">{doc.jenis_dokumen}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Tanggal Upload</p>
+                  <p className="font-medium mt-1">{format(new Date(doc.tanggal_upload), "dd MMMM yyyy")}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tanggal Upload</p>
-                <p className="font-medium mt-1">{format(new Date(doc.tanggal_upload), "dd MMMM yyyy")}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-muted-foreground">File</p>
-                <a
-                  href={doc.file_path}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-blue-600 underline break-all mt-1 inline-block"
-                >
-                  {doc.file_path}
-                </a>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <Eye className="w-6 h-6 text-muted-foreground" />
+                Preview File
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {previewLoading ? (
+                <div className="flex items-center justify-center min-h-[200px]">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : fileUrl && isPDF ? (
+                <div>
+                  <iframe
+                    ref={previewRef}
+                    src={fileUrl}
+                    className="w-full h-[400px] border rounded-lg bg-white"
+                    title={doc.nama}
+                  />
+                  <div className="flex justify-end mt-2">
+                    <Button variant="outline" size="sm" onClick={handleDownload}>
+                      <Download className="w-4 h-4 mr-2" /> Unduh PDF
+                    </Button>
+                  </div>
+                </div>
+              ) : fileUrl ? (
+                <div className="flex flex-col items-center justify-center min-h-[200px] border rounded-lg bg-muted/20 text-center p-6">
+                  <FileText className="w-14 h-14 text-muted-foreground mb-3" />
+                  <p className="font-medium">{fileName || doc.nama}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Preview tidak tersedia untuk format ini. Silakan unduh file.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-4" onClick={handleDownload}>
+                    <Download className="w-4 h-4 mr-2" /> Unduh File
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center min-h-[200px] border rounded-lg bg-muted/20 text-center p-6">
+                  <FileText className="w-14 h-14 text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">Gagal memuat preview file.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
@@ -216,6 +350,7 @@ export function DocumentDistributionDetailPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Tanggal Distribusi</TableHead>
                   <TableHead>Tanggal Keputusan</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,11 +373,35 @@ export function DocumentDistributionDetailPage() {
                           ? format(new Date(d.tanggal_keputusan), "dd MMM yyyy HH:mm")
                           : "-"}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {d.status === "DITOLAK" && (
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setResendTarget(d)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Kirim Ulang"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setRemoveTarget(d)}
+                              className="text-red-600 hover:text-red-800"
+                              title="Hapus dari daftar penerima"
+                            >
+                              <UserX className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Dokumen belum didistribusikan ke dosen mana pun.
                     </TableCell>
                   </TableRow>
@@ -266,6 +425,41 @@ export function DocumentDistributionDetailPage() {
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
               Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!resendTarget} onOpenChange={(open) => { if (!open) setResendTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kirim Ulang Dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen akan dikirim ulang ke <strong>{resendTarget?.dosen.nama}</strong>.
+              Status akan direset menjadi "Menunggu Konfirmasi".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResend} className="bg-blue-600 hover:bg-blue-700">
+              <RefreshCw className="w-4 h-4 mr-2" /> Kirim Ulang
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!removeTarget} onOpenChange={(open) => { if (!open) setRemoveTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Penerima?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus <strong>{removeTarget?.dosen.nama}</strong> dari daftar penerima dokumen ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRemove} className="bg-destructive hover:bg-destructive/90">
+              <UserX className="w-4 h-4 mr-2" /> Hapus
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

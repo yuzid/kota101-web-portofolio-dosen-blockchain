@@ -32,6 +32,8 @@ import {
   Upload,
   Loader2,
   FileText,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -51,6 +53,7 @@ export function DocumentDistributionEditPage() {
   const [showReplaceConfirm, setShowReplaceConfirm] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [existingFileName, setExistingFileName] = useState("");
 
   const [formData, setFormData] = useState({
     nama: "",
@@ -81,6 +84,8 @@ export function DocumentDistributionEditPage() {
           jenis_dokumen: d.jenis_dokumen,
           tanggal_upload: d.tanggal_upload?.split("T")[0] || "",
         });
+        const parts = (d.file_path || "").split("/");
+        setExistingFileName(parts[parts.length - 1] || d.nama || "");
       } else {
         toast.error("Gagal memuat data dokumen");
         navigate("/document-distribution");
@@ -245,7 +250,38 @@ export function DocumentDistributionEditPage() {
                 onChange={(e) => setFormData({ ...formData, tanggal_upload: e.target.value })}
               />
             </div>
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>File Dokumen</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Existing File Display */}
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <p className="text-sm text-muted-foreground mb-2">File Saat Ini</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileText className="w-8 h-8 text-blue-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{existingFileName || formData.nama}</p>
+                    <p className="text-xs text-muted-foreground">PDF / DOCX</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0 ml-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => id && navigate(`/document-distribution/${id}`)}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" /> Lihat Detail
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* File Replacement */}
             <div className="space-y-2">
               <Label>Ganti File Dokumen</Label>
               <input
