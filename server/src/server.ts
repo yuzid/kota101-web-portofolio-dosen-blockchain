@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import authRoutes from './routes/authRoutes';
 import adminUserRoutes from './routes/admin/userRoutes';
 import adminJabatanRoutes from './routes/admin/jabatan';
@@ -14,6 +16,11 @@ import akademikRoleRoutes from './routes/dosen/akademikRoleRoutes';
 
 
 const app = express();
+app.use(cors({
+  origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(',') : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  exposedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 // ── Public Routes (Unauthenticated) ──
@@ -41,7 +48,11 @@ app.get('/api/status', (req: Request, res: Response) => {
 });
 
 // ── Frontend static ──
-const clientBuildPath = path.join(__dirname, '../../client/dist');
+const clientBuildPath = (() => {
+  const dockerPath = path.join(__dirname, '../client/dist');
+  if (fs.existsSync(dockerPath)) return dockerPath;
+  return path.join(__dirname, '../../client/dist');
+})();
 app.use(express.static(clientBuildPath));
 app.all(/^\/(?!api).*/, (req: Request, res: Response) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'));

@@ -63,6 +63,16 @@ const DocumentDistributionPage = lazy(() =>
     default: m.DocumentDistributionPage,
   }))
 );
+const DocumentDistributionDetailPage = lazy(() =>
+  import("./pages/DocumentDistributionDetailPage").then((m) => ({
+    default: m.DocumentDistributionDetailPage,
+  }))
+);
+const DocumentDistributionEditPage = lazy(() =>
+  import("./pages/DocumentDistributionEditPage").then((m) => ({
+    default: m.DocumentDistributionEditPage,
+  }))
+);
 const FileManagementPage = lazy(() =>
   import("./pages/FileManagementPage").then((m) => ({
     default: m.FileManagementPage,
@@ -260,6 +270,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <DocumentDistributionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document-distribution/:id"
+          element={
+            <ProtectedRoute>
+              <DocumentDistributionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/document-distribution/:id/edit"
+          element={
+            <ProtectedRoute>
+              <DocumentDistributionEditPage />
             </ProtectedRoute>
           }
         />

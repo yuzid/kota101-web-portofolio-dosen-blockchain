@@ -83,4 +83,39 @@ export class DocumentRepository {
       data: { deleted_at: new Date() } as any
     });
   }
+
+  async findKepemilikan(dosenId: string, dokumenId: string) {
+    return await prisma.kepemilikanDokumen.findFirst({
+      where: { dosen_id: dosenId, dokumen_id: dokumenId },
+    });
+  }
+
+  async createKepemilikan(dosenId: string, dokumenId: string) {
+    return await prisma.kepemilikanDokumen.create({
+      data: { dosen_id: dosenId, dokumen_id: dokumenId },
+    });
+  }
+
+  async findWithDistribusi(id: string) {
+    return await prisma.dokumen.findUnique({
+      where: { id },
+      include: {
+        kepemilikan: {
+          include: {
+            dosen: { select: { nama: true, nip: true, nidn: true } },
+          },
+        },
+        distribusi_dokumen: {
+          include: {
+            dosen: { select: { nama: true, nip: true, nidn: true } },
+            didistribusikan_oleh: {
+              select: { tata_usaha: { select: { nama: true, nip: true } } },
+            },
+            kepemilikan: { select: { id: true } },
+          },
+          orderBy: { tanggal_distribusi: 'desc' },
+        },
+      },
+    });
+  }
 }

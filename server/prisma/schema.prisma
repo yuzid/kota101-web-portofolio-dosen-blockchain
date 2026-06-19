@@ -55,10 +55,11 @@ model User {
   email         String     @unique @db.VarChar(255)
   password_hash String     @db.VarChar(255)
   role          String     @db.VarChar(50)
-  tata_usaha    TataUsaha?
-  dosen         Dosen?
-  admin         Admin?
-  rekap_laporan RekapLaporan[]
+  tata_usaha        TataUsaha?
+  dosen             Dosen?
+  admin             Admin?
+  rekap_laporan     RekapLaporan[]
+  distribusi_dokumen DistribusiDokumen[] @relation("UserDistribusi")
 
   @@map("user")
 }
@@ -95,6 +96,7 @@ model Dosen {
   kepemilikan_dokumen            KepemilikanDokumen[]
   partisipasi_kegiatan_tridharma PartisipasiKegiatanTridharma[]
   kegiatan_tridharma             KegiatanTridharma[]
+  distribusi_dokumen             DistribusiDokumen[]
   chain_address                  String
 
   @@map("dosen")
@@ -176,8 +178,27 @@ model KepemilikanDokumen {
   dosen      Dosen       @relation(fields: [dosen_id], references: [id])
   dokumen    Dokumen     @relation(fields: [dokumen_id], references: [id])
   highlights Highlight[]
+  distribusi DistribusiDokumen? @relation("DistribusiKeKepemilikan")
 
   @@map("kepemilikan_dokumen")
+}
+
+model DistribusiDokumen {
+  id                       String             @id @default(uuid()) @db.Uuid
+  dokumen_id               String             @db.Uuid
+  dosen_id                 String             @db.Uuid
+  didistribusikan_oleh_id  String             @db.Uuid
+  status                   String             @default("MENUNGGU_KONFIRMASI")
+  tanggal_distribusi       DateTime           @default(now()) @db.Timestamp
+  tanggal_keputusan        DateTime?          @db.Timestamp
+  kepemilikan_id           String?            @unique @db.Uuid
+
+  dokumen                  Dokumen            @relation(fields: [dokumen_id], references: [id])
+  dosen                    Dosen              @relation(fields: [dosen_id], references: [id])
+  didistribusikan_oleh     User               @relation("UserDistribusi", fields: [didistribusikan_oleh_id], references: [id])
+  kepemilikan              KepemilikanDokumen? @relation("DistribusiKeKepemilikan", fields: [kepemilikan_id], references: [id])
+
+  @@map("distribusi_dokumen")
 }
 
 model Dokumen {
@@ -191,6 +212,7 @@ model Dokumen {
   deleted_at        DateTime?            @db.Timestamp
   kepemilikan       KepemilikanDokumen[]
   lampiran_bukti    LampiranBukti[]
+  distribusi_dokumen DistribusiDokumen[]
 
   @@map("dokumen")
 }
