@@ -149,7 +149,7 @@ export class DocumentService {
     const { tab, search, jenis } = query;
     let whereClause: any = {
       deleted_at: null,
-      kepemilikan: { some: { dosen_id: dosenId } }
+      kepemilikan: { some: { dosen_id: dosenId, status: 'DISETUJUI' } }
     };
 
     if (tab === 'tu') {
@@ -187,7 +187,7 @@ export class DocumentService {
     if (currentUser.role.toUpperCase() === 'TATA_USAHA') {
       if (!currentUser.jurusan_id) throw new Error('Akses ditolak. Yurisdiksi jurusan tidak valid.');
       whereClause.kepemilikan = {
-        some: { dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } } }
+        some: { status: 'DISETUJUI', dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } } }
       };
     }
 

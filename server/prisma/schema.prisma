@@ -1,6 +1,5 @@
 datasource db {
   provider = "postgresql"
-  
 }
 
 generator client {
@@ -51,15 +50,15 @@ enum JenisKegiatan {
 }
 
 model User {
-  id            String     @id @default(uuid()) @db.Uuid
-  email         String     @unique @db.VarChar(255)
-  password_hash String     @db.VarChar(255)
-  role          String     @db.VarChar(50)
-  tata_usaha        TataUsaha?
-  dosen             Dosen?
-  admin             Admin?
-  rekap_laporan     RekapLaporan[]
-  distribusi_dokumen DistribusiDokumen[] @relation("UserDistribusi")
+  id                      String               @id @default(uuid()) @db.Uuid
+  email                   String               @unique @db.VarChar(255)
+  password_hash           String               @db.VarChar(255)
+  role                    String               @db.VarChar(50)
+  tata_usaha              TataUsaha?
+  dosen                   Dosen?
+  admin                   Admin?
+  rekap_laporan           RekapLaporan[]
+  dokumen_didistribusikan KepemilikanDokumen[] @relation("UserDistribusi")
 
   @@map("user")
 }
@@ -84,19 +83,18 @@ model TataUsaha {
 }
 
 model Dosen {
-  id                             String                           @id @db.Uuid
-  nip                            String                           @unique @db.VarChar(50)
-  nidn                           String                           @unique @db.VarChar(50)
-  nama                           String                           @db.VarChar(255)
-  program_studi_id               String                           @db.Uuid
-  user                           User                             @relation(fields: [id], references: [id], onDelete: Cascade)
-  program_studi                  ProgramStudi                     @relation(fields: [program_studi_id], references: [id])
+  id                             String                         @id @db.Uuid
+  nip                            String                         @unique @db.VarChar(50)
+  nidn                           String                         @unique @db.VarChar(50)
+  nama                           String                         @db.VarChar(255)
+  program_studi_id               String                         @db.Uuid
+  user                           User                           @relation(fields: [id], references: [id], onDelete: Cascade)
+  program_studi                  ProgramStudi                   @relation(fields: [program_studi_id], references: [id])
   jabatan_kajur                  JabatanKajur[]
   jabatan_kaprodi                JabatanKaprodi[]
   kepemilikan_dokumen            KepemilikanDokumen[]
   partisipasi_kegiatan_tridharma PartisipasiKegiatanTridharma[]
   kegiatan_tridharma             KegiatanTridharma[]
-  distribusi_dokumen             DistribusiDokumen[]
   chain_address                  String
 
   @@map("dosen")
@@ -121,9 +119,9 @@ model Jurusan {
   nama_jurusan  String         @db.VarChar(255)
   program_studi ProgramStudi[]
   jabatan_kajur JabatanKajur[]
-  tata_usaha    TataUsaha[]    // Tambahkan ini agar sinkron
+  tata_usaha    TataUsaha[] // Tambahkan ini agar sinkron
   rekap_laporan RekapLaporan[]
-  
+
   @@map("jurusan")
 }
 
@@ -152,67 +150,53 @@ model JabatanKaprodi {
 }
 
 model RekapLaporan {
-  id                String       @id @default(uuid()) @db.Uuid
-  nama              String       @db.VarChar(255)
-  tanggal_perekapan DateTime     @db.Date
-  dibuat_oleh_id    String       @db.Uuid
-  prodi_id          String?      @db.Uuid
-  jurusan_id        String?      @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  nama              String   @db.VarChar(255)
+  tanggal_perekapan DateTime @db.Date
+  dibuat_oleh_id    String   @db.Uuid
+  prodi_id          String?  @db.Uuid
+  jurusan_id        String?  @db.Uuid
   filter            Json
   kegiatan_data     Json
   riwayat           Json
-  created_at        DateTime     @default(now()) @db.Timestamp
-  updated_at        DateTime     @updatedAt @db.Timestamp
+  created_at        DateTime @default(now()) @db.Timestamp
+  updated_at        DateTime @updatedAt @db.Timestamp
 
-  user              User         @relation(fields: [dibuat_oleh_id], references: [id])
-  program_studi     ProgramStudi? @relation(fields: [prodi_id], references: [id])
-  jurusan           Jurusan?     @relation(fields: [jurusan_id], references: [id])
+  user          User          @relation(fields: [dibuat_oleh_id], references: [id])
+  program_studi ProgramStudi? @relation(fields: [prodi_id], references: [id])
+  jurusan       Jurusan?      @relation(fields: [jurusan_id], references: [id])
 
   @@map("rekap_laporan")
 }
 
 model KepemilikanDokumen {
-  id         String      @id @default(uuid()) @db.Uuid
-  dosen_id   String      @db.Uuid
-  dokumen_id String      @db.Uuid
-  dosen      Dosen       @relation(fields: [dosen_id], references: [id])
-  dokumen    Dokumen     @relation(fields: [dokumen_id], references: [id])
-  highlights Highlight[]
-  distribusi DistribusiDokumen? @relation("DistribusiKeKepemilikan")
+  id                      String      @id @default(uuid()) @db.Uuid
+  dosen_id                String      @db.Uuid
+  dokumen_id              String      @db.Uuid
+  didistribusikan_oleh_id String?     @db.Uuid
+  status                  String      @default("DISETUJUI")
+  tanggal_distribusi      DateTime?   @db.Timestamp
+  tanggal_keputusan       DateTime?   @db.Timestamp
+  dosen                   Dosen       @relation(fields: [dosen_id], references: [id])
+  dokumen                 Dokumen     @relation(fields: [dokumen_id], references: [id])
+  didistribusikan_oleh    User?       @relation("UserDistribusi", fields: [didistribusikan_oleh_id], references: [id])
+  highlights              Highlight[]
 
+  @@unique([dosen_id, dokumen_id])
   @@map("kepemilikan_dokumen")
 }
 
-model DistribusiDokumen {
-  id                       String             @id @default(uuid()) @db.Uuid
-  dokumen_id               String             @db.Uuid
-  dosen_id                 String             @db.Uuid
-  didistribusikan_oleh_id  String             @db.Uuid
-  status                   String             @default("MENUNGGU_KONFIRMASI")
-  tanggal_distribusi       DateTime           @default(now()) @db.Timestamp
-  tanggal_keputusan        DateTime?          @db.Timestamp
-  kepemilikan_id           String?            @unique @db.Uuid
-
-  dokumen                  Dokumen            @relation(fields: [dokumen_id], references: [id])
-  dosen                    Dosen              @relation(fields: [dosen_id], references: [id])
-  didistribusikan_oleh     User               @relation("UserDistribusi", fields: [didistribusikan_oleh_id], references: [id])
-  kepemilikan              KepemilikanDokumen? @relation("DistribusiKeKepemilikan", fields: [kepemilikan_id], references: [id])
-
-  @@map("distribusi_dokumen")
-}
-
 model Dokumen {
-  id                String               @id @default(uuid()) @db.Uuid
-  nama              String               @db.VarChar(255)
-  jenis_dokumen     JenisDokumen
-  file_path         String               @db.VarChar(512)
-  hash_file         String               @db.VarChar(255)
-  sumber_dokumen    SumberDokumen
-  tanggal_upload    DateTime             @db.Date
-  deleted_at        DateTime?            @db.Timestamp
-  kepemilikan       KepemilikanDokumen[]
-  lampiran_bukti    LampiranBukti[]
-  distribusi_dokumen DistribusiDokumen[]
+  id             String               @id @default(uuid()) @db.Uuid
+  nama           String               @db.VarChar(255)
+  jenis_dokumen  JenisDokumen
+  file_path      String               @db.VarChar(512)
+  hash_file      String               @db.VarChar(255)
+  sumber_dokumen SumberDokumen
+  tanggal_upload DateTime             @db.Date
+  deleted_at     DateTime?            @db.Timestamp
+  kepemilikan    KepemilikanDokumen[]
+  lampiran_bukti LampiranBukti[]
 
   @@map("dokumen")
 }
@@ -222,7 +206,7 @@ model PartisipasiKegiatanTridharma {
   dosen_id              String            @db.Uuid
   kegiatan_tridharma_id String            @db.Uuid
   peran                 PeranTridharma
-  status                String                       @default("MENUNGGU_KONFIRMASI")
+  status                String            @default("MENUNGGU_KONFIRMASI")
   dosen                 Dosen             @relation(fields: [dosen_id], references: [id])
   kegiatan_tridharma    KegiatanTridharma @relation(fields: [kegiatan_tridharma_id], references: [id])
 
@@ -239,7 +223,7 @@ model KegiatanTridharma {
   tanggal_selesai    DateTime                       @db.Date
   periode            String                         @db.VarChar(50)
   semester           String                         @db.VarChar(20)
-  jenis_bukti        String                       @default("MASING_MASING")
+  jenis_bukti        String                         @default("MASING_MASING")
   tx_id              String                         @db.VarChar(255)
   dosen              Dosen                          @relation(fields: [dosen_id], references: [id])
   partisipasi        PartisipasiKegiatanTridharma[]

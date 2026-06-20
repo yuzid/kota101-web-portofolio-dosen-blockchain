@@ -100,6 +100,7 @@ export class HighlightRepository {
       where: {
         dosen_id: dosenId,
         dokumen_id: dokumenId,
+        status: 'DISETUJUI',
       },
       select: { id: true },
     });

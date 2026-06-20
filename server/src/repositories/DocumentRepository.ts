@@ -15,6 +15,7 @@ export class DocumentRepository {
           select: { id: true }
         },
         kepemilikan: {
+          where: { status: 'DISETUJUI' },
           select: {
             dosen: {
               select: {
@@ -35,7 +36,7 @@ export class DocumentRepository {
   async findById(id: string) {
     return await prisma.dokumen.findUnique({
       where: { id },
-      include: { kepemilikan: true }
+      include: { kepemilikan: { where: { status: 'DISETUJUI' } } }
     });
   }
 
@@ -43,7 +44,7 @@ export class DocumentRepository {
     return await prisma.dokumen.findUnique({
       where: { id },
       include: {
-        kepemilikan: true,
+        kepemilikan: { where: { status: 'DISETUJUI' } },
         lampiran_bukti: {
           include: {
             kegiatan: {
@@ -86,7 +87,7 @@ export class DocumentRepository {
 
   async findKepemilikan(dosenId: string, dokumenId: string) {
     return await prisma.kepemilikanDokumen.findFirst({
-      where: { dosen_id: dosenId, dokumen_id: dokumenId },
+      where: { dosen_id: dosenId, dokumen_id: dokumenId, status: 'DISETUJUI' },
     });
   }
 
@@ -103,15 +104,9 @@ export class DocumentRepository {
         kepemilikan: {
           include: {
             dosen: { select: { nama: true, nip: true, nidn: true } },
-          },
-        },
-        distribusi_dokumen: {
-          include: {
-            dosen: { select: { nama: true, nip: true, nidn: true } },
             didistribusikan_oleh: {
               select: { tata_usaha: { select: { nama: true, nip: true } } },
             },
-            kepemilikan: { select: { id: true } },
           },
           orderBy: { tanggal_distribusi: 'desc' },
         },

@@ -133,7 +133,7 @@ export class DocumentDistributionService {
         tanggalKeputusan: d.tanggal_keputusan,
         status: d.status,
         pengirim: tu ? tu.nama : 'Tata Usaha',
-        sudahDiklaim: !!d.kepemilikan_id,
+        sudahDiklaim: d.status === 'DISETUJUI',
       };
     });
   }
@@ -146,18 +146,7 @@ export class DocumentDistributionService {
     const doc = await this.documentRepository.findById(dokumenId);
     if (!doc) throw new Error('Dokumen tidak ditemukan.');
 
-    const existingKepemilikan = await this.documentRepository.findKepemilikan(dosenId, dokumenId);
-    let kepemilikanId: string;
-
-    if (existingKepemilikan) {
-      kepemilikanId = existingKepemilikan.id;
-    } else {
-      const newKepemilikan = await this.documentRepository.createKepemilikan(dosenId, dokumenId);
-      kepemilikanId = newKepemilikan.id;
-    }
-
     await this.distributionRepository.updateStatus(distribusi.id, 'DISETUJUI');
-    await this.distributionRepository.linkKepemilikan(distribusi.id, kepemilikanId);
 
     return { message: 'Dokumen berhasil diterima.' };
   }

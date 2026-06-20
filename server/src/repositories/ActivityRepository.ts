@@ -139,7 +139,9 @@ export class ActivityRepository {
       include: { lampiran_bukti: true }
     });
 
-    const total_dokumen = await prisma.kepemilikanDokumen.count({ where: { dosen_id: dosenId } });
+    const total_dokumen = await prisma.kepemilikanDokumen.count({
+      where: { dosen_id: dosenId, status: 'DISETUJUI' },
+    });
 
     return { activities, total_dokumen };
   }
@@ -255,6 +257,7 @@ export class ActivityRepository {
             dokumen: {
               include: {
                 kepemilikan: {
+                  where: { status: 'DISETUJUI' },
                   include: { highlights: true }
                 }
               }
@@ -379,9 +382,16 @@ export class ActivityRepository {
   async createKepemilikanIfNotExists(dosenId: string, dokumenIds: string[]) {
     const existing = await prisma.kepemilikanDokumen.findMany({
       where: { dosen_id: dosenId, dokumen_id: { in: dokumenIds } },
-      select: { dokumen_id: true }
+      select: { id: true, dokumen_id: true, status: true }
     });
     const existingIds = new Set(existing.map(e => e.dokumen_id));
+    const inactiveIds = existing.filter(e => e.status !== 'DISETUJUI').map(e => e.id);
+    if (inactiveIds.length > 0) {
+      await prisma.kepemilikanDokumen.updateMany({
+        where: { id: { in: inactiveIds } },
+        data: { status: 'DISETUJUI', tanggal_keputusan: new Date() },
+      });
+    }
     const newData = dokumenIds
       .filter(id => !existingIds.has(id))
       .map(dokumen_id => ({ dosen_id: dosenId, dokumen_id }));

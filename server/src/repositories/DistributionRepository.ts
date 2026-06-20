@@ -7,7 +7,9 @@ export class DistributionRepository {
     didistribusikan_oleh_id: string;
     status?: string;
   }) {
-    return await prisma.distribusiDokumen.create({ data });
+    return await prisma.kepemilikanDokumen.create({
+      data: { ...data, tanggal_distribusi: new Date() },
+    });
   }
 
   async createMany(
@@ -21,43 +23,48 @@ export class DistributionRepository {
       didistribusikan_oleh_id: tuUserId,
       status: 'MENUNGGU_KONFIRMASI',
     }));
-    return await prisma.distribusiDokumen.createMany({ data });
+    return await prisma.kepemilikanDokumen.createMany({
+      data: data.map(item => ({ ...item, tanggal_distribusi: new Date() })),
+      skipDuplicates: true,
+    });
   }
 
   async findByDokumen(dokumenId: string) {
-    return await prisma.distribusiDokumen.findMany({
-      where: { dokumen_id: dokumenId },
+    return await prisma.kepemilikanDokumen.findMany({
+      where: {
+        dokumen_id: dokumenId,
+        didistribusikan_oleh_id: { not: null },
+      },
       include: {
         dosen: { select: { nama: true, nip: true, nidn: true } },
         didistribusikan_oleh: {
           select: { tata_usaha: { select: { nama: true, nip: true } } },
         },
-        kepemilikan: { select: { id: true } },
       },
       orderBy: { tanggal_distribusi: 'desc' },
     });
   }
 
   async findById(id: string) {
-    return await prisma.distribusiDokumen.findUnique({
-      where: { id },
+    return await prisma.kepemilikanDokumen.findFirst({
+      where: { id, didistribusikan_oleh_id: { not: null } },
       include: {
         dosen: { select: { nama: true, nip: true, nidn: true } },
         dokumen: true,
         didistribusikan_oleh: {
           select: { tata_usaha: { select: { nama: true, nip: true } } },
         },
-        kepemilikan: { select: { id: true } },
       },
     });
   }
 
   async findPendingByDosen(dosenId: string) {
     try {
-      return await prisma.distribusiDokumen.findMany({
+      return await prisma.kepemilikanDokumen.findMany({
         where: {
           dosen_id: dosenId,
           status: 'MENUNGGU_KONFIRMASI',
+          didistribusikan_oleh_id: { not: null },
         },
         include: {
           dokumen: {
@@ -82,21 +89,23 @@ export class DistributionRepository {
   }
 
   async findByDosen(dosenId: string) {
-    return await prisma.distribusiDokumen.findMany({
-      where: { dosen_id: dosenId },
+    return await prisma.kepemilikanDokumen.findMany({
+      where: {
+        dosen_id: dosenId,
+        didistribusikan_oleh_id: { not: null },
+      },
       include: {
         dokumen: true,
         didistribusikan_oleh: {
           select: { tata_usaha: { select: { nama: true, nip: true } } },
         },
-        kepemilikan: { select: { id: true } },
       },
       orderBy: { tanggal_distribusi: 'desc' },
     });
   }
 
   async updateStatus(id: string, status: string) {
-    return await prisma.distribusiDokumen.update({
+    return await prisma.kepemilikanDokumen.update({
       where: { id },
       data: {
         status,
@@ -105,36 +114,37 @@ export class DistributionRepository {
     });
   }
 
-  async linkKepemilikan(distribusiId: string, kepemilikanId: string) {
-    return await prisma.distribusiDokumen.update({
-      where: { id: distribusiId },
-      data: { kepemilikan_id: kepemilikanId },
-    });
-  }
-
   async findDistributionByDosenAndDokumen(dosenId: string, dokumenId: string) {
-    return await prisma.distribusiDokumen.findFirst({
+    return await prisma.kepemilikanDokumen.findFirst({
       where: {
         dosen_id: dosenId,
         dokumen_id: dokumenId,
+        didistribusikan_oleh_id: { not: null },
       },
     });
   }
 
   async resetStatus(id: string) {
-    return await prisma.distribusiDokumen.update({
+    return await prisma.kepemilikanDokumen.update({
       where: { id },
       data: {
         status: 'MENUNGGU_KONFIRMASI',
         tanggal_keputusan: null,
-        kepemilikan_id: null,
       },
     });
   }
 
   async delete(id: string) {
-    return await prisma.distribusiDokumen.delete({
-      where: { id },
+    return await prisma.$transaction(async (tx) => {
+      const highlights = await tx.highlight.findMany({
+        where: { kepemilikan_id: id },
+        select: { id: true },
+      });
+      await tx.highlightRect.deleteMany({
+        where: { highlight_id: { in: highlights.map(item => item.id) } },
+      });
+      await tx.highlight.deleteMany({ where: { kepemilikan_id: id } });
+      return await tx.kepemilikanDokumen.delete({ where: { id } });
     });
   }
 }
