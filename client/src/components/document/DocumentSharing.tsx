@@ -44,10 +44,15 @@ interface DocumentSharingProps {
   documentId: string;
   documentName: string;
   iconOnly?: boolean;
+  hideButton?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function DocumentSharing({ documentId, documentName, iconOnly = false }: DocumentSharingProps) {
-  const [showDialog, setShowDialog] = useState(false);
+export function DocumentSharing({ documentId, documentName, iconOnly = false, hideButton = false, open, onOpenChange }: DocumentSharingProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const showDialog = open !== undefined ? open : internalOpen;
+  const setShowDialog = onOpenChange || setInternalOpen;
   const [shareEmail, setShareEmail] = useState('');
   const [sharePermission, setSharePermission] = useState<'view' | 'comment' | 'edit'>('view');
   const [linkSharing, setLinkSharing] = useState(false);
@@ -155,10 +160,12 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
 
   return (
     <>
-      <Button variant={iconOnly ? "ghost" : "outline"} size={iconOnly ? "sm" : "default"} onClick={() => setShowDialog(true)}>
-        <Share2 className="w-4 h-4" />
-        {!iconOnly && <span className="ml-2">Bagikan</span>}
-      </Button>
+      {!hideButton && (
+        <Button variant={iconOnly ? "ghost" : "outline"} size={iconOnly ? "sm" : "default"} onClick={() => setShowDialog(true)}>
+          <Share2 className="w-4 h-4" />
+          {!iconOnly && <span className="ml-2">Bagikan</span>}
+        </Button>
+      )}
 
       {/* Remove Share Confirmation */}
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>

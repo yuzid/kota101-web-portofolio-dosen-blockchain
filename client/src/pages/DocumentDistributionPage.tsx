@@ -59,7 +59,14 @@ import {
   ChevronRight,
   ListFilter,
   UserPlus,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -80,7 +87,18 @@ interface Document {
   tanggal_upload: string;
   file_path: string;
   sumber_dokumen: string;
+  status?: string;
   distribusi: DistribusiItem[];
+  draft_recipients?: string[];
+}
+
+interface LocalDraft {
+  id: string;
+  nama: string;
+  jenis_dokumen: string;
+  tanggal_upload: string;
+  status: "DRAFT";
+  draft_recipients: string[];
 }
 
 interface Dosen {
@@ -126,6 +144,26 @@ export function DocumentDistributionPage() {
 
   const token = localStorage.getItem("token");
 
+  // ── Local draft storage ──
+  const DRAFT_KEY = "tu_draft_docs";
+
+  function loadLocalDrafts(): LocalDraft[] {
+    try {
+      return JSON.parse(localStorage.getItem(DRAFT_KEY) || "[]");
+    } catch { return []; }
+  }
+
+  function saveLocalDraft(draft: LocalDraft) {
+    const drafts = loadLocalDrafts().filter(d => d.id !== draft.id);
+    drafts.push(draft);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  }
+
+  function removeLocalDraft(id: string) {
+    const drafts = loadLocalDrafts().filter(d => d.id !== id);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  }
+
   // ── Filter state ──
   const [searchTerm, setSearchTerm] = useState("");
   const [jenisFilter, setJenisFilter] = useState("");
@@ -160,7 +198,25 @@ export function DocumentDistributionPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const dataDocs = await resDocs.json();
-      if (dataDocs.status === "success") setDocuments(dataDocs.data);
+      const apiDocs: Document[] = dataDocs.status === "success" ? dataDocs.data : [];
+      // Merge local drafts into API docs (ensure drafts always visible)
+      const localDrafts: Document[] = loadLocalDrafts().map(d => ({
+        id: d.id,
+        nama: d.nama,
+        jenis_dokumen: d.jenis_dokumen,
+        tanggal_upload: d.tanggal_upload,
+        file_path: "",
+        sumber_dokumen: "UPLOAD",
+        status: "DRAFT",
+        distribusi: [],
+        draft_recipients: d.draft_recipients,
+      }));
+      const merged = [...apiDocs];
+      for (const draft of localDrafts) {
+        const existing = merged.findIndex(d => d.id === draft.id);
+        if (existing === -1) merged.push(draft);
+      }
+      setDocuments(merged);
     } catch {
       toast.error("Gagal memuat data dari server.");
     }
@@ -169,8 +225,9 @@ export function DocumentDistributionPage() {
   // ── Computed ──
   const stats = useMemo(() => ({
     total: documents.length,
+    draft: documents.filter(d => d.status === "DRAFT").length,
     terdistribusi: documents.filter(d => d.distribusi && d.distribusi.length > 0).length,
-    belumDistribusi: documents.filter(d => !d.distribusi || d.distribusi.length === 0).length,
+    belumDistribusi: documents.filter(d => (!d.distribusi || d.distribusi.length === 0) && d.status !== "DRAFT").length,
     jenisUnik: new Set(documents.map(d => d.jenis_dokumen)).size,
   }), [documents]);
 
@@ -185,8 +242,9 @@ export function DocumentDistributionPage() {
     let result = [...documents];
     if (searchTerm) result = result.filter(d => d.nama.toLowerCase().includes(searchTerm.toLowerCase()));
     if (jenisFilter) result = result.filter(d => d.jenis_dokumen === jenisFilter);
+    if (statusFilter === "draft") result = result.filter(d => d.status === "DRAFT");
     if (statusFilter === "terdistribusi") result = result.filter(d => d.distribusi && d.distribusi.length > 0);
-    if (statusFilter === "belum") result = result.filter(d => !d.distribusi || d.distribusi.length === 0);
+    if (statusFilter === "belum") result = result.filter(d => (!d.distribusi || d.distribusi.length === 0) && d.status !== "DRAFT");
     switch (sortBy) {
       case "terlama": result.sort((a, b) => new Date(a.tanggal_upload).getTime() - new Date(b.tanggal_upload).getTime()); break;
       case "a-z": result.sort((a, b) => a.nama.localeCompare(b.nama)); break;
@@ -258,6 +316,20 @@ export function DocumentDistributionPage() {
       const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
       const result = await response.json();
       if (!response.ok || result.status === "error") throw new Error(result.error);
+
+      if (submitAction === "draft") {
+        // Save as local draft so it always appears in table
+        const docId = result.data?.id || `draft-${Date.now()}`;
+        saveLocalDraft({
+          id: docId,
+          nama: uploadForm.name,
+          jenis_dokumen: uploadForm.jenis,
+          tanggal_upload: new Date().toISOString().split("T")[0],
+          status: "DRAFT",
+          draft_recipients: uploadForm.recipients,
+        });
+      }
+
       toast.success(submitAction === "draft" ? "Dokumen berhasil disimpan sebagai Draft." : "Dokumen berhasil didistribusikan!");
       setShowUploadDialog(false);
       setUploadForm({ name: "", jenis: "", file: null, recipients: [] });
@@ -274,6 +346,7 @@ export function DocumentDistributionPage() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setShowDeleteDialog(false);
+    removeLocalDraft(deleteTarget.id);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${deleteTarget.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await response.json();
@@ -284,18 +357,25 @@ export function DocumentDistributionPage() {
   };
 
   // ── Status Summary helpers ──
-  const recipientBadge = (distribusi: DistribusiItem[]) => {
+  const recipientBadge = (distribusi: DistribusiItem[], doc?: Document) => {
+    if (doc?.status === "DRAFT") {
+      const n = doc.draft_recipients?.length || 0;
+      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">{n}</Badge>;
+    }
     if (!distribusi || distribusi.length === 0) {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">0 Dosen</Badge>;
+      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">0</Badge>;
     }
     return (
       <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">
-        {distribusi.length} Dosen
+        {distribusi.length}
       </Badge>
     );
   };
 
-  const statusBadges = (distribusi: DistribusiItem[]) => {
+  const statusBadges = (distribusi: DistribusiItem[], doc?: Document) => {
+    if (doc?.status === "DRAFT") {
+      return <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-100 text-xs">Draft</Badge>;
+    }
     if (!distribusi || distribusi.length === 0) {
       return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">Belum didistribusi</Badge>;
     }
@@ -344,8 +424,9 @@ export function DocumentDistributionPage() {
         </div>
 
         {/* ── Stats Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <StatCard icon={<FileText className="w-5 h-5 text-indigo-600" />} value={stats.total} label="Total Dokumen" bg="bg-indigo-50 border-indigo-200" />
+          <StatCard icon={<Save className="w-5 h-5 text-gray-600" />} value={stats.draft} label="Draft" bg="bg-gray-50 border-gray-200" />
           <StatCard icon={<Check className="w-5 h-5 text-emerald-600" />} value={stats.terdistribusi} label="Sudah Terdistribusi" bg="bg-emerald-50 border-emerald-200" />
           <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />} value={stats.belumDistribusi} label="Belum Terdistribusi" bg="bg-amber-50 border-amber-200" />
           <StatCard icon={<Tag className="w-5 h-5 text-purple-600" />} value={stats.jenisUnik} label="Jenis Dokumen" bg="bg-purple-50 border-purple-200" />
@@ -378,6 +459,7 @@ export function DocumentDistributionPage() {
                     <SelectItem value=" ">Semua Status</SelectItem>
                     <SelectItem value="terdistribusi">Sudah Terdistribusi</SelectItem>
                     <SelectItem value="belum">Belum Terdistribusi</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={sortBy} onValueChange={setSortBy}>
@@ -460,20 +542,27 @@ export function DocumentDistributionPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 px-4 text-sm whitespace-nowrap">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
-                          <TableCell className="py-3 px-4">{recipientBadge(doc.distribusi)}</TableCell>
-                          <TableCell className="py-3 px-4">{statusBadges(doc.distribusi)}</TableCell>
+                          <TableCell className="py-3 px-4">{recipientBadge(doc.distribusi, doc)}</TableCell>
+                          <TableCell className="py-3 px-4">{statusBadges(doc.distribusi, doc)}</TableCell>
                           <TableCell className="py-3 px-4 text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" onClick={() => navigate(`/document-distribution/${doc.id}`)} className="h-8 text-xs">
-                                <Eye className="w-3.5 h-3.5 mr-1" /> Lihat
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => navigate(`/document-distribution/${doc.id}/edit`)} className="h-8 text-xs text-blue-600 border-blue-200 hover:bg-blue-50">
-                                <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleDelete(doc)} className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50">
-                                <Trash2 className="w-3.5 h-3.5 mr-1" /> Hapus
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="min-w-[130px]">
+                                <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}`)}>
+                                  <Eye className="w-3.5 h-3.5 mr-2" /> Lihat
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}/edit`)}>
+                                  <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
+                                  <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -510,7 +599,7 @@ export function DocumentDistributionPage() {
 
       {/* ── Upload Dialog ── */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           <div className="p-6 pb-0">
             <DialogHeader className="pb-0">
               <DialogTitle className="text-lg">Upload dokumen baru</DialogTitle>
@@ -649,6 +738,29 @@ export function DocumentDistributionPage() {
                       ) : null;
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* ── Pilih Semua ── */}
+              {searchedDosen.length > 0 && (
+                <div
+                  className="flex items-center gap-3 px-4 py-2 cursor-pointer border-b bg-muted/10 hover:bg-muted/20 transition-colors"
+                  onClick={() => {
+                    const allSelected = searchedDosen.every(d => uploadForm.recipients.includes(d.id));
+                    if (allSelected) {
+                      setUploadForm(prev => ({
+                        ...prev,
+                        recipients: prev.recipients.filter(id => !searchedDosen.some(d => d.id === id)),
+                      }));
+                    } else {
+                      const newIds = searchedDosen.filter(d => !uploadForm.recipients.includes(d.id)).map(d => d.id);
+                      setUploadForm(prev => ({ ...prev, recipients: [...prev.recipients, ...newIds] }));
+                    }
+                  }}
+                >
+                  <Checkbox checked={searchedDosen.every(d => uploadForm.recipients.includes(d.id))} />
+                  <span className="text-sm font-medium text-muted-foreground">Pilih Semua</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{searchedDosen.filter(d => uploadForm.recipients.includes(d.id)).length}/{searchedDosen.length} dipilih</span>
                 </div>
               )}
 
