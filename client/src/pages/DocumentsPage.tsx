@@ -78,6 +78,8 @@ import {
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { DocumentSharing } from "../components/document/DocumentSharing";
+import { getHighlightStatusByDokumenId, isHighlightMockMode } from "../services/highlightService";
 
 interface Document {
   id: string;
@@ -112,6 +114,7 @@ export function DocumentsPage() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [shareDocument, setShareDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -137,7 +140,15 @@ export function DocumentsPage() {
       });
       const result = await res.json();
       if (result.status === "success") {
-        setDocuments(result.data);
+        const docs = result.data;
+        if (isHighlightMockMode()) {
+          docs.forEach((doc: any) => {
+            if (getHighlightStatusByDokumenId(doc.id)) {
+              doc.hasHighlight = true;
+            }
+          });
+        }
+        setDocuments(docs);
       }
     } catch (err) {
       toast.error("Gagal melakukan sinkronisasi data dokumen dengan server.");
@@ -315,6 +326,26 @@ export function DocumentsPage() {
     return <Badge className="bg-green-500">Milik Saya</Badge>;
   };
 
+  const handleDownload = async (doc: Document) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${doc.id}/content`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Gagal mengunduh');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Gagal mengunduh dokumen');
+    }
+  };
+
   return (
     <MainLayout
       title="Dokumen Saya"
@@ -490,7 +521,14 @@ export function DocumentsPage() {
                           <TableCell className="text-sm">{format(new Date(doc.tanggal), "dd MMM yyyy")}</TableCell>
                           <TableCell>{getAsalBadge(doc.asal)}</TableCell>
                           <TableCell className="text-center">
-                            {doc.hasHighlight && <Highlighter className="w-4 h-4 text-yellow-500 mx-auto" />}
+                            {doc.hasHighlight ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <Highlighter className="w-4 h-4 text-yellow-500" />
+                                <span className="text-xs text-green-600 font-medium">Sudah</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Belum</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
@@ -502,13 +540,19 @@ export function DocumentsPage() {
                                   <Eye className="w-4 h-4 mr-2" /> Lihat Detail
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => navigate(`/documents/${doc.id}/preview`)}>
+                                <DropdownMenuItem onClick={() => handleDownload(doc)}>
                                   <Download className="w-4 h-4 mr-2" /> Unduh
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setShareDocument(doc)}>
+                                  <Share2 className="w-4 h-4 mr-2" /> Bagikan
+                                </DropdownMenuItem>
                                 {doc.asal === "dosen" && (
-                                  <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">
-                                    <Trash2 className="w-4 h-4 mr-2" /> Hapus
-                                  </DropdownMenuItem>
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">
+                                      <Trash2 className="w-4 h-4 mr-2" /> Hapus
+                                    </DropdownMenuItem>
+                                  </>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -544,6 +588,12 @@ export function DocumentsPage() {
                         <div className="flex gap-1 pt-2">
                           <Button variant="outline" size="sm" className="flex-1" onClick={() => navigate(`/documents/${doc.id}/preview`)}>
                             <Eye className="w-3 h-3 mr-1" /> Lihat Detail
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleDownload(doc)}>
+                            <Download className="w-3 h-3" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setShareDocument(doc)}>
+                            <Share2 className="w-3 h-3" />
                           </Button>
                         </div>
                       </div>
@@ -641,6 +691,15 @@ export function DocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </MainLayout>
-  );
-}
+      {/* Share Dialog */}
+      {shareDocument && (
+        <DocumentSharing
+          documentId={shareDocument.id}
+          documentName={shareDocument.name}
+          open={true}
+          onOpenChange={(open) => { if (!open) setShareDocument(null); }}
+        />
+      )}
+      </MainLayout>
+    );
+  }
