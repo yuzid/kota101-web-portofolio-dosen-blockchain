@@ -250,8 +250,12 @@ export class ActivityRepository {
     return await prisma.kegiatanTridharma.findUnique({
       where: { id },
       include: {
-        dosen: { include: { program_studi: true } },
-        partisipasi: { include: { dosen: true } },
+        dosen: { include: { program_studi: true, user: { select: { email: true } } } },
+        partisipasi: {
+          include: {
+            dosen: { include: { user: { select: { email: true } } } },
+          },
+        },
         lampiran_bukti: {
           include: {
             dokumen: {
@@ -355,6 +359,14 @@ export class ActivityRepository {
   async findParticipationById(id: string) {
     return await prisma.partisipasiKegiatanTridharma.findUnique({
       where: { id },
+      include: {
+        dosen: { include: { user: { select: { email: true } } } },
+        kegiatan_tridharma: {
+          include: {
+            dosen: { include: { user: { select: { email: true } } } },
+          },
+        },
+      },
     });
   }
 
