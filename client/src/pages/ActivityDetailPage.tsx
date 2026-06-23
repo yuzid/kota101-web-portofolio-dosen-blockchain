@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
   Card,
@@ -17,14 +18,6 @@ import {
   TabsTrigger,
 } from "../components/ui/tabs";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -34,6 +27,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogContent as DetailDialogContent,
+  DialogHeader,
+  DialogHeader as DetailDialogHeader,
+  DialogTitle,
+  DialogTitle as DetailDialogTitle,
+  DialogDescription as DetailDialogDescription,
+} from "../components/ui/dialog";
+import { ScrollArea } from "../components/ui/scroll-area";
 import {
   ArrowLeft,
   Calendar,
@@ -54,6 +58,13 @@ import {
   GraduationCap,
   BookOpen,
   Check,
+  ChevronRight,
+  FileWarning,
+  UserCheck,
+  UserX,
+  Upload,
+  ShieldCheck,
+  CheckCircle2 as CheckCircle2Icon,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -121,9 +132,33 @@ interface ActivityLog {
   documentCount: number;
   confirmations: number;
   blockHeight: number | null;
+  payload: {
+    event_type?: string;
+    payload_version?: number;
+    recorded_at?: string;
+    kegiatan?: Record<string, unknown>;
+    pencatat?: Record<string, unknown> & {
+      program_studi?: Record<string, unknown>;
+    };
+    partisipasi?: Array<Record<string, unknown>>;
+    dokumen_pendukung?: Array<Record<string, unknown>>;
+  };
 }
 
-const statusBadge: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+const activityFieldLabels: Record<string, string> = {
+  nama_kegiatan: "Nama kegiatan",
+  kategori_tridharma: "Kategori Tridharma",
+  jenis_kegiatan: "Jenis kegiatan",
+  tanggal_mulai: "Tanggal mulai",
+  tanggal_selesai: "Tanggal selesai",
+  periode: "Tahun akademik",
+  semester: "Semester",
+};
+
+const statusBadge: Record<
+  string,
+  { label: string; className: string; icon: React.ReactNode }
+> = {
   MENUNGGU_KONFIRMASI: {
     label: "Menunggu Konfirmasi",
     className: "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -150,8 +185,10 @@ const jenisColor: Record<string, string> = {
 const jenisBadge: Record<string, string> = {
   pendidikan: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100",
   penelitian: "bg-green-100 text-green-800 border-green-200 hover:bg-green-100",
-  pengabdian: "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100",
-  tugas_tambahan: "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100",
+  pengabdian:
+    "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100",
+  tugas_tambahan:
+    "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100",
 };
 const jenisIcon: Record<string, React.ReactNode> = {
   pendidikan: <GraduationCap className="w-4 h-4" />,
@@ -159,6 +196,20 @@ const jenisIcon: Record<string, React.ReactNode> = {
   pengabdian: <Users className="w-4 h-4" />,
   tugas_tambahan: <FileText className="w-4 h-4" />,
 };
+
+function formatAuditValue(value: unknown) {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value !== "string") return String(value);
+  const parsedDate = new Date(value);
+  if (value.includes("T") && !Number.isNaN(parsedDate.getTime())) {
+    return format(parsedDate, "dd MMM yyyy HH:mm", { locale: localeId });
+  }
+  return value.replaceAll("_", " ");
+}
+
+function getRecordId(record: Record<string, unknown>, key: string) {
+  return typeof record[key] === "string" ? String(record[key]) : "";
+}
 
 export function ActivityDetailPage() {
   const { id } = useParams();
@@ -171,11 +222,13 @@ export function ActivityDetailPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [auditLoaded, setAuditLoaded] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
-  const [showShare, setShowShare] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareMode, setShareMode] = useState<"detail" | "dokumen">("detail");
   const [copied, setCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     if (id) fetchActivityDetail();
@@ -184,18 +237,21 @@ export function ActivityDetailPage() {
   const fetchActivityDetail = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === "success") {
         setActivity(result.data);
       } else {
-        toast.error(result.error || 'Gagal mengambil detail kegiatan');
-        navigate('/activities');
+        toast.error(result.error || "Gagal mengambil detail kegiatan");
+        navigate("/activities");
       }
     } catch {
-      toast.error('Terjadi kesalahan koneksi ke server');
+      toast.error("Terjadi kesalahan koneksi ke server");
     } finally {
       setIsLoading(false);
     }
@@ -211,13 +267,17 @@ export function ActivityDetailPage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const result = await response.json();
-      if (!response.ok || result.status !== 'success') {
-        throw new Error(result.error || 'Gagal mengambil riwayat blockchain');
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.error || "Gagal mengambil riwayat blockchain");
       }
       setLogs(result.data);
       setAuditLoaded(true);
     } catch (error) {
-      setAuditError(error instanceof Error ? error.message : 'Gagal mengambil riwayat blockchain');
+      setAuditError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengambil riwayat blockchain"
+      );
     } finally {
       setIsAuditLoading(false);
     }
@@ -225,47 +285,97 @@ export function ActivityDetailPage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    if (value === 'riwayat') fetchAuditTrail();
+    if (value === "riwayat") fetchAuditTrail();
   };
 
   const handleCopyLink = async () => {
-    const link = `${window.location.origin}/activities/${id}`;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(activeShareLink);
       setCopied(true);
-      toast.success('Link berhasil disalin!');
+      toast.success("Link berhasil disalin!");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.info(`Link: ${link}`);
+      toast.info(`Link: ${activeShareLink}`);
     }
+  };
+
+  const getPreviousLog = (log: ActivityLog) => {
+    const selectedIndex = logs.findIndex((item) => item.id === log.id);
+    return selectedIndex >= 0 ? logs[selectedIndex + 1] ?? null : null;
+  };
+
+  const getActivityChanges = (log: ActivityLog) => {
+    const current = log.payload.kegiatan ?? {};
+    const previous = getPreviousLog(log)?.payload.kegiatan ?? null;
+    return Object.entries(activityFieldLabels)
+      .filter(([field]) => !previous || current[field] !== previous[field])
+      .map(([field, label]) => ({
+        label,
+        before: previous?.[field],
+        after: current[field],
+        isInitial: !previous,
+      }));
+  };
+
+  const getCollectionChanges = (
+    log: ActivityLog,
+    collection: "partisipasi" | "dokumen_pendukung",
+    idKey: string,
+  ) => {
+    const current = log.payload[collection] ?? [];
+    const previous = getPreviousLog(log)?.payload[collection] ?? [];
+    const currentById = new Map(current.map((item) => [getRecordId(item, idKey), item]));
+    const previousById = new Map(previous.map((item) => [getRecordId(item, idKey), item]));
+    return {
+      added: current.filter((item) => !previousById.has(getRecordId(item, idKey))),
+      removed: previous.filter((item) => !currentById.has(getRecordId(item, idKey))),
+      changed: current.filter((item) => {
+        const oldItem = previousById.get(getRecordId(item, idKey));
+        return oldItem && JSON.stringify(oldItem) !== JSON.stringify(item);
+      }),
+    };
   };
 
   const confirmDelete = async () => {
     setShowDeleteDialog(false);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === "success") {
         toast.success("Kegiatan berhasil dihapus");
         navigate("/activities");
       } else {
-        toast.error(result.error || 'Gagal menghapus kegiatan');
+        toast.error(result.error || "Gagal menghapus kegiatan");
       }
     } catch {
-      toast.error('Terjadi kesalahan saat menghapus kegiatan');
+      toast.error("Terjadi kesalahan saat menghapus kegiatan");
     }
   };
 
   const getInitials = (name: string) => {
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().substring(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   if (isLoading) {
     return (
-      <MainLayout title="Detail Kegiatan" breadcrumbs={[{ label: "Kegiatan Tridharma", path: "/activities" }, { label: "Detail" }]}>
+      <MainLayout
+        title="Detail Kegiatan"
+        breadcrumbs={[
+          { label: "Kegiatan Tridharma", path: "/activities" },
+          { label: "Detail" },
+        ]}
+      >
         <div className="space-y-4 max-w-5xl mx-auto">
           <div className="h-10 w-32 bg-muted rounded-lg animate-pulse" />
           <div className="h-32 bg-muted rounded-xl animate-pulse" />
@@ -283,9 +393,18 @@ export function ActivityDetailPage() {
 
   if (!activity) return null;
 
-  const isCurrentUserMember = activity.dosenTerlibat.some(d => d.isCurrentUser);
-  const isReadOnlyView = !isCurrentUserMember || location.pathname.includes("/ami-recap/");
-  const shareLink = `${window.location.origin}/activities/${id}`;
+  const isCurrentUserMember = activity.dosenTerlibat.some(
+    (d) => d.isCurrentUser
+  );
+  const isReadOnlyView =
+    !isCurrentUserMember || location.pathname.includes("/ami-recap/");
+  const shareLinkDetail = `${window.location.origin}/activities/${id}`;
+  const shareLinkDokumen = activity?.dokumenBersama?.[0]
+    ? `${window.location.origin}/documents/${activity.dokumenBersama[0].id}/preview`
+    : activity?.dosenTerlibat?.[0]?.dokumen?.[0]
+      ? `${window.location.origin}/documents/${activity.dosenTerlibat[0].dokumen[0].id}/preview`
+      : shareLinkDetail;
+  const activeShareLink = shareMode === "detail" ? shareLinkDetail : shareLinkDokumen;
 
   const jType = activity.jenisTridharma?.toLowerCase() || "";
 
@@ -305,57 +424,145 @@ export function ActivityDetailPage() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowShare(!showShare)} className={showShare ? "bg-accent" : ""}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowShareDialog(true)}
+            >
               <Share2 className="w-4 h-4 mr-1.5" /> Bagikan
             </Button>
             {!isReadOnlyView && (
-              <Button variant="outline" size="sm" onClick={() => navigate(`/activities/${id}/edit`)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/activities/${id}/edit`)}
+              >
                 <Edit className="w-4 h-4 mr-1.5" /> Edit
               </Button>
             )}
-            {activity.isCurrentUserPencatat && !location.pathname.includes("/ami-recap/") && (
-              <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
-                <Trash2 className="w-4 h-4 mr-1.5" /> Hapus
-              </Button>
-            )}
+            {activity.isCurrentUserPencatat &&
+              !location.pathname.includes("/ami-recap/") && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" /> Hapus
+                </Button>
+              )}
           </div>
         </div>
 
-        {/* ── Share Section ── */}
-        {showShare && (
-          <Card className="border-blue-200 bg-blue-50/50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground mb-1">Bagikan link kegiatan ini</p>
-                  <p className="text-sm font-mono text-foreground truncate">{shareLink}</p>
+        {/* ── Share Dialog ── */}
+        <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Bagikan Kegiatan</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="flex gap-3">
+                <div
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    shareMode === "detail"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => { setShareMode("detail"); setCopied(false); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full border-2 ${
+                      shareMode === "detail" ? "border-primary bg-primary" : ""
+                    }`}>
+                      {shareMode === "detail" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Detail Kegiatan</p>
+                      <p className="text-xs text-muted-foreground">
+                        Bagikan halaman detail kegiatan lengkap
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleCopyLink} className="shrink-0">
-                  {copied ? (
-                    <><Check className="w-4 h-4 mr-1 text-green-600" /> Tersalin</>
-                  ) : (
-                    <><Copy className="w-4 h-4 mr-1" /> Salin</>
-                  )}
-                </Button>
+                <div
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    shareMode === "dokumen"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => { setShareMode("dokumen"); setCopied(false); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full border-2 ${
+                      shareMode === "dokumen" ? "border-primary bg-primary" : ""
+                    }`}>
+                      {shareMode === "dokumen" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Dokumen Saja</p>
+                      <p className="text-xs text-muted-foreground">
+                        Bagikan dokumen tanpa detail kegiatan
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  {shareMode === "detail" ? "Link detail kegiatan" : "Link dokumen"}
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={activeShareLink}
+                    readOnly
+                    className="font-mono text-sm flex-1 min-w-0"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyLink}
+                    className="shrink-0"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4 mr-1 text-green-600" /> Tersalin
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-1" /> Salin
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* ── Hero Card ── */}
-        <Card className={`overflow-hidden border-l-4 ${jenisColor[jType] || "border-l-gray-300"}`}>
+        <Card
+          className={`overflow-hidden border-l-4 ${
+            jenisColor[jType] || "border-l-gray-300"
+          }`}
+        >
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-3 flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={jenisBadge[jType] || ""}>
-                    {jenisIcon[jType]} <span className="ml-1 capitalize">{activity.jenisTridharma?.replace("_", " ") || "-"}</span>
+                    {jenisIcon[jType]}{" "}
+                    <span className="ml-1 capitalize">
+                      {activity.jenisTridharma?.replace("_", " ") || "-"}
+                    </span>
                   </Badge>
                   <Badge variant="secondary">{activity.kategori}</Badge>
                   {getKelengkapanBadge(activity.statusKelengkapan)}
                 </div>
-                <h1 className="text-2xl font-bold tracking-tight">{activity.namaKegiatan}</h1>
-                <p className="text-sm text-muted-foreground">{activity.programStudi}</p>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {activity.namaKegiatan}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {activity.programStudi}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -380,16 +587,40 @@ export function ActivityDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Mulai" value={format(new Date(activity.tanggalMulai), "dd MMMM yyyy", { locale: localeId })} />
-                  <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Selesai" value={format(new Date(activity.tanggalSelesai), "dd MMMM yyyy", { locale: localeId })} />
-                  <InfoItem icon={<GraduationCap className="w-4 h-4" />} label="Tahun Akademik" value={activity.tahunAkademik} />
-                  <InfoItem icon={<BookOpen className="w-4 h-4" />} label="Semester" value={activity.semester} />
+                  <InfoItem
+                    icon={<Calendar className="w-4 h-4" />}
+                    label="Tanggal Mulai"
+                    value={format(
+                      new Date(activity.tanggalMulai),
+                      "dd MMMM yyyy",
+                      { locale: localeId }
+                    )}
+                  />
+                  <InfoItem
+                    icon={<Calendar className="w-4 h-4" />}
+                    label="Tanggal Selesai"
+                    value={format(
+                      new Date(activity.tanggalSelesai),
+                      "dd MMMM yyyy",
+                      { locale: localeId }
+                    )}
+                  />
+                  <InfoItem
+                    icon={<GraduationCap className="w-4 h-4" />}
+                    label="Tahun Akademik"
+                    value={activity.tahunAkademik}
+                  />
+                  <InfoItem
+                    icon={<BookOpen className="w-4 h-4" />}
+                    label="Semester"
+                    value={activity.semester}
+                  />
                 </div>
               </CardContent>
             </Card>
 
             {/* ── Dokumen Bersama ── */}
-            {activity.jenisBukti === 'BERSAMA' && (
+            {activity.jenisBukti === "BERSAMA" && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -401,7 +632,8 @@ export function ActivityDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {activity.dokumenBersama && activity.dokumenBersama.length > 0 ? (
+                  {activity.dokumenBersama &&
+                  activity.dokumenBersama.length > 0 ? (
                     <div className="space-y-2">
                       {activity.dokumenBersama.map((doc) => (
                         <FileRow key={doc.id} doc={doc} activity={activity} />
@@ -429,7 +661,7 @@ export function ActivityDetailPage() {
                     {activity.dosenTerlibat.length} dosen
                   </Badge>
                 </div>
-                {activity.jenisBukti === 'MASING_MASING' && (
+                {activity.jenisBukti === "MASING_MASING" && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Setiap dosen memiliki dokumen bukti masing-masing
                   </p>
@@ -437,7 +669,10 @@ export function ActivityDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {activity.dosenTerlibat.map((dosen) => (
-                  <div key={dosen.id} className="border rounded-xl overflow-hidden">
+                  <div
+                    key={dosen.id}
+                    className="border rounded-xl overflow-hidden"
+                  >
                     {/* Dosen header */}
                     <div className="flex items-center justify-between p-4 bg-muted/20 border-b">
                       <div className="flex items-center gap-3 min-w-0">
@@ -448,71 +683,117 @@ export function ActivityDetailPage() {
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-medium text-sm truncate">{dosen.name}</span>
-                            {dosen.isPencatat && <Badge className="bg-blue-500 text-xs h-5">Pembuat</Badge>}
-                            {dosen.isKetua && !dosen.isPencatat && <Badge className="bg-purple-500 text-xs h-5">Ketua</Badge>}
+                            <span className="font-medium text-sm truncate">
+                              {dosen.name}
+                            </span>
+                            {dosen.isPencatat && (
+                              <Badge className="bg-blue-500 text-xs h-5">
+                                Pembuat
+                              </Badge>
+                            )}
+                            {dosen.isKetua && !dosen.isPencatat && (
+                              <Badge className="bg-purple-500 text-xs h-5">
+                                Ketua
+                              </Badge>
+                            )}
                           </div>
                           {dosen.nidn && (
-                            <p className="text-xs text-muted-foreground font-mono mt-0.5">NIDN: {dosen.nidn}</p>
+                            <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                              NIDN: {dosen.nidn}
+                            </p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {getStatusBadge(dosen.status || "MENUNGGU_KONFIRMASI")}
-                        {activity.jenisBukti !== 'BERSAMA' && (
-                          dosen.dokumen.length > 0 ? (
+                        {activity.jenisBukti !== "BERSAMA" &&
+                          (dosen.dokumen.length > 0 ? (
                             <Badge className="bg-green-500 text-xs whitespace-nowrap">
                               <CheckCircle className="w-3 h-3 mr-1" />
                               {dosen.dokumen.length} dokumen
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs text-muted-foreground whitespace-nowrap">
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-muted-foreground whitespace-nowrap"
+                            >
                               Belum upload
                             </Badge>
-                          )
-                        )}
+                          ))}
                       </div>
                     </div>
 
                     {/* Dokumen list per dosen */}
-                    {activity.jenisBukti !== 'BERSAMA' && (
+                    {activity.jenisBukti !== "BERSAMA" && (
                       <div className="p-4 space-y-2">
                         {dosen.dokumen.length > 0 ? (
                           dosen.dokumen.map((doc) => {
-                            const isOwner = 'isOwner' in doc ? (doc as any).isOwner : true;
+                            const isOwner =
+                              "isOwner" in doc ? (doc as any).isOwner : true;
                             const uploadedBy = (doc as any).uploadedBy;
                             return (
-                              <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                              <div
+                                key={doc.id}
+                                className="flex items-center justify-between p-3 border rounded-lg bg-muted/20"
+                              >
                                 <div className="flex items-center gap-3 flex-1 min-w-0">
                                   <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
                                   <div className="min-w-0">
-                                    <p className="font-medium text-sm truncate">{doc.name}</p>
+                                    <p className="font-medium text-sm truncate">
+                                      {doc.name}
+                                    </p>
                                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{doc.jenis}</Badge>
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-[10px] px-1.5 py-0"
+                                      >
+                                        {doc.jenis}
+                                      </Badge>
                                       {!isOwner && uploadedBy && (
-                                        <span className="text-xs text-muted-foreground">Upload: {uploadedBy.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          Upload: {uploadedBy.name}
+                                        </span>
                                       )}
                                       <span className="text-xs text-muted-foreground">
-                                        {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
+                                        {format(
+                                          new Date(doc.tanggalUpload),
+                                          "dd MMM yyyy",
+                                          { locale: localeId }
+                                        )}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
-                                  {doc.hasHighlight && <Highlighter className="w-4 h-4 text-yellow-500" />}
-                                  <Button variant="ghost" size="sm" onClick={() =>
-                                    navigate(`/documents/${doc.id}/preview`, {
-                                      state: {
-                                        activityId: activity.id,
-                                        breadcrumbs: [
-                                          { label: "Beranda", path: "/dashboard" },
-                                          { label: "Kegiatan Tridharma", path: "/activities" },
-                                          { label: activity.namaKegiatan, path: `/activities/${id}` },
-                                          { label: doc.name },
-                                        ],
-                                      },
-                                    })
-                                  }>
+                                  {doc.hasHighlight && (
+                                    <Highlighter className="w-4 h-4 text-yellow-500" />
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      navigate(`/documents/${doc.id}/preview`, {
+                                        state: {
+                                          activityId: activity.id,
+                                          breadcrumbs: [
+                                            {
+                                              label: "Beranda",
+                                              path: "/dashboard",
+                                            },
+                                            {
+                                              label: "Kegiatan Tridharma",
+                                              path: "/activities",
+                                            },
+                                            {
+                                              label: activity.namaKegiatan,
+                                              path: `/activities/${id}`,
+                                            },
+                                            { label: doc.name },
+                                          ],
+                                        },
+                                      })
+                                    }
+                                  >
                                     <Eye className="w-4 h-4" />
                                   </Button>
                                 </div>
@@ -549,21 +830,39 @@ export function ActivityDetailPage() {
               />
               <SummaryCard
                 icon={<FileText className="w-5 h-5 text-green-600" />}
-                label={activity.jenisBukti === 'BERSAMA' ? "Total Dokumen Bersama" : "Total Dokumen Bukti"}
+                label={
+                  activity.jenisBukti === "BERSAMA"
+                    ? "Total Dokumen Bersama"
+                    : "Total Dokumen Bukti"
+                }
                 value={
-                  activity.jenisBukti === 'BERSAMA'
+                  activity.jenisBukti === "BERSAMA"
                     ? (activity.dokumenBersama?.length || 0).toString()
-                    : activity.dosenTerlibat.reduce((s, d) => s + d.dokumen.length, 0).toString()
+                    : activity.dosenTerlibat
+                        .reduce((s, d) => s + d.dokumen.length, 0)
+                        .toString()
                 }
                 bg="bg-green-50 border-green-200"
               />
               <SummaryCard
                 icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
-                label={activity.jenisBukti === 'BERSAMA' ? "Status Dokumen" : "Dosen Belum Upload"}
+                label={
+                  activity.jenisBukti === "BERSAMA"
+                    ? "Status Dokumen"
+                    : "Dosen Belum Upload"
+                }
                 value={
-                  activity.jenisBukti === 'BERSAMA'
-                    ? (activity.dokumenBersama && activity.dokumenBersama.length > 0 ? "Ada" : "Kosong")
-                    : activity.dosenTerlibat.filter(d => d.dokumen.length === 0 && d.status === "DITERIMA").length.toString()
+                  activity.jenisBukti === "BERSAMA"
+                    ? activity.dokumenBersama &&
+                      activity.dokumenBersama.length > 0
+                      ? "Ada"
+                      : "Kosong"
+                    : activity.dosenTerlibat
+                        .filter(
+                          (d) =>
+                            d.dokumen.length === 0 && d.status === "DITERIMA"
+                        )
+                        .length.toString()
                 }
                 bg="bg-amber-50 border-amber-200"
               />
@@ -588,51 +887,67 @@ export function ActivityDetailPage() {
                   <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
                     <AlertCircle className="w-10 h-10 text-destructive" />
                     <p className="text-sm text-destructive">{auditError}</p>
-                    <Button variant="outline" onClick={() => fetchAuditTrail()}>Coba Lagi</Button>
+                    <Button variant="outline" onClick={() => fetchAuditTrail()}>
+                      Coba Lagi
+                    </Button>
                   </div>
                 ) : logs.length > 0 ? (
-                  <div className="border rounded-lg overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Waktu</TableHead>
-                          <TableHead>Aksi</TableHead>
-                          <TableHead>Pelaku</TableHead>
-                          <TableHead>Transaksi</TableHead>
-                          <TableHead>Blok</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {logs.map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell className="text-sm whitespace-nowrap">
-                              {format(new Date(log.timestamp), "dd MMM yyyy HH:mm", { locale: localeId })}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">{log.action.replaceAll("_", " ")}</Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">{log.actor}</TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <p className="font-mono text-xs" title={log.txId}>{log.txId.slice(0, 12)}...</p>
-                                <p className="text-xs text-muted-foreground">{log.documentCount} dokumen</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1 text-sm">
-                                <p>#{log.blockHeight ?? "-"}</p>
-                                <p className="text-xs text-muted-foreground">{log.confirmations} konfirmasi</p>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-0">
+                    {logs.map((log, idx) => (
+                      <div
+                        key={log.id}
+                        role="button"
+                        tabIndex={0}
+                        className="relative flex gap-4 pb-8 last:pb-0 cursor-pointer transition-colors hover:bg-muted/30 rounded-lg px-3 py-2 -mx-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => setSelectedLog(log)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedLog(log);
+                          }
+                        }}
+                      >
+                        {idx < logs.length - 1 && (
+                          <div className="absolute left-[23px] top-10 h-full w-px bg-border" />
+                        )}
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background">
+                          {getTimelineIcon(log.action)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium capitalize">
+                              {log.action.replaceAll("_", " ").toLowerCase()}
+                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              {format(
+                                new Date(log.timestamp),
+                                "dd MMM yyyy, HH:mm",
+                                { locale: localeId }
+                              )}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Oleh: {log.actor}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>Tx: {log.txId.slice(0, 12)}...</span>
+                            <span>Blok #{log.blockHeight ?? "-"}</span>
+                            <span>{log.confirmations} konfirmasi</span>
+                            <span>{log.documentCount} dokumen</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0 self-center">
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center py-10 text-muted-foreground">
                     <HistoryIcon className="w-10 h-10 mb-2 opacity-20" />
-                    <p className="text-sm">Belum ada riwayat tercatat untuk kegiatan ini.</p>
+                    <p className="text-sm">
+                      Belum ada riwayat tercatat untuk kegiatan ini.
+                    </p>
                   </div>
                 )}
               </CardContent>
@@ -646,22 +961,261 @@ export function ActivityDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus kegiatan <strong>{activity?.namaKegiatan}</strong>? Tindakan ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus kegiatan{" "}
+              <strong>{activity?.namaKegiatan}</strong>? Tindakan ini tidak
+              dapat dibatalkan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Hapus</AlertDialogAction>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Hapus
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={selectedLog !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedLog(null);
+        }}
+      >
+        <DetailDialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-3xl">
+          {selectedLog && (() => {
+            const activityChanges = getActivityChanges(selectedLog);
+            const participantChanges = getCollectionChanges(selectedLog, "partisipasi", "dosen_id");
+            const documentChanges = getCollectionChanges(selectedLog, "dokumen_pendukung", "dokumen_id");
+            const activitySnapshot = selectedLog.payload.kegiatan ?? {};
+            const recorder = selectedLog.payload.pencatat ?? {};
+            const participants = selectedLog.payload.partisipasi ?? [];
+            const documents = selectedLog.payload.dokumen_pendukung ?? [];
+            const hasCollectionChanges =
+              participantChanges.added.length > 0 ||
+              participantChanges.removed.length > 0 ||
+              participantChanges.changed.length > 0 ||
+              documentChanges.added.length > 0 ||
+              documentChanges.removed.length > 0 ||
+              documentChanges.changed.length > 0;
+
+            return (
+              <>
+                <DetailDialogHeader className="border-b px-6 py-5 pr-12">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <DetailDialogTitle>Detail Perubahan</DetailDialogTitle>
+                    <Badge variant="secondary">
+                      {selectedLog.action.replaceAll("_", " ")}
+                    </Badge>
+                  </div>
+                  <DetailDialogDescription>
+                    Dicatat oleh {selectedLog.actor} pada{" "}
+                    {format(new Date(selectedLog.timestamp), "dd MMMM yyyy, HH:mm", { locale: localeId })}
+                  </DetailDialogDescription>
+                </DetailDialogHeader>
+
+                <ScrollArea className="max-h-[calc(90vh-110px)]">
+                  <div className="space-y-6 p-6">
+                    <section className="grid gap-3 sm:grid-cols-3">
+                      <div className="border p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Block</p>
+                        <p className="mt-1 font-medium">#{selectedLog.blockHeight ?? "Belum dikonfirmasi"}</p>
+                      </div>
+                      <div className="border p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Konfirmasi</p>
+                        <p className="mt-1 font-medium">{selectedLog.confirmations}</p>
+                      </div>
+                      <div className="border p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Versi payload</p>
+                        <p className="mt-1 font-medium">{selectedLog.payload.payload_version ?? "-"}</p>
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <div>
+                        <h3 className="font-semibold">Perubahan Tercatat</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Dibandingkan dengan snapshot blockchain sebelumnya.
+                        </p>
+                      </div>
+
+                      {activityChanges.length > 0 && (
+                        <div className="divide-y border rounded-lg">
+                          {activityChanges.map((change) => (
+                            <div key={change.label} className="grid gap-1 px-4 py-3 sm:grid-cols-[170px_1fr]">
+                              <p className="text-sm font-medium">{change.label}</p>
+                              {change.isInitial ? (
+                                <p className="text-sm">{formatAuditValue(change.after)}</p>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                  <span className="text-muted-foreground line-through">
+                                    {formatAuditValue(change.before)}
+                                  </span>
+                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                  <span className="font-medium">{formatAuditValue(change.after)}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {participantChanges.added.map((p) => (
+                        <div key={`pa-${getRecordId(p, "dosen_id")}`} className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 rounded-lg">
+                          Dosen ditambahkan: <strong>{String(p.nama ?? "-")}</strong> sebagai {formatAuditValue(p.peran)}.
+                        </div>
+                      ))}
+                      {participantChanges.removed.map((p) => (
+                        <div key={`pr-${getRecordId(p, "dosen_id")}`} className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 rounded-lg">
+                          Dosen dihapus: <strong>{String(p.nama ?? "-")}</strong>.
+                        </div>
+                      ))}
+                      {participantChanges.changed.map((p) => (
+                        <div key={`pc-${getRecordId(p, "dosen_id")}`} className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 rounded-lg">
+                          Data partisipasi berubah: <strong>{String(p.nama ?? "-")}</strong>.
+                        </div>
+                      ))}
+
+                      {documentChanges.added.map((d) => (
+                        <div key={`da-${getRecordId(d, "dokumen_id")}`} className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 rounded-lg">
+                          Dokumen ditambahkan: <strong>{String(d.nama ?? "-")}</strong>.
+                        </div>
+                      ))}
+                      {documentChanges.removed.map((d) => (
+                        <div key={`dr-${getRecordId(d, "dokumen_id")}`} className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 rounded-lg">
+                          Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
+                        </div>
+                      ))}
+                      {documentChanges.changed.map((d) => (
+                        <div key={`dc-${getRecordId(d, "dokumen_id")}`} className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 rounded-lg">
+                          Data atau hash dokumen berubah: <strong>{String(d.nama ?? "-")}</strong>.
+                        </div>
+                      ))}
+
+                      {activityChanges.length === 0 && !hasCollectionChanges && (
+                        <div className="border bg-muted/30 px-4 py-3 text-sm text-muted-foreground rounded-lg">
+                          Tidak ada perbedaan data dengan snapshot sebelumnya.
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="font-semibold">Snapshot Kegiatan</h3>
+                      <div className="grid gap-x-6 gap-y-3 border rounded-lg p-4 sm:grid-cols-2">
+                        {Object.entries(activityFieldLabels).map(([field, label]) => (
+                          <div key={field}>
+                            <p className="text-xs text-muted-foreground">{label}</p>
+                            <p className="mt-1 text-sm font-medium">{formatAuditValue(activitySnapshot[field])}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="font-semibold">Pencatat dan Publisher</h3>
+                      <div className="space-y-3 border rounded-lg p-4 text-sm">
+                        <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                          <span className="text-muted-foreground">Nama</span>
+                          <span className="font-medium">{String(recorder.nama ?? selectedLog.actor)}</span>
+                        </div>
+                        <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                          <span className="text-muted-foreground">Program studi</span>
+                          <span>{String(recorder.program_studi?.nama ?? "-")}</span>
+                        </div>
+                        <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                          <span className="text-muted-foreground">Publisher</span>
+                          <span className="break-all font-mono text-xs">{selectedLog.publisher ?? "-"}</span>
+                        </div>
+                        <div className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                          <span className="text-muted-foreground">Transaction ID</span>
+                          <span className="break-all font-mono text-xs">{selectedLog.txId}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="font-semibold">Dosen Terlibat ({participants.length})</h3>
+                      {participants.length > 0 ? (
+                        <div className="divide-y border rounded-lg">
+                          {participants.map((p) => (
+                            <div key={getRecordId(p, "dosen_id")} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                              <div>
+                                <p className="text-sm font-medium">{String(p.nama ?? "-")}</p>
+                                <p className="text-xs text-muted-foreground">NIDN {String(p.nidn ?? "-")}</p>
+                              </div>
+                              <Badge variant="outline">{formatAuditValue(p.peran)}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="border rounded-lg p-4 text-sm text-muted-foreground">Tidak ada data partisipan pada snapshot ini.</p>
+                      )}
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="font-semibold">Dokumen Pendukung ({documents.length})</h3>
+                      {documents.length > 0 ? (
+                        <div className="divide-y border rounded-lg">
+                          {documents.map((d) => (
+                            <div key={getRecordId(d, "dokumen_id")} className="space-y-2 px-4 py-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium">{String(d.nama ?? "-")}</p>
+                                <Badge variant="outline">{formatAuditValue(d.jenis_dokumen)}</Badge>
+                              </div>
+                              <p className="break-all font-mono text-xs text-muted-foreground">SHA-256: {String(d.hash_file ?? "-")}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="border rounded-lg p-4 text-sm text-muted-foreground">Tidak ada dokumen pendukung pada snapshot ini.</p>
+                      )}
+                    </section>
+                  </div>
+                </ScrollArea>
+              </>
+            );
+          })()}
+        </DetailDialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
 
+/* ── Helper Functions ── */
+
+function getTimelineIcon(action: string) {
+  const a = action.toUpperCase();
+  if (a.includes("CREATED") || a.includes("ADDED")) {
+    return <Upload className="h-4 w-4 text-blue-500" />;
+  }
+  if (a.includes("UPDATED") || a.includes("EDITED")) {
+    return <Edit className="h-4 w-4 text-amber-500" />;
+  }
+  if (a.includes("REMOVED") || a.includes("DELETED")) {
+    return <Trash2 className="h-4 w-4 text-red-500" />;
+  }
+  if (a.includes("CONFIRMED") || a.includes("VERIFIED")) {
+    return <ShieldCheck className="h-4 w-4 text-green-500" />;
+  }
+  if (a.includes("PARTISIPASI") || a.includes("MEMBER")) {
+    return <UserCheck className="h-4 w-4 text-blue-500" />;
+  }
+  return <Clock className="h-4 w-4 text-muted-foreground" />;
+}
+
 /* ── Helper Components ── */
 
-function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function InfoItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
       <div className="p-2 rounded-lg bg-background border shrink-0 text-muted-foreground">
@@ -675,7 +1229,17 @@ function InfoItem({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
-function SummaryCard({ icon, label, value, bg }: { icon: React.ReactNode; label: string; value: string; bg: string }) {
+function SummaryCard({
+  icon,
+  label,
+  value,
+  bg,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  bg: string;
+}) {
   return (
     <div className={`rounded-xl border p-4 ${bg}`}>
       <div className="flex items-center gap-3">
@@ -689,7 +1253,13 @@ function SummaryCard({ icon, label, value, bg }: { icon: React.ReactNode; label:
   );
 }
 
-function FileRow({ doc, activity }: { doc: SharedDoc; activity: ActivityDetail }) {
+function FileRow({
+  doc,
+  activity,
+}: {
+  doc: SharedDoc;
+  activity: ActivityDetail;
+}) {
   const navigate = useNavigate();
   const { id } = useParams();
   return (
@@ -701,29 +1271,41 @@ function FileRow({ doc, activity }: { doc: SharedDoc; activity: ActivityDetail }
         <div className="min-w-0">
           <p className="font-medium text-sm truncate">{doc.name}</p>
           <div className="flex flex-wrap items-center gap-2 mt-0.5">
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{doc.jenis}</Badge>
-            <span className="text-xs text-muted-foreground">Upload: {doc.uploadedBy.name}</span>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+              {doc.jenis}
+            </Badge>
             <span className="text-xs text-muted-foreground">
-              {format(new Date(doc.tanggalUpload), "dd MMM yyyy", { locale: localeId })}
+              Upload: {doc.uploadedBy.name}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(doc.tanggalUpload), "dd MMM yyyy", {
+                locale: localeId,
+              })}
             </span>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {doc.hasHighlight && <Highlighter className="w-4 h-4 text-yellow-500" />}
-        <Button variant="ghost" size="sm" onClick={() =>
-          navigate(`/documents/${doc.id}/preview`, {
-            state: {
-              activityId: activity.id,
-              breadcrumbs: [
-                { label: "Beranda", path: "/dashboard" },
-                { label: "Kegiatan Tridharma", path: "/activities" },
-                { label: activity.namaKegiatan, path: `/activities/${id}` },
-                { label: doc.name },
-              ],
-            },
-          })
-        }>
+        {doc.hasHighlight && (
+          <Highlighter className="w-4 h-4 text-yellow-500" />
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            navigate(`/documents/${doc.id}/preview`, {
+              state: {
+                activityId: activity.id,
+                breadcrumbs: [
+                  { label: "Beranda", path: "/dashboard" },
+                  { label: "Kegiatan Tridharma", path: "/activities" },
+                  { label: activity.namaKegiatan, path: `/activities/${id}` },
+                  { label: doc.name },
+                ],
+              },
+            })
+          }
+        >
           <Eye className="w-4 h-4" />
         </Button>
       </div>
@@ -750,10 +1332,18 @@ function getKelengkapanBadge(status: string) {
 
 function getStatusBadge(status: string) {
   const s = statusBadge[status];
-  if (!s) return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  if (!s)
+    return (
+      <Badge variant="outline" className="text-xs">
+        {status}
+      </Badge>
+    );
   return (
     <Badge variant="outline" className={`${s.className} text-xs`}>
-      <span className="flex items-center gap-1">{s.icon}{s.label}</span>
+      <span className="flex items-center gap-1">
+        {s.icon}
+        {s.label}
+      </span>
     </Badge>
   );
 }

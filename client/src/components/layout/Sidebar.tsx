@@ -205,9 +205,7 @@ export function Sidebar() {
             onClick={() => !isCollapsed && toggleMenu(item.label)}
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group w-full text-left",
-              childActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+              "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}
           >
             <Icon
@@ -233,8 +231,7 @@ export function Sidebar() {
               {item.children!.map((child) => {
                 const ChildIcon = child.icon;
                 const isChildActive =
-                  location.pathname === child.path ||
-                  location.pathname.startsWith(child.path + "/");
+                  location.pathname === child.path;
 
                 return (
                   <li key={child.path}>
