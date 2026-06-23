@@ -1,15 +1,22 @@
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 import { resolveBlockchainNode } from '../lib/blockchainNode';
+import { EmailService } from './EmailService';
 import { MultiChainService } from './MultiChainService';
 
 export class ActivityService {
   private activityRepository: ActivityRepository;
   private multiChainService: MultiChainService;
+  private emailService: EmailService;
 
-  constructor(activityRepository: ActivityRepository, multiChainService = new MultiChainService()) {
+  constructor(
+    activityRepository: ActivityRepository,
+    multiChainService = new MultiChainService(),
+    emailService = new EmailService(),
+  ) {
     this.activityRepository = activityRepository;
     this.multiChainService = multiChainService;
+    this.emailService = emailService;
   }
 
   private buildBlockchainPayload(activity: any, eventType: string) {
@@ -70,6 +77,34 @@ export class ActivityService {
       activity.dosen.chain_address,
       activity.id,
       this.buildBlockchainPayload(activity, eventType),
+    );
+  }
+
+  private async notifyInvitedMembers(activityId: string, memberIds: string[]) {
+    if (memberIds.length === 0) return;
+
+    const activity = await this.activityRepository.findById(activityId);
+    if (!activity) return;
+
+    const inviterName = activity.dosen.nama;
+    const invited = activity.partisipasi.filter((participant: any) =>
+      memberIds.includes(participant.dosen_id),
+    );
+
+    await this.emailService.sendMany(
+      invited.map((participant: any) => ({
+        to: {
+          nama: participant.dosen.nama,
+          email: participant.dosen.user?.email,
+        },
+        subject: `Undangan anggota kegiatan tridharma: ${activity.nama_kegiatan}`,
+        text: [
+          `Halo ${participant.dosen.nama || 'Bapak/Ibu'},`,
+          '',
+          `${inviterName} menambahkan Anda sebagai anggota kegiatan tridharma "${activity.nama_kegiatan}".`,
+          'Silakan masuk ke sistem untuk menerima atau menolak partisipasi.',
+        ].join('\n'),
+      })),
     );
   }
 
@@ -337,7 +372,9 @@ export class ActivityService {
       throw error;
     }
 
-    return await this.activityRepository.updateTransactionId(createdActivity.id, txId);
+    const result = await this.activityRepository.updateTransactionId(createdActivity.id, txId);
+    await this.notifyInvitedMembers(createdActivity.id, filteredAnggotaIds);
+    return result;
   }
 
   async updateActivity(id: string, dosenId: string, data: any) {
@@ -371,12 +408,14 @@ export class ActivityService {
 
     await this.activityRepository.update(id, updateData);
 
+    let newlyAddedMemberIds: string[] = [];
     if (anggota_ids && Array.isArray(anggota_ids)) {
       const existingParticipations = activity.partisipasi;
       const existingIds = existingParticipations.map(p => p.dosen_id);
       const newIds = anggota_ids
         .filter((aid: string) => !existingIds.includes(aid))
         .filter((aid: string) => aid !== dosenId);
+      newlyAddedMemberIds = newIds;
 
       for (const newId of newIds) {
         await this.activityRepository.createParticipation({
@@ -421,7 +460,9 @@ export class ActivityService {
       throw error;
     }
 
-    return await this.activityRepository.updateTransactionId(id, txId);
+    const result = await this.activityRepository.updateTransactionId(id, txId);
+    await this.notifyInvitedMembers(id, newlyAddedMemberIds);
+    return result;
   }
 
   async deleteActivity(id: string, dosenId: string) {
@@ -514,18 +555,29 @@ export class ActivityService {
   async acceptParticipation(partisipasiId: string, dosenId: string) {
     if (!this.isValidUUID(partisipasiId)) throw new Error('Format ID tidak valid.');
 
+    const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
+    if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
+    if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+
     const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA');
 
-    const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
-    if (partisipasi) {
-      const activity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
-      if (activity && activity.jenis_bukti === 'BERSAMA') {
-        const docIds = await this.activityRepository.getActivityDocumentIds(activity.id);
-        if (docIds.length > 0) {
-          await this.activityRepository.createKepemilikanIfNotExists(dosenId, docIds);
-        }
+    const activity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+    if (activity && activity.jenis_bukti === 'BERSAMA') {
+      const docIds = await this.activityRepository.getActivityDocumentIds(activity.id);
+      if (docIds.length > 0) {
+        await this.activityRepository.createKepemilikanIfNotExists(dosenId, docIds);
       }
     }
+
+    await this.emailService.notifyActivityDecision(
+      {
+        nama: partisipasi.kegiatan_tridharma.dosen.nama,
+        email: partisipasi.kegiatan_tridharma.dosen.user?.email,
+      },
+      partisipasi.kegiatan_tridharma.nama_kegiatan,
+      partisipasi.dosen.nama,
+      'DITERIMA',
+    );
 
     return updated;
   }
@@ -533,7 +585,20 @@ export class ActivityService {
   async rejectParticipation(partisipasiId: string, dosenId: string) {
     if (!this.isValidUUID(partisipasiId)) throw new Error('Format ID tidak valid.');
 
+    const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
+    if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
+    if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+
     const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK');
+    await this.emailService.notifyActivityDecision(
+      {
+        nama: partisipasi.kegiatan_tridharma.dosen.nama,
+        email: partisipasi.kegiatan_tridharma.dosen.user?.email,
+      },
+      partisipasi.kegiatan_tridharma.nama_kegiatan,
+      partisipasi.dosen.nama,
+      'DITOLAK',
+    );
     return updated;
   }
 
@@ -547,12 +612,14 @@ export class ActivityService {
     const existing = activity.partisipasi.find(p => p.dosen_id === anggotaId);
     if (existing) throw new Error('Dosen sudah terdaftar sebagai anggota.');
 
-    return await this.activityRepository.createParticipation({
+    const participation = await this.activityRepository.createParticipation({
       dosen_id: anggotaId,
       kegiatan_tridharma_id: kegiatanId,
       peran: 'ANGGOTA',
       status: 'MENUNGGU_KONFIRMASI',
     });
+    await this.notifyInvitedMembers(kegiatanId, [anggotaId]);
+    return participation;
   }
 
   async removeMember(kegiatanId: string, dosenId: string, anggotaId: string) {
@@ -564,5 +631,19 @@ export class ActivityService {
     if (activity.dosen_id === anggotaId) throw new Error('Tidak dapat menghapus pembuat kegiatan.');
 
     return await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
+  }
+
+  // Public methods (no authentication required)
+  async getPublicActivities() {
+    return await this.activityRepository.findAllPublic();
+  }
+
+  async getPublicActivityById(id: string) {
+    if (!this.isValidUUID(id)) throw new Error('Format ID tidak valid.');
+    
+    const activity = await this.activityRepository.findByIdPublic(id);
+    if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+    
+    return activity;
   }
 }

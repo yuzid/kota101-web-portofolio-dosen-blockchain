@@ -29,6 +29,39 @@ export class DistributionRepository {
     });
   }
 
+  async findDosenRecipientsByIds(dosenIds: string[]) {
+    return await prisma.dosen.findMany({
+      where: { id: { in: dosenIds } },
+      select: {
+        id: true,
+        nama: true,
+        user: { select: { email: true } },
+      },
+    });
+  }
+
+  async findTataUsahaSenderByUserId(userId: string) {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        tata_usaha: { select: { nama: true, nip: true } },
+      },
+    });
+  }
+
+  async findDistributedDosenIds(dokumenId: string, dosenIds: string[]) {
+    const distributions = await prisma.kepemilikanDokumen.findMany({
+      where: {
+        dokumen_id: dokumenId,
+        dosen_id: { in: dosenIds },
+        didistribusikan_oleh_id: { not: null },
+      },
+      select: { dosen_id: true },
+    });
+    return distributions.map(distribution => distribution.dosen_id);
+  }
+
   async findByDokumen(dokumenId: string) {
     return await prisma.kepemilikanDokumen.findMany({
       where: {

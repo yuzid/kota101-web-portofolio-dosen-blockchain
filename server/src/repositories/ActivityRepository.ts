@@ -250,8 +250,12 @@ export class ActivityRepository {
     return await prisma.kegiatanTridharma.findUnique({
       where: { id },
       include: {
-        dosen: { include: { program_studi: true } },
-        partisipasi: { include: { dosen: true } },
+        dosen: { include: { program_studi: true, user: { select: { email: true } } } },
+        partisipasi: {
+          include: {
+            dosen: { include: { user: { select: { email: true } } } },
+          },
+        },
         lampiran_bukti: {
           include: {
             dokumen: {
@@ -355,6 +359,14 @@ export class ActivityRepository {
   async findParticipationById(id: string) {
     return await prisma.partisipasiKegiatanTridharma.findUnique({
       where: { id },
+      include: {
+        dosen: { include: { user: { select: { email: true } } } },
+        kegiatan_tridharma: {
+          include: {
+            dosen: { include: { user: { select: { email: true } } } },
+          },
+        },
+      },
     });
   }
 
@@ -417,5 +429,105 @@ export class ActivityRepository {
       if (!ids.includes(p.dosen_id)) ids.push(p.dosen_id);
     });
     return ids;
+  }
+
+  // Public methods (no authentication required)
+  async findAllPublic() {
+    return await prisma.kegiatanTridharma.findMany({
+      include: {
+        dosen: {
+          select: {
+            id: true,
+            nama: true,
+            nip: true,
+            program_studi: {
+              select: {
+                id: true,
+                nama_prodi: true,
+                kode_prodi: true
+              }
+            }
+          }
+        },
+        partisipasi: {
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true
+              }
+            },
+            peran: true,
+            status: true
+          }
+        },
+        lampiran_bukti: {
+          include: {
+            dokumen: {
+              select: {
+                id: true,
+                nama: true,
+                jenis_dokumen: true,
+                tanggal_upload: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { tanggal_mulai: 'desc' }
+    });
+  }
+
+  async findByIdPublic(id: string) {
+    return await prisma.kegiatanTridharma.findUnique({
+      where: { id },
+      include: {
+        dosen: {
+          select: {
+            id: true,
+            nama: true,
+            nip: true,
+            nidn: true,
+            program_studi: {
+              select: {
+                id: true,
+                nama_prodi: true,
+                kode_prodi: true
+              }
+            }
+          }
+        },
+        partisipasi: {
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true,
+                nidn: true
+              }
+            },
+            peran: true,
+            status: true
+          }
+        },
+        lampiran_bukti: {
+          include: {
+            dokumen: {
+              select: {
+                id: true,
+                nama: true,
+                jenis_dokumen: true,
+                sumber_dokumen: true,
+                tanggal_upload: true,
+                hash_file: true
+              }
+            }
+          }
+        },
+        audit_trail: true
+      }
+    });
   }
 }

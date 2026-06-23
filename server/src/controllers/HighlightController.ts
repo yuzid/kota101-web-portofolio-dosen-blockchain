@@ -16,13 +16,17 @@ export class HighlightController {
 
       if (kepemilikanId) {
         const highlights = await this.highlightService.getHighlightsByDocument(kepemilikanId);
-        res.json({ status: 'success', data: highlights });
+        res.json({ status: 'success', data: highlights, kepemilikanId });
       } else if (dokumenId && req.user?.id) {
-        const highlights = await this.highlightService.getHighlightsByDocumentAndDosen(
+        const result = await this.highlightService.getHighlightsByDocumentAndDosen(
           dokumenId as string,
           req.user.id,
         );
-        res.json({ status: 'success', data: highlights });
+        res.json({ 
+          status: 'success', 
+          data: result.highlights,
+          kepemilikanId: result.kepemilikanId,
+        });
       } else {
         res.status(400).json({ status: 'error', error: 'Missing kepemilikanId or dokumenId.' });
       }
