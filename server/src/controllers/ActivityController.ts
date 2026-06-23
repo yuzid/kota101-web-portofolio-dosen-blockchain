@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { ActivityService } from '../services/ActivityService';
 import { AuthRequest } from '../middleware/authMiddleware';
 
@@ -9,6 +9,29 @@ export class ActivityController {
     this.activityService = activityService;
   }
 
+  // Public methods (no authentication required)
+  getPublicActivities = async (req: Request, res: Response) => {
+    try {
+      const activities = await this.activityService.getPublicActivities();
+      res.status(200).json({ status: 'success', data: activities });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getPublicActivityById = async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      const activity = await this.activityService.getPublicActivityById(id);
+      res.status(200).json({ status: 'success', data: activity });
+    } catch (error: any) {
+      const status = error.message.includes('Format ID') ? 400 :
+                     error.message === 'Kegiatan tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  // Authenticated methods
   getAllActivities = async (req: AuthRequest, res: Response) => {
     try {
       const dosenId = req.user?.id;

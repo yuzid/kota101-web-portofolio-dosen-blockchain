@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { DocumentService } from '../services/DocumentService';
 import { DocumentDistributionService } from '../services/DocumentDistributionService';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -14,6 +14,26 @@ export class DocumentController {
     this.documentService = documentService;
     this.distributionService = distributionService;
   }
+
+  // Public methods (no authentication required)
+  getPublicDocuments = async (req: Request, res: Response) => {
+    try {
+      const documents = await this.documentService.getPublicDocuments();
+      res.json({ status: 'success', data: documents });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getPublicDocumentById = async (req: Request, res: Response) => {
+    try {
+      const document = await this.documentService.getPublicDocumentById(req.params.id as string);
+      res.json({ status: 'success', data: document });
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
 
   // Dosen Handlers
   getDosenDocuments = async (req: AuthRequest, res: Response) => {

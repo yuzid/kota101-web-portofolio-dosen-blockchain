@@ -565,4 +565,18 @@ export class ActivityService {
 
     return await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
   }
+
+  // Public methods (no authentication required)
+  async getPublicActivities() {
+    return await this.activityRepository.findAllPublic();
+  }
+
+  async getPublicActivityById(id: string) {
+    if (!this.isValidUUID(id)) throw new Error('Format ID tidak valid.');
+    
+    const activity = await this.activityRepository.findByIdPublic(id);
+    if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+    
+    return activity;
+  }
 }
