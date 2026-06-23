@@ -33,7 +33,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { HighlightOverlay } from "../components/document/HighlightOverlay";
 import { HighlightMenu } from "../components/document/HighlightMenu";
-import { getHighlightsByDokumenId } from "../services/highlightService";
+import { 
+  getHighlightsByDokumenId,
+  addHighlight,
+  updateHighlight,
+  deleteHighlight,
+  syncHighlights,
+} from "../services/highlightService";
 import type { Highlight } from "../services/highlightService";
 import {
   AlertDialog,
@@ -70,7 +76,7 @@ import { Calendar } from "../components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { DocumentSharing } from "../components/document/DocumentSharing";
-import { isHighlightMockMode, replaceMockHighlights } from "../services/highlightService";
+import { isHighlightMockMode } from "../services/highlightService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { FileVersionHistory } from "../components/file/FileVersionHistory";
 import type { FileVersion } from "../hooks/useFileManagement";
@@ -488,11 +494,40 @@ export function DocumentPreviewPage() {
         hl.id === highlightId ? { ...hl, highlighted_text: text } : hl,
       ),
     );
+    
+    // Save to backend
+    try {
+      if (!highlightId.startsWith("temp-")) {
+        await updateHighlight(highlightId, { highlighted_text: text });
+        toast.success("Highlight berhasil diperbarui");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui highlight");
+      setHighlights((prev) =>
+        prev.map((hl) =>
+          hl.id === highlightId ? { ...hl, highlighted_text: "" } : hl,
+        ),
+      );
+    }
   };
 
   const handleDeleteHighlight = async (highlightId: string) => {
     pushHistory();
+    const deletedHighlight = highlights.find((hl) => hl.id === highlightId);
     setHighlights((prev) => prev.filter((hl) => hl.id !== highlightId));
+    
+    // Delete from backend
+    try {
+      if (!highlightId.startsWith("temp-")) {
+        await deleteHighlight(highlightId);
+        toast.success("Highlight berhasil dihapus");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus highlight");
+      if (deletedHighlight) {
+        setHighlights((prev) => [...prev, deletedHighlight]);
+      }
+    }
   };
 
   const pushHistory = useCallback(() => {
@@ -506,10 +541,21 @@ export function DocumentPreviewPage() {
     setHighlights(previous);
   };
 
-  const toggleAddMode = () => {
+  const toggleAddMode = async () => {
     if (!kepemilikanId) return;
     if (addMode) {
-      replaceMockHighlights(kepemilikanId, highlights);
+      // Save highlights to backend when exiting add mode
+      try {
+        const syncData = highlights.map(h => ({
+          page_number: h.page_number,
+          highlighted_text: h.highlighted_text,
+          highlight_rect: h.highlight_rect,
+        }));
+        await syncHighlights(kepemilikanId, syncData);
+        toast.success("Highlight berhasil disimpan");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal menyimpan highlight");
+      }
     }
     setAddMode((prev) => !prev);
     setMenuHighlight(null);
@@ -549,6 +595,14 @@ export function DocumentPreviewPage() {
     if (!kepemilikanId) return;
     pushHistory();
     setHighlights([]);
+    
+    // Sync empty array to backend
+    try {
+      await syncHighlights(kepemilikanId, []);
+      toast.success("Semua highlight berhasil dihapus");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus semua highlight");
+    }
   };
 
   const handleNavigateToPage = (pageNumber: number) => {

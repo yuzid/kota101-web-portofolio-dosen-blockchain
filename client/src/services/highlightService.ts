@@ -1,8 +1,8 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Mock mode ──
-// Set USE_MOCK = false ketika backend sudah siap (kepemilikanId dikembalikan)
-const USE_MOCK = true;
+// Set USE_MOCK = true untuk menggunakan data mock yang disimpan di localStorage.
+const USE_MOCK = false;
 
 export function isHighlightMockMode(): boolean {
   return USE_MOCK;
@@ -107,11 +107,12 @@ export async function getHighlightsByDokumenId(
     throw new Error(result.error || "Gagal mengambil highlight");
   }
   const highlights: Highlight[] = result.data || [];
-  let kepemilikanId: string | undefined =
-    highlights.length > 0 ? highlights[0].kepemilikan_id : result.kepemilikanId;
+  const kepemilikanId: string | undefined = result.kepemilikanId;
 
   if (!kepemilikanId) {
-    kepemilikanId = generateFakeKepemilikanId(dokumenId);
+    throw new Error(
+      'Dokumen ownership tidak tersedia. Pastikan dokumen sudah didistribusikan kepada Anda.'
+    );
   }
   return { highlights, kepemilikanId };
 }
