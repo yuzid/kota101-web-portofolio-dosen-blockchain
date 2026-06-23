@@ -1,21 +1,25 @@
 import crypto from 'crypto';
 import { DistributionRepository } from '../repositories/DistributionRepository';
 import { DocumentRepository } from '../repositories/DocumentRepository';
+import { EmailService } from './EmailService';
 import { FileStorageService } from './FileStorageService';
 
 export class DocumentDistributionService {
   private distributionRepository: DistributionRepository;
   private documentRepository: DocumentRepository;
   private fileStorageService: FileStorageService;
+  private emailService: EmailService;
 
   constructor(
     distributionRepository: DistributionRepository,
     documentRepository: DocumentRepository,
     fileStorageService: FileStorageService,
+    emailService = new EmailService(),
   ) {
     this.distributionRepository = distributionRepository;
     this.documentRepository = documentRepository;
     this.fileStorageService = fileStorageService;
+    this.emailService = emailService;
   }
 
   async saveDraft(data: any, file: Express.Multer.File) {
@@ -70,7 +74,24 @@ export class DocumentDistributionService {
       docId = doc.id;
     }
 
+    const existingRecipientIds = await this.distributionRepository.findDistributedDosenIds(docId, targetDosenIds);
+    const newRecipientIds = targetDosenIds.filter(id => !existingRecipientIds.includes(id));
+
     await this.distributionRepository.createMany(docId, targetDosenIds, tuUserId);
+
+    const [document, recipients, sender] = await Promise.all([
+      this.documentRepository.findById(docId),
+      this.distributionRepository.findDosenRecipientsByIds(newRecipientIds),
+      this.distributionRepository.findTataUsahaSenderByUserId(tuUserId),
+    ]);
+    await this.emailService.notifyDocumentDistribution(
+      recipients.map(recipient => ({
+        nama: recipient.nama,
+        email: recipient.user.email,
+      })),
+      document?.nama || nama || 'Dokumen',
+      sender?.tata_usaha?.nama || 'Tata Usaha',
+    );
 
     return { id: docId };
   }
