@@ -127,4 +127,83 @@ export class DocumentRepository {
       },
     });
   }
+
+  // Public methods (no authentication required)
+  async findAllPublic() {
+    return await prisma.dokumen.findMany({
+      where: { deleted_at: null },
+      select: {
+        id: true,
+        nama: true,
+        jenis_dokumen: true,
+        tanggal_upload: true,
+        sumber_dokumen: true,
+        kepemilikan: {
+          where: { status: 'DISETUJUI' },
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true
+              }
+            }
+          }
+        },
+        lampiran_bukti: {
+          select: {
+            kegiatan: {
+              select: {
+                id: true,
+                nama_kegiatan: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { tanggal_upload: 'desc' }
+    });
+  }
+
+  async findByIdPublic(id: string) {
+    return await prisma.dokumen.findUnique({
+      where: { id },
+      include: {
+        kepemilikan: {
+          where: { status: 'DISETUJUI' },
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true,
+                nidn: true,
+                program_studi: {
+                  select: {
+                    id: true,
+                    nama_prodi: true,
+                    kode_prodi: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        lampiran_bukti: {
+          include: {
+            kegiatan: {
+              select: {
+                id: true,
+                nama_kegiatan: true,
+                kategori_tridharma: true,
+                jenis_kegiatan: true,
+                tanggal_mulai: true,
+                tanggal_selesai: true
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 }

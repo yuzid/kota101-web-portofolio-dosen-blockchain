@@ -277,4 +277,15 @@ export class DocumentService {
 
     return await this.documentRepository.softDelete(id);
   }
+
+  // Public methods (no authentication required)
+  async getPublicDocuments() {
+    return await this.documentRepository.findAllPublic();
+  }
+
+  async getPublicDocumentById(id: string) {
+    const document = await this.documentRepository.findByIdPublic(id);
+    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    return document;
+  }
 }

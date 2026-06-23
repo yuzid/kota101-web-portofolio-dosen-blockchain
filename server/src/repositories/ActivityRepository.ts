@@ -418,4 +418,104 @@ export class ActivityRepository {
     });
     return ids;
   }
+
+  // Public methods (no authentication required)
+  async findAllPublic() {
+    return await prisma.kegiatanTridharma.findMany({
+      include: {
+        dosen: {
+          select: {
+            id: true,
+            nama: true,
+            nip: true,
+            program_studi: {
+              select: {
+                id: true,
+                nama_prodi: true,
+                kode_prodi: true
+              }
+            }
+          }
+        },
+        partisipasi: {
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true
+              }
+            },
+            peran: true,
+            status: true
+          }
+        },
+        lampiran_bukti: {
+          include: {
+            dokumen: {
+              select: {
+                id: true,
+                nama: true,
+                jenis_dokumen: true,
+                tanggal_upload: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { tanggal_mulai: 'desc' }
+    });
+  }
+
+  async findByIdPublic(id: string) {
+    return await prisma.kegiatanTridharma.findUnique({
+      where: { id },
+      include: {
+        dosen: {
+          select: {
+            id: true,
+            nama: true,
+            nip: true,
+            nidn: true,
+            program_studi: {
+              select: {
+                id: true,
+                nama_prodi: true,
+                kode_prodi: true
+              }
+            }
+          }
+        },
+        partisipasi: {
+          select: {
+            dosen: {
+              select: {
+                id: true,
+                nama: true,
+                nip: true,
+                nidn: true
+              }
+            },
+            peran: true,
+            status: true
+          }
+        },
+        lampiran_bukti: {
+          include: {
+            dokumen: {
+              select: {
+                id: true,
+                nama: true,
+                jenis_dokumen: true,
+                sumber_dokumen: true,
+                tanggal_upload: true,
+                hash_file: true
+              }
+            }
+          }
+        },
+        audit_trail: true
+      }
+    });
+  }
 }
