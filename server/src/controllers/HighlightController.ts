@@ -37,42 +37,98 @@ export class HighlightController {
 
   syncHighlights = async (req: AuthRequest, res: Response) => {
     try {
-      const  kepemilikanId  = req.params.kepemilikanId as string;
+      const kepemilikanId = req.params.kepemilikanId as string;
       const highlightsJson = req.body.highlights;
-      const result = await this.highlightService.syncHighlights(kepemilikanId, highlightsJson);
+      const dosenId = req.user?.id;
+
+      if (!dosenId) {
+        res.status(401).json({ 
+          status: 'error', 
+          error: 'Otentikasi diperlukan untuk melakukan operasi ini.' 
+        });
+        return;
+      }
+
+      const result = await this.highlightService.syncHighlights(kepemilikanId, highlightsJson, dosenId);
       res.json({ status: 'success', message: 'Highlights synchronized successfully.', data: result });
     } catch (error: any) {
-      res.status(400).json({ status: 'error', error: error.message });
+      if (error.message.includes('tidak memiliki akses')) {
+        res.status(403).json({ status: 'error', error: error.message });
+      } else {
+        res.status(400).json({ status: 'error', error: error.message });
+      }
     }
   };
 
   addHighlight = async (req: AuthRequest, res: Response) => {
     try {
-      const  kepemilikanId  = req.params.kepemilikanId as string;
-      const result = await this.highlightService.addHighlight(kepemilikanId, req.body);
+      const kepemilikanId = req.params.kepemilikanId as string;
+      const dosenId = req.user?.id;
+
+      if (!dosenId) {
+        res.status(401).json({ 
+          status: 'error', 
+          error: 'Otentikasi diperlukan untuk melakukan operasi ini.' 
+        });
+        return;
+      }
+
+      const result = await this.highlightService.addHighlight(kepemilikanId, req.body, dosenId);
       res.status(201).json({ status: 'success', data: result });
     } catch (error: any) {
-      res.status(400).json({ status: 'error', error: error.message });
+      if (error.message.includes('tidak memiliki akses')) {
+        res.status(403).json({ status: 'error', error: error.message });
+      } else {
+        res.status(400).json({ status: 'error', error: error.message });
+      }
     }
   };
 
   updateHighlight = async (req: AuthRequest, res: Response) => {
     try {
-      const  id  = req.params.id as string;
-      const result = await this.highlightService.updateHighlight(id, req.body);
+      const id = req.params.id as string;
+      const dosenId = req.user?.id;
+
+      if (!dosenId) {
+        res.status(401).json({ 
+          status: 'error', 
+          error: 'Otentikasi diperlukan untuk melakukan operasi ini.' 
+        });
+        return;
+      }
+
+      const result = await this.highlightService.updateHighlight(id, req.body, dosenId);
       res.json({ status: 'success', data: result });
     } catch (error: any) {
-      res.status(400).json({ status: 'error', error: error.message });
+      if (error.message.includes('tidak memiliki akses')) {
+        res.status(403).json({ status: 'error', error: error.message });
+      } else {
+        res.status(400).json({ status: 'error', error: error.message });
+      }
     }
   };
 
   deleteHighlight = async (req: AuthRequest, res: Response) => {
     try {
-      const  id  = req.params.id as string;
-      await this.highlightService.deleteHighlight(id);
+      const id = req.params.id as string;
+      const dosenId = req.user?.id;
+
+      if (!dosenId) {
+        res.status(401).json({ 
+          status: 'error', 
+          error: 'Otentikasi diperlukan untuk melakukan operasi ini.' 
+        });
+        return;
+      }
+
+      await this.highlightService.deleteHighlight(id, dosenId);
       res.json({ status: 'success', message: 'Highlight deleted successfully.' });
     } catch (error: any) {
-      res.status(400).json({ status: 'error', error: error.message });
+      if (error.message.includes('tidak memiliki akses')) {
+        res.status(403).json({ status: 'error', error: error.message });
+      } else {
+        res.status(400).json({ status: 'error', error: error.message });
+      }
     }
   };
 
