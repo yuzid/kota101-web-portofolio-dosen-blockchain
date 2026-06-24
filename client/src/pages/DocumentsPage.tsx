@@ -113,6 +113,8 @@ export function DocumentsPage() {
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showFileSizeDialog, setShowFileSizeDialog] = useState(false);
+  const [uploadKey, setUploadKey] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [shareDocument, setShareDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,8 +260,16 @@ export function DocumentsPage() {
   };
 
   const handleUpload = async () => {
-    if (!uploadForm.name || !uploadForm.jenis || !uploadForm.tanggal || !selectedFile) {
-      toast.error("Mohon lengkapi semua field yang wajib beserta file berkas!");
+    if (!uploadForm.name || !uploadForm.jenis || !uploadForm.tanggal) {
+      toast.error("Mohon lengkapi field nama, jenis, dan tanggal dokumen!");
+      return;
+    }
+    if (!selectedFile) {
+      setShowFileSizeDialog(true);
+      return;
+    }
+    if (selectedFile.size > 20 * 1024 * 1024) {
+      setShowFileSizeDialog(true);
       return;
     }
 
@@ -656,7 +666,7 @@ export function DocumentsPage() {
               </Popover>
             </div>
 
-            <FileUploader onFilesSelected={handleFilesSelected} maxSizeInMB={20} multiple={false} />
+            <FileUploader key={uploadKey} onFilesSelected={handleFilesSelected} maxSizeInMB={20} multiple={false} />
 
             <div className="flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <input type="checkbox" id="add-highlight" checked={uploadForm.addHighlight} onChange={(e) => setUploadForm({ ...uploadForm, addHighlight: e.target.checked })} className="rounded" />
@@ -691,6 +701,24 @@ export function DocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* File Size Error */}
+      <AlertDialog open={showFileSizeDialog} onOpenChange={setShowFileSizeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ukuran File Melebihi Batas</AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2">
+              File yang dipilih melebihi batas maksimal <strong>20MB</strong>.
+              <br /><br />
+              Silahkan upload ulang file dengan ukuran maksimal <strong>20MB</strong> dan format <strong>PDF</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => { setShowFileSizeDialog(false); setUploadKey(k => k + 1); }}>Mengerti</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Share Dialog */}
       {shareDocument && (
         <DocumentSharing

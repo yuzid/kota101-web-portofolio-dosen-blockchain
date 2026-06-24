@@ -680,7 +680,7 @@ export function DocumentDistributionPage() {
                   <p className="text-sm font-medium text-gray-700">
                     Drag & drop file di sini, atau <span className="text-indigo-600 underline underline-offset-2">klik untuk memilih</span>
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1.5">Format: PDF · Maks. 10MB</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">Format: PDF · Maks. 20MB</p>
                 </div>
               )}
             </div>
