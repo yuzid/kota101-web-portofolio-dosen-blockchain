@@ -21,16 +21,32 @@ export class DocumentService {
   }
 
   private canAccessDocument(document: any, currentUser: any) {
+    // Non-dosen users (Admin, TU) can access all documents
     if (currentUser.role?.toUpperCase() !== 'DOSEN') return true;
 
+    // Check ownership
     const isOwner = document.kepemilikan.some((item: any) => item.dosen_id === currentUser.id);
+    
+    // Check if document is attached to activities where user is creator or participant
     const isInLinkedActivity = document.lampiran_bukti.some((item: any) => {
       const activity = item.kegiatan;
       return activity.dosen_id === currentUser.id ||
         activity.partisipasi.some((participant: any) => participant.dosen_id === currentUser.id);
     });
 
-    return isOwner || isInLinkedActivity;
+    // Check if user is Kajur and document is attached to activity in their jurusan
+    const isAccessibleByKajur = currentUser.jabatan?.is_kajur && document.lampiran_bukti.some((item: any) => {
+      const activity = item.kegiatan;
+      return activity?.dosen?.program_studi?.jurusan_id === currentUser.jabatan?.jurusan_id;
+    });
+
+    // Check if user is Kaprodi and document is attached to activity in their prodi
+    const isAccessibleByKaprodi = currentUser.jabatan?.is_kaprodi && document.lampiran_bukti.some((item: any) => {
+      const activity = item.kegiatan;
+      return activity?.dosen?.program_studi_id === currentUser.jabatan?.program_studi_id;
+    });
+
+    return isOwner || isInLinkedActivity || isAccessibleByKajur || isAccessibleByKaprodi;
   }
 
   private getMimeType(contentType: string, filePath: string) {

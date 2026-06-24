@@ -4,16 +4,23 @@ import { ActivityRepository } from '../repositories/ActivityRepository';
 import { Kajur } from '../services/Kajur';
 import { Kaprodi } from '../services/Kaprodi';
 import { RekapService } from '../services/RekapService';
+import { DocumentService } from '../services/DocumentService';
+import { DocumentRepository } from '../repositories/DocumentRepository';
+import { FileStorageService } from '../services/FileStorageService';
 import { KegiatanFilter, PageRequest } from '../types/activity';
 import { prisma } from '../lib/prisma';
 
 export class AkademikRoleController {
   private activityRepository: ActivityRepository;
   private rekapService: RekapService;
+  private documentService: DocumentService;
 
   constructor() {
     this.activityRepository = new ActivityRepository();
     this.rekapService = new RekapService();
+    const documentRepository = new DocumentRepository();
+    const fileStorageService = new FileStorageService();
+    this.documentService = new DocumentService(documentRepository, fileStorageService);
   }
 
   getJurusanActivities = async (req: AuthRequest, res: Response) => {
@@ -356,6 +363,252 @@ export class AkademikRoleController {
       res.status(200).json({ status: 'success', message: 'Rekap berhasil dihapus.' });
     } catch (error: any) {
       res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
+  // Lampiran preview dan content endpoints untuk Kajur
+  getJurusanLampiranPreview = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKajur.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Anda bukan Ketua Jurusan aktif.' });
+        return;
+      }
+
+      const lampiranId = req.params.lampiranId as string;
+      const kegiatanId = req.params.kegiatanId as string;
+
+      // Verify the activity belongs to this jurusan
+      const lampiran = await prisma.lampiranBukti.findUnique({
+        where: { id: lampiranId },
+        include: {
+          kegiatan: {
+            include: { dosen: { include: { program_studi: true } } }
+          },
+          dokumen: true
+        }
+      });
+
+      if (!lampiran) {
+        res.status(404).json({ status: 'error', error: 'Lampiran tidak ditemukan.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.id !== kegiatanId) {
+        res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.dosen.program_studi.jurusan_id !== jabatan.jurusan_id) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Kegiatan tidak berada dalam yurisdiksi Anda.' });
+        return;
+      }
+
+      const preview = await this.documentService.getDocumentPreview(lampiran.dokumen_id, req.user, kegiatanId);
+      res.json({ status: 'success', data: preview });
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getJurusanLampiranContent = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKajur.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Anda bukan Ketua Jurusan aktif.' });
+        return;
+      }
+
+      const lampiranId = req.params.lampiranId as string;
+      const kegiatanId = req.params.kegiatanId as string;
+
+      // Verify the activity belongs to this jurusan
+      const lampiran = await prisma.lampiranBukti.findUnique({
+        where: { id: lampiranId },
+        include: {
+          kegiatan: {
+            include: { dosen: { include: { program_studi: true } } }
+          },
+          dokumen: true
+        }
+      });
+
+      if (!lampiran) {
+        res.status(404).json({ status: 'error', error: 'Lampiran tidak ditemukan.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.id !== kegiatanId) {
+        res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.dosen.program_studi.jurusan_id !== jabatan.jurusan_id) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Kegiatan tidak berada dalam yurisdiksi Anda.' });
+        return;
+      }
+
+      const file = await this.documentService.getDocumentContent(lampiran.dokumen_id, req.user);
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Content-Length', file.contentLength);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.setHeader('X-Content-SHA256', file.contentHash);
+      res.send(file.bytes);
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  // Lampiran preview dan content endpoints untuk Kaprodi
+  getProdiLampiranPreview = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKaprodi.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Anda bukan Ketua Program Studi aktif.' });
+        return;
+      }
+
+      const lampiranId = req.params.lampiranId as string;
+      const kegiatanId = req.params.kegiatanId as string;
+
+      // Verify the activity belongs to this prodi
+      const lampiran = await prisma.lampiranBukti.findUnique({
+        where: { id: lampiranId },
+        include: {
+          kegiatan: {
+            include: { dosen: true }
+          },
+          dokumen: true
+        }
+      });
+
+      if (!lampiran) {
+        res.status(404).json({ status: 'error', error: 'Lampiran tidak ditemukan.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.id !== kegiatanId) {
+        res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.dosen.program_studi_id !== jabatan.program_studi_id) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Kegiatan tidak berada dalam yurisdiksi Anda.' });
+        return;
+      }
+
+      const preview = await this.documentService.getDocumentPreview(lampiran.dokumen_id, req.user, kegiatanId);
+      res.json({ status: 'success', data: preview });
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
+  getProdiLampiranContent = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKaprodi.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Anda bukan Ketua Program Studi aktif.' });
+        return;
+      }
+
+      const lampiranId = req.params.lampiranId as string;
+      const kegiatanId = req.params.kegiatanId as string;
+
+      // Verify the activity belongs to this prodi
+      const lampiran = await prisma.lampiranBukti.findUnique({
+        where: { id: lampiranId },
+        include: {
+          kegiatan: {
+            include: { dosen: true }
+          },
+          dokumen: true
+        }
+      });
+
+      if (!lampiran) {
+        res.status(404).json({ status: 'error', error: 'Lampiran tidak ditemukan.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.id !== kegiatanId) {
+        res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
+        return;
+      }
+
+      if (lampiran.kegiatan.dosen.program_studi_id !== jabatan.program_studi_id) {
+        res.status(403).json({ status: 'error', error: 'Akses ditolak. Kegiatan tidak berada dalam yurisdiksi Anda.' });
+        return;
+      }
+
+      const file = await this.documentService.getDocumentContent(lampiran.dokumen_id, req.user);
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Content-Length', file.contentLength);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.setHeader('X-Content-SHA256', file.contentHash);
+      res.send(file.bytes);
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') ? 403 : 502;
+      res.status(status).json({ status: 'error', error: error.message });
     }
   };
 }
