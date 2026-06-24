@@ -8,6 +8,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import {
@@ -34,10 +38,12 @@ import {
   Edit,
   Trash2,
   Download,
-  Share2,
+  MoreVertical,
   FileText,
   Loader2,
   ChevronDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -56,6 +62,8 @@ export function LaporanRekapitulasiPage() {
   const [rekaps, setRekaps] = useState<RekapLaporan[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const isKajur = location.pathname.includes("/monitoring/jurusan");
   const roleTitle = isKajur ? "Jurusan" : "Program Studi";
@@ -79,9 +87,70 @@ export function LaporanRekapitulasiPage() {
     }
   };
 
-  const filteredRekaps = rekaps.filter((r) =>
-    r.nama.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortData = (data: RekapLaporan[]) => {
+    if (!sortColumn) return data;
+    return [...data].sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+      switch (sortColumn) {
+        case "nama":
+          aVal = a.nama.toLowerCase();
+          bVal = b.nama.toLowerCase();
+          break;
+        case "tanggalPerekapan":
+          aVal = a.tanggalPerekapan;
+          bVal = b.tanggalPerekapan;
+          break;
+        case "dibuatOleh":
+          aVal = a.dibuatOleh.nama.toLowerCase();
+          bVal = b.dibuatOleh.nama.toLowerCase();
+          break;
+        case "prodi":
+          aVal = (a.prodiNama || "").toLowerCase();
+          bVal = (b.prodiNama || "").toLowerCase();
+          break;
+        case "jumlahKegiatan":
+          aVal = a.kegiatanData.length;
+          bVal = b.kegiatanData.length;
+          break;
+        case "createdAt":
+          aVal = a.createdAt;
+          bVal = b.createdAt;
+          break;
+      }
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const filteredRekaps = sortData(
+    rekaps.filter((r) => {
+      const q = searchTerm.toLowerCase();
+      return (
+        r.nama.toLowerCase().includes(q) ||
+        (r.dibuatOleh.nama || "").toLowerCase().includes(q) ||
+        (r.prodiNama || "").toLowerCase().includes(q) ||
+        (r.jurusanNama || "").toLowerCase().includes(q)
+      );
+    })
   );
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
 
   const handleDelete = async () => {
     if (!deleteRekapId) return;
@@ -124,15 +193,6 @@ export function LaporanRekapitulasiPage() {
     } catch (error) {
       toast.error("Gagal mengunduh file CSV");
     }
-  };
-
-  const handleShare = (rekap: RekapLaporan) => {
-    const shareData = {
-      title: `Rekap: ${rekap.nama}`,
-      text: `Laporan Rekapitulasi: ${rekap.nama}\nDibuat: ${format(new Date(rekap.tanggalPerekapan), "dd MMM yyyy")}\nOleh: ${rekap.dibuatOleh.nama}\nJumlah Kegiatan: ${rekap.kegiatanData.length}`,
-    };
-    navigator.clipboard.writeText(JSON.stringify(shareData, null, 2));
-    toast.success("Data rekap disalin ke clipboard");
   };
 
   const formatDate = (dateStr: string) => {
@@ -184,18 +244,32 @@ export function LaporanRekapitulasiPage() {
 
         <div className="border rounded-lg bg-background">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama Rekap</TableHead>
-                <TableHead>Tanggal Perekapan</TableHead>
-                <TableHead>Dibuat Oleh</TableHead>
-                {isKajur && <TableHead>Prodi</TableHead>}
-                <TableHead className="text-center">Jumlah Kegiatan</TableHead>
-                <TableHead>Filter</TableHead>
-                <TableHead>Dibuat Pada</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("nama")}>
+                    Nama Rekap <SortIcon column="nama" />
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalPerekapan")}>
+                    Tanggal Perekapan <SortIcon column="tanggalPerekapan" />
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("dibuatOleh")}>
+                    Dibuat Oleh <SortIcon column="dibuatOleh" />
+                  </TableHead>
+                  {isKajur && (
+                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort("prodi")}>
+                      Prodi <SortIcon column="prodi" />
+                    </TableHead>
+                  )}
+                  <TableHead className="text-center cursor-pointer select-none" onClick={() => handleSort("jumlahKegiatan")}>
+                    Jumlah Kegiatan <SortIcon column="jumlahKegiatan" />
+                  </TableHead>
+                  <TableHead>Filter</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("createdAt")}>
+                    Dibuat Pada <SortIcon column="createdAt" />
+                  </TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
@@ -223,9 +297,11 @@ export function LaporanRekapitulasiPage() {
                       <TableCell>
                         <div>
                           <p className="text-sm">{rekap.dibuatOleh.nama}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {rekap.dibuatOleh.role === "kajur" ? "Kajur" : "Kaprodi"}
-                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {rekap.dibuatOleh.role === "kajur"
+                              ? `Kajur ${rekap.jurusanNama || ""}`
+                              : `Kaprodi ${rekap.prodiNama || ""}`}
+                          </p>
                         </div>
                       </TableCell>
                       {isKajur && (
@@ -256,35 +332,45 @@ export function LaporanRekapitulasiPage() {
                         {formatDateTime(rekap.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`${basePath}/${rekap.id}`)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => navigate(`${basePath}/${rekap.id}/edit`)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleExportXlsx(rekap.id)}>
-                                Format Excel (XLSX)
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleExportCsv(rekap.id)}>
-                                Format CSV
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <Button variant="ghost" size="sm" onClick={() => handleShare(rekap)}>
-                            <Share2 className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setDeleteRekapId(rekap.id)}>
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`${basePath}/${rekap.id}`)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Lihat Detail
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`${basePath}/${rekap.id}/edit`)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuItem onClick={() => handleExportXlsx(rekap.id)}>
+                                  Format Excel (XLSX)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExportCsv(rekap.id)}>
+                                  Format CSV
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setDeleteRekapId(rekap.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   );

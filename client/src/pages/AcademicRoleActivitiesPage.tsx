@@ -65,6 +65,10 @@ import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { createRekap } from "../lib/rekapStorage";
+import {
+  setMonitoringActivityDetail,
+  setMonitoringContext,
+} from "../lib/monitoringStorage";
 
 interface Activity {
   id: string;
@@ -291,6 +295,27 @@ export function AcademicRoleActivitiesPage() {
     filterKelengkapan !== "all" ||
     filterDateFrom ||
     filterDateTo;
+
+  const handleViewDetail = async (activityId: string) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${activityId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (result.status === "success") {
+        setMonitoringActivityDetail(result.data);
+        setMonitoringContext({ role: isKajur ? "jurusan" : "prodi" });
+        navigate(`/monitoring/${endpoint}/kegiatan/${activityId}`);
+      } else {
+        toast.error("Gagal memuat detail kegiatan");
+        navigate(`/activities/${activityId}`);
+      }
+    } catch {
+      toast.error("Terjadi kesalahan koneksi");
+      navigate(`/activities/${activityId}`);
+    }
+  };
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -777,7 +802,7 @@ export function AcademicRoleActivitiesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/activities/${activity.id}`)}
+                            onClick={() => handleViewDetail(activity.id)}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>

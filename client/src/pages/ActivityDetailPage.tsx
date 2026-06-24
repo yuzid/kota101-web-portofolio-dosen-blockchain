@@ -398,12 +398,8 @@ export function ActivityDetailPage() {
   );
   const isReadOnlyView =
     !isCurrentUserMember || location.pathname.includes("/ami-recap/");
-  const shareLinkDetail = `${window.location.origin}/activities/${id}`;
-  const shareLinkDokumen = activity?.dokumenBersama?.[0]
-    ? `${window.location.origin}/documents/${activity.dokumenBersama[0].id}/preview`
-    : activity?.dosenTerlibat?.[0]?.dokumen?.[0]
-      ? `${window.location.origin}/documents/${activity.dosenTerlibat[0].dokumen[0].id}/preview`
-      : shareLinkDetail;
+  const shareLinkDetail = `${window.location.origin}/public/kegiatan/${id}`;
+  const shareLinkDokumen = `${window.location.origin}/public/kegiatan/${id}/dokumen`;
   const activeShareLink = shareMode === "detail" ? shareLinkDetail : shareLinkDokumen;
 
   const jType = activity.jenisTridharma?.toLowerCase() || "";
@@ -774,6 +770,7 @@ export function ActivityDetailPage() {
                                     onClick={() =>
                                       navigate(`/documents/${doc.id}/preview`, {
                                         state: {
+                                          isDocumentOwner: dosen.isCurrentUser === true,
                                           activityId: activity.id,
                                           breadcrumbs: [
                                             {
@@ -1295,6 +1292,7 @@ function FileRow({
           onClick={() =>
             navigate(`/documents/${doc.id}/preview`, {
               state: {
+                isDocumentOwner: doc.isUploader === true,
                 activityId: activity.id,
                 breadcrumbs: [
                   { label: "Beranda", path: "/dashboard" },

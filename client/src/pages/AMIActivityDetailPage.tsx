@@ -364,6 +364,7 @@ export function AMIActivityDetailPage() {
                             onClick={() =>
                               navigate(`/documents/${doc.id}/preview`, {
                                 state: {
+                                  isDocumentOwner: false,
                                   activityId: activity.id,
                                   breadcrumbs: [
                                     { label: "Beranda", path: "/dashboard" },

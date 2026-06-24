@@ -125,7 +125,6 @@ export function ActivitiesPage() {
       }
     } catch (error) {
       // Backend belum menyediakan endpoint ini - catat sebagai Backend Requirement
-      console.log('Endpoint permintaan-konfirmasi belum tersedia');
     }
   };
 
@@ -196,8 +195,7 @@ export function ActivitiesPage() {
 
   const handleShare = (activity: Activity) => {
     setSelectedActivity(activity);
-    const link = `${window.location.origin}/activities/${activity.id}`;
-    setShareLink(link);
+    setShareLink(`${window.location.origin}/public/kegiatan/${activity.id}`);
     setShareMode("detail");
     setCopied(false);
     setShowShareDialog(true);
@@ -505,29 +503,29 @@ export function ActivitiesPage() {
                     ? "border-primary bg-primary/5"
                     : "hover:bg-muted/50"
                 }`}
-                onClick={() => { setShareMode("detail"); setCopied(false); setShareLink(`${window.location.origin}/activities/${selectedActivity?.id}`); }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full border-2 ${
-                    shareMode === "detail" ? "border-primary bg-primary" : ""
-                  }`}>
-                    {shareMode === "detail" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Detail Kegiatan</p>
-                    <p className="text-xs text-muted-foreground">
-                      Bagikan halaman detail kegiatan lengkap
-                    </p>
+                onClick={() => { setShareMode("detail"); setCopied(false); setShareLink(`${window.location.origin}/public/kegiatan/${selectedActivity?.id}`); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full border-2 ${
+                      shareMode === "detail" ? "border-primary bg-primary" : ""
+                    }`}>
+                      {shareMode === "detail" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Detail Kegiatan</p>
+                      <p className="text-xs text-muted-foreground">
+                        Bagikan halaman detail kegiatan lengkap
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div
-                className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
-                  shareMode === "dokumen"
-                    ? "border-primary bg-primary/5"
-                    : "hover:bg-muted/50"
-                }`}
-                onClick={() => { setShareMode("dokumen"); setCopied(false); setShareLink(`${window.location.origin}/activities/${selectedActivity?.id}`); }}
+                <div
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    shareMode === "dokumen"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => { setShareMode("dokumen"); setCopied(false); setShareLink(`${window.location.origin}/public/kegiatan/${selectedActivity?.id}/dokumen`); }}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full border-2 ${

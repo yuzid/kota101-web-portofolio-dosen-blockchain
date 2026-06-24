@@ -1,6 +1,7 @@
 // src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
+import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
 
 export type UserRole =
   | "administrator"
@@ -70,19 +71,53 @@ const mapBackendUserToFrontend = (backendData: any): User => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      const parsed = JSON.parse(storedUser);
-      if (!parsed.uuid && parsed.token) {
-        const decoded = decodeJwtPayload(parsed.token);
-        parsed.uuid = decoded?.id || parsed.id;
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (!parsed.uuid && parsed.token) {
+          const decoded = decodeJwtPayload(parsed.token);
+          parsed.uuid = decoded?.id || parsed.id;
+        }
+        setUser(parsed);
+      } catch {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
       }
-      setUser(parsed);
     }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    initFetchInterceptor(() => clearAuth());
+    return () => destroyFetchInterceptor();
+  }, [clearAuth]);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      if (isTokenExpired()) {
+        clearAuth();
+      }
+    }, 30000);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [clearAuth]);
 
   // 1. Login Manual (Form)
   const login = async (email: string, password: string) => {
@@ -125,9 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearAuth();
   };
 
   return (

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { Toaster } from "./components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { isTokenExpired } from "./lib/api";
 
 // Lazy load semua pages
 const LoginPage = lazy(() =>
@@ -96,6 +97,11 @@ const AcademicRoleActivitiesPage = lazy(() =>
     default: m.AcademicRoleActivitiesPage,
   }))
 );
+const MonitoringActivityDetailPage = lazy(() =>
+  import("./pages/MonitoringActivityDetailPage").then((m) => ({
+    default: m.MonitoringActivityDetailPage,
+  }))
+);
 const LaporanRekapitulasiPage = lazy(() =>
   import("./pages/LaporanRekapitulasiPage").then((m) => ({
     default: m.LaporanRekapitulasiPage,
@@ -109,6 +115,16 @@ const RekapLaporanDetailPage = lazy(() =>
 const RekapLaporanEditPage = lazy(() =>
   import("./pages/RekapLaporanEditPage").then((m) => ({
     default: m.RekapLaporanEditPage,
+  }))
+);
+const PublicActivityPage = lazy(() =>
+  import("./pages/PublicActivityPage").then((m) => ({
+    default: m.PublicActivityPage,
+  }))
+);
+const PublicDocumentPage = lazy(() =>
+  import("./pages/PublicDocumentPage").then((m) => ({
+    default: m.PublicDocumentPage,
   }))
 );
 
@@ -128,6 +144,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (isTokenExpired()) {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    return <Navigate to="/login" replace />;
+  }
+
   if (!user) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
@@ -156,6 +179,18 @@ function AppRoutes() {
               <LoginPage />
             </PublicRoute>
           }
+        />
+        <Route
+          path="/public/kegiatan/:id"
+          element={<PublicActivityPage />}
+        />
+        <Route
+          path="/public/kegiatan/:id/dokumen"
+          element={<PublicActivityPage />}
+        />
+        <Route
+          path="/public/dokumen/:id"
+          element={<PublicDocumentPage />}
         />
 
         {/* Dashboard */}
@@ -338,6 +373,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/monitoring/jurusan/kegiatan/:id"
+          element={
+            <ProtectedRoute>
+              <MonitoringActivityDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/monitoring/jurusan/rekap"
           element={
             <ProtectedRoute>
@@ -366,6 +409,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <AcademicRoleActivitiesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/monitoring/prodi/kegiatan/:id"
+          element={
+            <ProtectedRoute>
+              <MonitoringActivityDetailPage />
             </ProtectedRoute>
           }
         />

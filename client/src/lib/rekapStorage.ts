@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { apiFetch } from "./api";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -55,19 +56,10 @@ function mapFromBackend(data: any): RekapLaporan {
   };
 }
 
-const getHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  };
-};
-
 export async function createRekap(data: any, isKajur: boolean): Promise<RekapLaporan> {
   const endpoint = isKajur ? 'jurusan' : 'prodi';
-  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`, {
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`, {
     method: 'POST',
-    headers: getHeaders(),
     body: JSON.stringify(data)
   });
   const result = await response.json();
@@ -77,9 +69,7 @@ export async function createRekap(data: any, isKajur: boolean): Promise<RekapLap
 
 export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
   const endpoint = isKajur ? 'jurusan' : 'prodi';
-  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`, {
-    headers: getHeaders()
-  });
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap`);
   const result = await response.json();
   if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
   return result.data.map(mapFromBackend);
@@ -87,9 +77,7 @@ export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
 
 export async function getRekap(id: string, isKajur: boolean): Promise<RekapLaporan> {
   const endpoint = isKajur ? 'jurusan' : 'prodi';
-  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
-    headers: getHeaders()
-  });
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`);
   const result = await response.json();
   if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil detail rekap');
   return mapFromBackend(result.data);
@@ -97,9 +85,8 @@ export async function getRekap(id: string, isKajur: boolean): Promise<RekapLapor
 
 export async function updateRekap(id: string, data: any, isKajur: boolean): Promise<RekapLaporan> {
   const endpoint = isKajur ? 'jurusan' : 'prodi';
-  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
     method: 'PUT',
-    headers: getHeaders(),
     body: JSON.stringify(data)
   });
   const result = await response.json();
@@ -109,9 +96,8 @@ export async function updateRekap(id: string, data: any, isKajur: boolean): Prom
 
 export async function deleteRekap(id: string, isKajur: boolean): Promise<boolean> {
   const endpoint = isKajur ? 'jurusan' : 'prodi';
-  const response = await fetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders()
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`, {
+    method: 'DELETE'
   });
   const result = await response.json();
   return result.status === 'success';
@@ -119,6 +105,7 @@ export async function deleteRekap(id: string, isKajur: boolean): Promise<boolean
 
 function formatDokumenLinks(k: any): string {
   if (!k.lampiran_bukti || k.lampiran_bukti.length === 0) return '-';
+  if (k.id) return `${window.location.origin}/public/kegiatan/${k.id}`;
   return k.lampiran_bukti
     .map((lb: any) => lb.file_url || lb.path || (lb.dokumen?.file_path) || '')
     .filter(Boolean)
@@ -199,6 +186,10 @@ export function exportRekapCsv(rekap: RekapLaporan): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = `rekap_${rekap.nama.replace(/\s+/g, '_')}_${rekap.id}.csv`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }

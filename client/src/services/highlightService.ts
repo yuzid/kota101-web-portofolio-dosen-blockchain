@@ -1,8 +1,10 @@
+import { apiFetch } from "../lib/api";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Mock mode ──
-// Set USE_MOCK = true untuk menggunakan data mock yang disimpan di localStorage.
-const USE_MOCK = false;
+// Set VITE_HIGHLIGHT_MOCK=true di .env untuk menggunakan data mock.
+const USE_MOCK = import.meta.env.VITE_HIGHLIGHT_MOCK === "true";
 
 export function isHighlightMockMode(): boolean {
   return USE_MOCK;
@@ -53,14 +55,6 @@ function mockId(): string {
   return crypto.randomUUID();
 }
 
-function getHeaders() {
-  const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-}
-
 export interface HighlightRect {
   id?: string;
   x1: number;
@@ -98,9 +92,8 @@ export async function getHighlightsByDokumenId(
     return { highlights, kepemilikanId };
   }
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/dosen/highlights?dokumenId=${encodeURIComponent(dokumenId)}`,
-    { headers: getHeaders() },
   );
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
@@ -110,9 +103,7 @@ export async function getHighlightsByDokumenId(
   const kepemilikanId: string | undefined = result.kepemilikanId;
 
   if (!kepemilikanId) {
-    throw new Error(
-      'Dokumen ownership tidak tersedia. Pastikan dokumen sudah didistribusikan kepada Anda.'
-    );
+    return { highlights: [], kepemilikanId: undefined };
   }
   return { highlights, kepemilikanId };
 }
@@ -140,11 +131,10 @@ export async function addHighlight(
     return newHighlight;
   }
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/dosen/highlights/${kepemilikanId}`,
     {
       method: "POST",
-      headers: getHeaders(),
       body: JSON.stringify(data),
     },
   );
@@ -175,7 +165,7 @@ export async function updateHighlight(
           ...data,
           highlight_rect:
             data.highlight_rect ||
-            JSON.parse(all[kepId][idx].highlight_rect_raw || "[]"),
+            JSON.parse(all[kepId][idx].highlight_rect || "[]"),
         };
         all[kepId][idx] = updated;
         localStorage.setItem(MOCK_HIGHLIGHTS_KEY, JSON.stringify(all));
@@ -185,9 +175,8 @@ export async function updateHighlight(
     throw new Error("Highlight tidak ditemukan");
   }
 
-  const response = await fetch(`${API_URL}/api/dosen/highlights/${id}`, {
+  const response = await apiFetch(`${API_URL}/api/dosen/highlights/${id}`, {
     method: "PUT",
-    headers: getHeaders(),
     body: JSON.stringify(data),
   });
   const result = await response.json();
@@ -211,9 +200,8 @@ export async function deleteHighlight(id: string): Promise<void> {
     throw new Error("Highlight tidak ditemukan");
   }
 
-  const response = await fetch(`${API_URL}/api/dosen/highlights/${id}`, {
+  const response = await apiFetch(`${API_URL}/api/dosen/highlights/${id}`, {
     method: "DELETE",
-    headers: getHeaders(),
   });
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
@@ -242,11 +230,10 @@ export async function syncHighlights(
     return synced;
   }
 
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_URL}/api/dosen/highlights/${kepemilikanId}/sync`,
     {
       method: "POST",
-      headers: getHeaders(),
       body: JSON.stringify({ highlights }),
     },
   );
