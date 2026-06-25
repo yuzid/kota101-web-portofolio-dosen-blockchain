@@ -40,6 +40,7 @@ import {
   BookOpen,
   Check,
   Download,
+  Highlighter,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -159,15 +160,40 @@ export function MonitoringActivityDetailPage() {
     loadActivity();
   }, [id]);
 
-  const loadActivity = () => {
+  const loadActivity = async () => {
+    setIsLoading(true);
     const data = getMonitoringActivityDetail<ActivityDetail>();
     if (data && data.id === id) {
       setActivity(data);
       setIsLoading(false);
       return;
     }
-    toast.error("Data kegiatan tidak tersedia. Silakan kembali ke daftar.");
-    navigate(`/monitoring/${isKajur ? "jurusan" : "prodi"}`);
+    
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Sesi Anda telah habis. Silakan login kembali.");
+        navigate("/login");
+        return;
+      }
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (result.status === "success") {
+        setActivity(result.data);
+      } else {
+        toast.error(result.error || "Gagal memuat detail kegiatan");
+        navigate(`/monitoring/${isKajur ? "jurusan" : "prodi"}`);
+      }
+    } catch {
+      toast.error("Terjadi kesalahan koneksi ke server");
+      navigate(`/monitoring/${isKajur ? "jurusan" : "prodi"}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDownload = () => {
@@ -573,6 +599,9 @@ export function MonitoringActivityDetailPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
+                                {/* {doc.hasHighlight && (
+                                  <Highlighter className="w-4 h-4 text-yellow-500 mr-1" />
+                                )} */}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -746,6 +775,9 @@ function FileRow({
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
+        {/* {doc.hasHighlight && (
+          <Highlighter className="w-4 h-4 text-yellow-500 mr-1" />
+        )} */}
         <Button
           variant="ghost"
           size="sm"

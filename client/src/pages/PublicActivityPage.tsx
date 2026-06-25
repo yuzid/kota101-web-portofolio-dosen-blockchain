@@ -102,6 +102,7 @@ export function PublicActivityPage() {
             if (sharedDoc) {
               if (detail.file_path) sharedDoc.filePath = detail.file_path;
               if (detail.hash_file) sharedDoc.hashFile = detail.hash_file;
+              sharedDoc.kepemilikanId = detail.kepemilikan?.[0]?.id || undefined;
             }
           });
         } else {
@@ -122,10 +123,12 @@ export function PublicActivityPage() {
                     tanggalUpload: detail.tanggal_upload || "",
                     hashFile: detail.hash_file || "",
                     filePath: detail.file_path || "",
+                    kepemilikanId: detail.kepemilikan?.find((k: any) => k.dosen?.id === dosen.id)?.id || undefined,
                   });
                 } else {
                   if (detail.file_path) existing.filePath = detail.file_path;
                   if (detail.hash_file) existing.hashFile = detail.hash_file;
+                  existing.kepemilikanId = detail.kepemilikan?.find((k: any) => k.dosen?.id === dosen.id)?.id || undefined;
                 }
               }
             });
@@ -630,14 +633,14 @@ function DocPreviewBlock({
       <div className="bg-white">
         {fileType === "pdf" && (
           <PublicPdfPreview
-            fileUrl={doc.filePath}
-            documentId={doc.id}
+            fileUrl={`${API_URL}/api/public/dokumen/${doc.id}/content`}
+            kepemilikanId={doc.kepemilikanId}
           />
         )}
         {fileType === "image" && (
           <div className="p-4 flex justify-center">
             <img
-              src={doc.filePath}
+              src={`${API_URL}/api/public/dokumen/${doc.id}/content`}
               alt={label}
               className="max-w-full max-h-[600px] object-contain rounded"
             />
@@ -648,7 +651,7 @@ function DocPreviewBlock({
             <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p>Pratinjau tidak tersedia untuk format ini</p>
             <a
-              href={doc.filePath}
+              href={`${API_URL}/api/public/dokumen/${doc.id}/content`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline mt-2 inline-block"

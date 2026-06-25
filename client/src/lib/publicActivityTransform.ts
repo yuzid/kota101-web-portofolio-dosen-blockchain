@@ -5,6 +5,7 @@ export interface PublicDosenDoc {
   tanggalUpload: string;
   hashFile: string;
   filePath: string;
+  kepemilikanId?: string;
 }
 
 export interface PublicDosenTerlibat {
@@ -23,6 +24,7 @@ export interface PublicDokumenBersama {
   tanggalUpload: string;
   hashFile: string;
   filePath: string;
+  kepemilikanId?: string;
 }
 
 export interface PublicActivity {

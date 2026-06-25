@@ -165,7 +165,7 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false, hi
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Add People */}
+            {/* Add People (Disabled temporarily)
             <div className="space-y-3">
               <Label>Bagikan ke Orang</Label>
               <div className="flex gap-2">
@@ -188,8 +188,9 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false, hi
                 </Button>
               </div>
             </div>
+            */}
 
-            {/* Shared Users List */}
+            {/* Shared Users List (Disabled temporarily)
             {sharedUsers.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -220,13 +221,16 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false, hi
               </div>
             </div>
             )}
+            */}
 
+            {/* Email notification banner (Disabled temporarily)
             <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
               <Mail className="w-4 h-4 text-blue-600 shrink-0" />
               <p className="text-blue-900">
                 Notifikasi email akan dikirimkan oleh sistem ke penerima.
               </p>
             </div>
+            */}
 
             {/* Share Link */}
             <div className="space-y-3 border-t pt-4">
