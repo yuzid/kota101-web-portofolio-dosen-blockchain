@@ -19,7 +19,7 @@ const app = express();
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN ? process.env.CLIENT_ORIGIN.split(',') : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
-  exposedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Type', 'Authorization', 'X-Content-SHA256'],
 }));
 app.use(express.json());
 

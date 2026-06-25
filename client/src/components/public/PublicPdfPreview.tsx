@@ -6,9 +6,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "../ui/button";
 import { HighlightOverlay } from "../document/HighlightOverlay";
-import {
-  getPublicHighlights,
-} from "../../lib/publicHighlight";
+
 import type { Highlight } from "../../services/highlightService";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
@@ -21,10 +19,10 @@ interface PageInfo {
 
 interface PublicPdfPreviewProps {
   fileUrl: string;
-  documentId: string;
+  kepemilikanId?: string;
 }
 
-export function PublicPdfPreview({ fileUrl, documentId }: PublicPdfPreviewProps) {
+export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -46,8 +44,27 @@ export function PublicPdfPreview({ fileUrl, documentId }: PublicPdfPreviewProps)
   }, []);
 
   useEffect(() => {
-    setHighlights(getPublicHighlights(documentId));
-  }, [documentId]);
+    let active = true;
+    const loadPublicHighlights = async () => {
+      if (!kepemilikanId) {
+        if (active) setHighlights([]);
+        return;
+      }
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/public/highlights/${kepemilikanId}`);
+        const result = await response.json();
+        if (response.ok && result.status === "success" && active) {
+          setHighlights(result.data || []);
+        }
+      } catch (err) {
+        console.error("Gagal memuat highlight publik:", err);
+      }
+    };
+    void loadPublicHighlights();
+    return () => {
+      active = false;
+    };
+  }, [kepemilikanId]);
 
   const renderWidth = useMemo(() => {
     if (containerWidth < 100) return 800;

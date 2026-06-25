@@ -261,14 +261,14 @@ export function PublicDocumentPage() {
             <>
               {fileType === "pdf" && (
                 <PublicPdfPreview
-                  fileUrl={doc.file_path}
-                  documentId={doc.id}
+                  fileUrl={`${API_URL}/api/public/dokumen/${doc.id}/content`}
+                  kepemilikanId={owners[0]?.id}
                 />
               )}
               {fileType === "image" && (
                 <div className="p-6 flex justify-center bg-gray-50">
                   <img
-                    src={doc.file_path}
+                    src={`${API_URL}/api/public/dokumen/${doc.id}/content`}
                     alt={doc.nama}
                     className="max-w-full max-h-[600px] object-contain rounded-lg shadow-sm"
                   />
@@ -281,7 +281,7 @@ export function PublicDocumentPage() {
                     Pratinjau tidak tersedia untuk format ini
                   </p>
                   <a
-                    href={doc.file_path}
+                    href={`${API_URL}/api/public/dokumen/${doc.id}/content`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

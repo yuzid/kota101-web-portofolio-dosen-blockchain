@@ -35,6 +35,20 @@ export class DocumentController {
     }
   };
 
+  getPublicDocumentContent = async (req: Request, res: Response) => {
+    try {
+      const file = await this.documentService.getPublicDocumentContent(req.params.id as string);
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Content-Length', file.contentLength);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.setHeader('X-Content-SHA256', file.contentHash);
+      res.send(file.bytes);
+    } catch (error: any) {
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
   // Dosen Handlers
   getDosenDocuments = async (req: AuthRequest, res: Response) => {
     try {
@@ -172,10 +186,16 @@ export class DocumentController {
 
   updateMetadata = async (req: AuthRequest, res: Response) => {
     try {
-      await this.documentService.updateMetadata(req.params.id as string, req.body);
+      if (!req.user) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+      await this.documentService.updateMetadata(req.params.id as string, req.body, req.user);
       res.json({ status: 'success', message: 'Metadata dokumen berhasil diperbarui di database.' });
     } catch (error: any) {
-      res.status(error.message === 'Dokumen tidak ditemukan.' ? 404 : 400).json({ status: 'error', error: error.message });
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') || error.message.includes('bukan pemilik') ? 403 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
     }
   };
 
@@ -185,14 +205,16 @@ export class DocumentController {
         res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
         return;
       }
-      const result = await this.documentService.replaceFile(req.params.id as string, req.file!);
+      const result = await this.documentService.replaceFile(req.params.id as string, req.file!, req.user);
       res.json({
         status: 'success',
         message: 'File dokumen berhasil diganti.',
         data: { id: result.id, file_path: result.file_path, hash_file: result.hash_file },
       });
     } catch (error: any) {
-      res.status(error.message === 'Dokumen tidak ditemukan.' ? 404 : 400).json({ status: 'error', error: error.message });
+      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
+                     error.message.includes('Akses ditolak') || error.message.includes('bukan pemilik') ? 403 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
     }
   };
 

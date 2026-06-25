@@ -623,11 +623,27 @@ export function DocumentPreviewPage() {
     }
     setSaving(true);
     try {
-      const edits = JSON.parse(localStorage.getItem("dokumen_edits") || "{}");
-      edits[document.id] = { name: editForm.name, jenis: editForm.jenis, tanggal: editForm.tanggal.toISOString() };
-      localStorage.setItem("dokumen_edits", JSON.stringify(edits));
+      // 1. Update metadata in backend
+      const metadataRes = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/metadata`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          nama: editForm.name,
+          jenis_dokumen: editForm.jenis,
+          tanggal_upload: editForm.tanggal.toISOString(),
+        }),
+      });
+      const metadataResult = await metadataRes.json();
+      if (!metadataRes.ok || metadataResult.status === "error") {
+        throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
+      }
+
       setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: editForm.tanggal.toISOString() });
 
+      // 2. Replace file if changed
       if (hasFileChange && newFile) {
         const formData = new FormData();
         formData.append("file", newFile);

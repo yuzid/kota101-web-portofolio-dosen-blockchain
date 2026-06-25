@@ -144,4 +144,15 @@ export class HighlightRepository {
 
     return kepemilikan.dosen_id === dosenId;
   }
+
+  async findByDokumenId(dokumenId: string) {
+    return await prisma.highlight.findMany({
+      where: {
+        kepemilikan: {
+          dokumen_id: dokumenId,
+        },
+      },
+      include: { highlight_rect: true },
+    });
+  }
 }

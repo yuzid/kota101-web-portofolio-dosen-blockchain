@@ -151,6 +151,10 @@ export class DocumentService {
   }
 
   mapJenisToEnum(jenis: string): JenisDokumen {
+    const upperInput = jenis.toUpperCase().trim();
+    if (Object.values(JenisDokumen).includes(upperInput as JenisDokumen)) {
+      return upperInput as JenisDokumen;
+    }
     switch (jenis) {
       case 'SK': return JenisDokumen.SURAT_KEPUTUSAN;
       case 'Surat Tugas': return JenisDokumen.SURAT_TUGAS;
@@ -254,21 +258,41 @@ export class DocumentService {
     }, targetDosenIds);
   }
 
-  async updateMetadata(id: string, data: any) {
-    const { nama, jenis_dokumen, tanggal_upload } = data;
+  async updateMetadata(id: string, data: any, currentUser: any) {
     const existing = await this.documentRepository.findById(id);
     if (!existing) throw new Error('Dokumen tidak ditemukan.');
 
+    if (currentUser.role.toUpperCase() === 'DOSEN') {
+      if (existing.sumber_dokumen === 'TATA_USAHA') {
+        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengubah dokumen resmi dari Tata Usaha.');
+      }
+      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      if (!isOwner) {
+        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+      }
+    }
+
+    const { nama, jenis_dokumen, tanggal_upload } = data;
     return await this.documentRepository.update(id, {
       nama,
-      jenis_dokumen,
+      jenis_dokumen: this.mapJenisToEnum(jenis_dokumen),
       tanggal_upload: new Date(tanggal_upload)
     });
   }
 
-  async replaceFile(id: string, file: Express.Multer.File) {
+  async replaceFile(id: string, file: Express.Multer.File, currentUser: any) {
     const existing = await this.documentRepository.findById(id);
     if (!existing) throw new Error('Dokumen tidak ditemukan.');
+
+    if (currentUser.role.toUpperCase() === 'DOSEN') {
+      if (existing.sumber_dokumen === 'TATA_USAHA') {
+        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha.');
+      }
+      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      if (!isOwner) {
+        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+      }
+    }
 
     const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
     const filePath = await this.fileStorageService.uploadFile(file, 'documents');
@@ -303,5 +327,18 @@ export class DocumentService {
     const document = await this.documentRepository.findByIdPublic(id);
     if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
     return document;
+  }
+
+  async getPublicDocumentContent(id: string) {
+    const document = await this.documentRepository.findByIdPublic(id);
+    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+
+    const file = await this.fileStorageService.getFile(document.file_path);
+    return {
+      ...file,
+      contentType: this.getMimeType(file.contentType, document.file_path),
+      fileName: document.nama,
+      contentHash: crypto.createHash('sha256').update(file.bytes).digest('hex'),
+    };
   }
 }

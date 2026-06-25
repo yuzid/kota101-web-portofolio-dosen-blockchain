@@ -4,7 +4,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 // ── Mock mode ──
 // Set VITE_HIGHLIGHT_MOCK=true di .env untuk menggunakan data mock.
-const USE_MOCK = import.meta.env.VITE_HIGHLIGHT_MOCK === "true";
+const USE_MOCK = false;
 
 export function isHighlightMockMode(): boolean {
   return USE_MOCK;
@@ -103,7 +103,7 @@ export async function getHighlightsByDokumenId(
   const kepemilikanId: string | undefined = result.kepemilikanId;
 
   if (!kepemilikanId) {
-    return { highlights: [], kepemilikanId: undefined };
+    return { highlights, kepemilikanId: undefined };
   }
   return { highlights, kepemilikanId };
 }

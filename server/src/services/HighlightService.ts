@@ -12,11 +12,8 @@ export class HighlightService {
   }
 
   async getHighlightsByDocumentAndDosen(dokumenId: string, dosenId: string) {
-    const kepemilikanId = await this.highlightRepository.findKepemilikanId(dosenId, dokumenId);
-    if (!kepemilikanId) {
-      return { highlights: [], kepemilikanId: null };
-    }
-    const highlights = await this.highlightRepository.findByKepemilikanId(kepemilikanId);
+    const kepemilikanId = await this.highlightRepository.findKepemilikanId(dosenId, dokumenId) || null;
+    const highlights = await this.highlightRepository.findByDokumenId(dokumenId);
     return { highlights, kepemilikanId };
   }
 
