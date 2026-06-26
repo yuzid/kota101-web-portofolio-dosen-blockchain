@@ -137,7 +137,7 @@ export function RekapLaporanEditPage() {
 
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
-      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pengajaran</Badge>;
+      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "PENELITIAN": return <Badge className="bg-green-500">Penelitian</Badge>;
       case "PENGABDIAN": return <Badge className="bg-purple-500">Pengabdian</Badge>;
       case "TUGAS_TAMBAHAN": return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
@@ -400,12 +400,12 @@ export function RekapLaporanEditPage() {
                             kegiatan.lampiran_bukti.map((lb: any, j: number) => (
                               <a
                                 key={j}
-                                href={lb.file_url || lb.path || '#'}
+                                href={`/documents/${lb.dokumen?.id || lb.dokumen_id}/preview`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
                               >
-                                {lb.nama_file || lb.nama || `Dokumen ${j + 1}`}
+                                {lb.dokumen?.nama || lb.nama_file || lb.nama || `Dokumen ${j + 1}`}
                               </a>
                             ))
                           ) : (

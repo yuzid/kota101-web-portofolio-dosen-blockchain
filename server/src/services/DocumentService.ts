@@ -21,16 +21,32 @@ export class DocumentService {
   }
 
   private canAccessDocument(document: any, currentUser: any) {
+    // Non-dosen users (Admin, TU) can access all documents
     if (currentUser.role?.toUpperCase() !== 'DOSEN') return true;
 
+    // Check ownership
     const isOwner = document.kepemilikan.some((item: any) => item.dosen_id === currentUser.id);
+    
+    // Check if document is attached to activities where user is creator or participant
     const isInLinkedActivity = document.lampiran_bukti.some((item: any) => {
       const activity = item.kegiatan;
       return activity.dosen_id === currentUser.id ||
         activity.partisipasi.some((participant: any) => participant.dosen_id === currentUser.id);
     });
 
-    return isOwner || isInLinkedActivity;
+    // Check if user is Kajur and document is attached to activity in their jurusan
+    const isAccessibleByKajur = currentUser.jabatan?.is_kajur && document.lampiran_bukti.some((item: any) => {
+      const activity = item.kegiatan;
+      return activity?.dosen?.program_studi?.jurusan_id === currentUser.jabatan?.jurusan_id;
+    });
+
+    // Check if user is Kaprodi and document is attached to activity in their prodi
+    const isAccessibleByKaprodi = currentUser.jabatan?.is_kaprodi && document.lampiran_bukti.some((item: any) => {
+      const activity = item.kegiatan;
+      return activity?.dosen?.program_studi_id === currentUser.jabatan?.program_studi_id;
+    });
+
+    return isOwner || isInLinkedActivity || isAccessibleByKajur || isAccessibleByKaprodi;
   }
 
   private getMimeType(contentType: string, filePath: string) {
@@ -135,6 +151,10 @@ export class DocumentService {
   }
 
   mapJenisToEnum(jenis: string): JenisDokumen {
+    const upperInput = jenis.toUpperCase().trim();
+    if (Object.values(JenisDokumen).includes(upperInput as JenisDokumen)) {
+      return upperInput as JenisDokumen;
+    }
     switch (jenis) {
       case 'SK': return JenisDokumen.SURAT_KEPUTUSAN;
       case 'Surat Tugas': return JenisDokumen.SURAT_TUGAS;
@@ -145,11 +165,18 @@ export class DocumentService {
     }
   }
 
+  private async getExistingFilePathOrUpload(file: Express.Multer.File, hashFile: string, folder: string) {
+    const existingDocument = await this.documentRepository.findByHashFile(hashFile);
+    if (existingDocument) return existingDocument.file_path;
+
+    return await this.fileStorageService.uploadFile(file, folder);
+  }
+
   async getDosenDocuments(dosenId: string, query: any) {
     const { tab, search, jenis } = query;
     let whereClause: any = {
       deleted_at: null,
-      kepemilikan: { some: { dosen_id: dosenId } }
+      kepemilikan: { some: { dosen_id: dosenId, status: 'DISETUJUI' } }
     };
 
     if (tab === 'tu') {
@@ -187,7 +214,7 @@ export class DocumentService {
     if (currentUser.role.toUpperCase() === 'TATA_USAHA') {
       if (!currentUser.jurusan_id) throw new Error('Akses ditolak. Yurisdiksi jurusan tidak valid.');
       whereClause.kepemilikan = {
-        some: { dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } } }
+        some: { status: 'DISETUJUI', dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } } }
       };
     }
 
@@ -199,7 +226,7 @@ export class DocumentService {
     if (!file || !nama || !jenis_dokumen || !tanggal_dokumen) throw new Error('Semua komponen data formulir wajib diisi.');
 
     const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.fileStorageService.uploadFile(file, `dosen_uploads/${dosenId}`);
+    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, `dosen_uploads/${dosenId}`);
 
     return await this.documentRepository.create({
       nama,
@@ -219,7 +246,7 @@ export class DocumentService {
     if (targetDosenIds.length === 0) throw new Error('Minimal pilih satu dosen penerima.');
 
     const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.fileStorageService.uploadFile(file, 'documents');
+    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, 'documents');
 
     return await this.documentRepository.create({
       nama,
@@ -231,16 +258,51 @@ export class DocumentService {
     }, targetDosenIds);
   }
 
-  async updateMetadata(id: string, data: any) {
-    const { nama, jenis_dokumen, tanggal_upload } = data;
+  async updateMetadata(id: string, data: any, currentUser: any) {
     const existing = await this.documentRepository.findById(id);
     if (!existing) throw new Error('Dokumen tidak ditemukan.');
 
+    if (currentUser.role.toUpperCase() === 'DOSEN') {
+      if (existing.sumber_dokumen === 'TATA_USAHA') {
+        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengubah dokumen resmi dari Tata Usaha.');
+      }
+      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      if (!isOwner) {
+        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+      }
+    }
+
+    const { nama, jenis_dokumen, tanggal_upload } = data;
     return await this.documentRepository.update(id, {
       nama,
-      jenis_dokumen,
+      jenis_dokumen: this.mapJenisToEnum(jenis_dokumen),
       tanggal_upload: new Date(tanggal_upload)
     });
+  }
+
+  async replaceFile(id: string, file: Express.Multer.File, currentUser: any) {
+    const existing = await this.documentRepository.findById(id);
+    if (!existing) throw new Error('Dokumen tidak ditemukan.');
+
+    if (currentUser.role.toUpperCase() === 'DOSEN') {
+      if (existing.sumber_dokumen === 'TATA_USAHA') {
+        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha.');
+      }
+      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      if (!isOwner) {
+        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+      }
+    }
+
+    const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const filePath = await this.fileStorageService.uploadFile(file, 'documents');
+
+    await this.documentRepository.update(id, {
+      file_path: filePath,
+      hash_file: hashFile,
+    });
+
+    return { id, file_path: filePath, hash_file: hashFile };
   }
 
   async deleteDocument(id: string, currentUser: any) {
@@ -254,5 +316,29 @@ export class DocumentService {
     }
 
     return await this.documentRepository.softDelete(id);
+  }
+
+  // Public methods (no authentication required)
+  async getPublicDocuments() {
+    return await this.documentRepository.findAllPublic();
+  }
+
+  async getPublicDocumentById(id: string) {
+    const document = await this.documentRepository.findByIdPublic(id);
+    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    return document;
+  }
+
+  async getPublicDocumentContent(id: string) {
+    const document = await this.documentRepository.findByIdPublic(id);
+    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+
+    const file = await this.fileStorageService.getFile(document.file_path);
+    return {
+      ...file,
+      contentType: this.getMimeType(file.contentType, document.file_path),
+      fileName: document.nama,
+      contentHash: crypto.createHash('sha256').update(file.bytes).digest('hex'),
+    };
   }
 }

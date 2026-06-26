@@ -121,7 +121,7 @@ export function RekapLaporanDetailPage() {
 
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
-      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pengajaran</Badge>;
+      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "PENELITIAN": return <Badge className="bg-green-500">Penelitian</Badge>;
       case "PENGABDIAN": return <Badge className="bg-purple-500">Pengabdian</Badge>;
       case "TUGAS_TAMBAHAN": return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
@@ -214,9 +214,11 @@ export function RekapLaporanDetailPage() {
                   <User className="w-3 h-3" /> Dibuat Oleh
                 </p>
                 <p className="font-medium">{rekap.dibuatOleh.nama}</p>
-                <Badge variant="outline" className="text-xs mt-1">
-                  {rekap.dibuatOleh.role === "kajur" ? "Kajur" : "Kaprodi"}
-                </Badge>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {rekap.dibuatOleh.role === "kajur"
+                    ? `Kajur ${rekap.jurusanNama || ""}`
+                    : `Kaprodi ${rekap.prodiNama || ""}`}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Jumlah Kegiatan</p>
@@ -302,23 +304,18 @@ export function RekapLaporanDetailPage() {
                           {kegiatan.tanggal_selesai && ` - ${formatDate(kegiatan.tanggal_selesai)}`}
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col gap-0.5">
-                            {kegiatan.lampiran_bukti && kegiatan.lampiran_bukti.length > 0 ? (
-                              kegiatan.lampiran_bukti.map((lb: any, j: number) => (
-                                <a
-                                  key={j}
-                                  href={lb.file_url || lb.path || '#'}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
-                                >
-                                  {lb.nama_file || lb.nama || `Dokumen ${j + 1}`}
-                                </a>
-                              ))
-                            ) : (
-                              <span className="text-xs text-muted-foreground">-</span>
-                            )}
-                          </div>
+                          {kegiatan.lampiran_bukti && kegiatan.lampiran_bukti.length > 0 ? (
+                            <a
+                              href={`/public/kegiatan/${kegiatan.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
+                            >
+                              Bukti Kegiatan
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

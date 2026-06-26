@@ -1,6 +1,7 @@
 // src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
+import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
 
 export type UserRole =
   | "administrator"
@@ -11,6 +12,7 @@ export type UserRole =
 
 export interface User {
   id: string;
+  uuid: string;
   email: string;
   name: string; 
   roles: UserRole[];
@@ -30,10 +32,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
 const mapBackendUserToFrontend = (backendData: any): User => {
   const roles: UserRole[] = [];
   
-  // Normalisasi ke uppercase agar aman dari ketidaksesuaian case database
   const dbRole = backendData.role?.toUpperCase();
   
   if (dbRole === 'ADMIN') roles.push('administrator');
@@ -43,8 +53,12 @@ const mapBackendUserToFrontend = (backendData: any): User => {
   if (backendData.jabatan?.is_kajur) roles.push('kajur');
   if (backendData.jabatan?.is_kaprodi) roles.push('kaprodi');
 
+  const decoded = decodeJwtPayload(backendData.token);
+  const uuid = decoded?.id || backendData.email;
+
   return {
-    id: backendData.email, 
+    id: backendData.email,
+    uuid: uuid,
     email: backendData.email,
     name: backendData.name, 
     programStudi: backendData.programStudi || undefined,
@@ -57,14 +71,53 @@ const mapBackendUserToFrontend = (backendData: any): User => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearAuth = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (!parsed.uuid && parsed.token) {
+          const decoded = decodeJwtPayload(parsed.token);
+          parsed.uuid = decoded?.id || parsed.id;
+        }
+        setUser(parsed);
+      } catch {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
     }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    initFetchInterceptor(() => clearAuth());
+    return () => destroyFetchInterceptor();
+  }, [clearAuth]);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      if (isTokenExpired()) {
+        clearAuth();
+      }
+    }, 30000);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [clearAuth]);
 
   // 1. Login Manual (Form)
   const login = async (email: string, password: string) => {
@@ -107,9 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    clearAuth();
   };
 
   return (

@@ -1,19 +1,87 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/esm/Page/TextLayer.css";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
   AlertCircle,
+  CalendarIcon,
   CheckCircle2,
   Download,
+  Eye,
   FileText,
+  FileWarning,
+  Highlighter,
+  List,
   Loader2,
+  Pencil,
   ShieldAlert,
   ShieldCheck,
+  Share2,
+  Clock,
+  History,
+  Trash2,
+  Undo2,
+  Upload,
   X,
 } from "lucide-react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { toast } from "sonner";
+import { HighlightOverlay } from "../components/document/HighlightOverlay";
+import { HighlightMenu } from "../components/document/HighlightMenu";
+import { 
+  getHighlightsByDokumenId,
+  addHighlight,
+  updateHighlight,
+  deleteHighlight,
+  syncHighlights,
+} from "../services/highlightService";
+import type { Highlight } from "../services/highlightService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { Calendar } from "../components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { DocumentSharing } from "../components/document/DocumentSharing";
+import { isHighlightMockMode } from "../services/highlightService";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { FileVersionHistory } from "../components/file/FileVersionHistory";
+import type { FileVersion } from "../hooks/useFileManagement";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 type IntegrityStatus = "valid" | "invalid" | "not_recorded";
 
@@ -39,6 +107,19 @@ interface DocumentPreview {
   };
 }
 
+interface DragState {
+  startX: number;
+  startY: number;
+  pageNumber: number;
+  pageEl: HTMLElement;
+}
+
+interface PageInfo {
+  pdfWidth: number;
+  pdfHeight: number;
+  rotate: number;
+}
+
 export function DocumentPreviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -50,11 +131,86 @@ export function DocumentPreviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInfos, setPageInfos] = useState<Record<number, PageInfo>>({});
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [kepemilikanId, setKepemilikanId] = useState<string | null>(null);
+  const [highlightsLoading, setHighlightsLoading] = useState(false);
+  const [highlightsError, setHighlightsError] = useState<string | null>(null);
+
+  const [addMode, setAddMode] = useState(false);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [previewRect, setPreviewRect] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+
+  const [menuHighlight, setMenuHighlight] = useState<{
+    highlight: Highlight;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", jenis: "", tanggal: undefined as Date | undefined });
+  const [saving, setSaving] = useState(false);
+  const [newFile, setNewFile] = useState<File | null>(null);
+  const [hasFileChange, setHasFileChange] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [allowHighlight] = useState(() => {
+    return (location.state as Record<string, unknown>)?.allowHighlight === true;
+  });
+
+  const isDocumentOwner = (location.state as Record<string, unknown>)?.isDocumentOwner !== false;
+
+  const [historyStack, setHistoryStack] = useState<Highlight[][]>([]);
+  const [showHighlightPanel, setShowHighlightPanel] = useState(false);
+  const [activeTab, setActiveTab] = useState("document");
+
   const token = localStorage.getItem("token");
   const activityId = location.state?.activityId as string | undefined;
   const apiPrefix = user?.roles.includes("admin_tu")
     ? "/api/tatausaha/dokumen"
     : "/api/dosen/dokumen";
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  const renderWidth = useMemo(() => {
+    if (containerWidth < 100) return 800;
+    return Math.max(500, containerWidth - 2);
+  }, [containerWidth]);
+
+  // Only apply localStorage edits once to avoid infinite re-render loop
+  const editAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!document || editAppliedRef.current) return;
+    const edits = JSON.parse(localStorage.getItem("dokumen_edits") || "{}");
+    const edit = edits[document.id];
+    if (edit) {
+      editAppliedRef.current = true;
+      setDocument({ ...document, name: edit.name, jenis: edit.jenis, tanggalUpload: edit.tanggal });
+    }
+  }, [document]);
 
   useEffect(() => {
     if (!id) return;
@@ -70,17 +226,27 @@ export function DocumentPreviewPage() {
           : "";
         const headers = { Authorization: `Bearer ${token}` };
         const [previewResponse, contentResponse] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/preview${query}`, { headers }),
-          fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/content`, { headers }),
+          fetch(
+            `${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/preview${query}`,
+            { headers },
+          ),
+          fetch(
+            `${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/content`,
+            { headers },
+          ),
         ]);
 
         const previewResult = await previewResponse.json();
         if (!previewResponse.ok || previewResult.status !== "success") {
-          throw new Error(previewResult.error || "Gagal mengambil informasi dokumen");
+          throw new Error(
+            previewResult.error || "Gagal mengambil informasi dokumen",
+          );
         }
         if (!contentResponse.ok) {
           const contentResult = await contentResponse.json();
-          throw new Error(contentResult.error || "Gagal mengambil file dokumen");
+          throw new Error(
+            contentResult.error || "Gagal mengambil file dokumen",
+          );
         }
 
         const blob = await contentResponse.blob();
@@ -89,7 +255,11 @@ export function DocumentPreviewPage() {
         setServedHash(contentResponse.headers.get("X-Content-SHA256"));
         setFileUrl(objectUrl);
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Gagal memuat dokumen");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Gagal memuat dokumen",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -100,6 +270,46 @@ export function DocumentPreviewPage() {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [activityId, apiPrefix, id, token]);
+
+  const loadHighlights = useCallback(async () => {
+    if (!id) return;
+    setHighlightsLoading(true);
+    setHighlightsError(null);
+    try {
+      const result = await getHighlightsByDokumenId(id);
+      setHighlights(result.highlights);
+      if (result.kepemilikanId) {
+        setKepemilikanId(result.kepemilikanId);
+      }
+    } catch (err) {
+      setHighlightsError(
+        err instanceof Error ? err.message : "Gagal memuat highlight",
+      );
+    } finally {
+      setHighlightsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (fileUrl) {
+      void loadHighlights();
+    }
+  }, [fileUrl, loadHighlights]);
+
+  const highlightsByPage = useMemo(() => {
+    const map: Record<number, Highlight[]> = {};
+    for (const hl of highlights) {
+      if (!map[hl.page_number]) map[hl.page_number] = [];
+      map[hl.page_number].push(hl);
+    }
+    return map;
+  }, [highlights]);
+
+  const currentPageInfo = currentPage ? pageInfos[currentPage] : null;
+  const currentPageHighlights = currentPage ? highlightsByPage[currentPage] || [] : [];
+  const pageHeightPx = currentPageInfo
+    ? renderWidth * (currentPageInfo.pdfHeight / currentPageInfo.pdfWidth)
+    : renderWidth * 1.4;
 
   const integrity = useMemo(() => {
     if (!document) return null;
@@ -115,10 +325,68 @@ export function DocumentPreviewPage() {
     return { ...document.blockchainIntegrity, status, exactServedHash };
   }, [document, servedHash]);
 
+  const mockVersions: FileVersion[] = useMemo(() => {
+    if (!document || !fileUrl) return [];
+    return [
+      {
+        id: `${document.id}-v1`,
+        versionNumber: 1,
+        fileName: document.name,
+        fileSize: document.size,
+        uploadedBy: user?.name || "Unknown",
+        uploadedAt: document.tanggalUpload,
+        url: fileUrl,
+        isCurrent: true,
+      },
+    ];
+  }, [document, fileUrl, user]);
+
+  const mockActivities = useMemo(() => {
+    if (!document) return [];
+    const baseTs = new Date(document.tanggalUpload).getTime();
+    return [
+      {
+        id: "act-1",
+        action: "upload",
+        actor: user?.name || "Unknown",
+        timestamp: document.tanggalUpload,
+        description: "Dokumen diupload ke sistem portofolio",
+      },
+      {
+        id: "act-2",
+        action: "blockchain",
+        actor: "Sistem Blockchain",
+        timestamp: new Date(baseTs + 60000).toISOString(),
+        description: "Hash dokumen dicatat di blockchain",
+      },
+      {
+        id: "act-3",
+        action: "verify",
+        actor: "Sistem",
+        timestamp: document.blockchainIntegrity.checkedAt,
+        description: "Integritas blockchain diverifikasi secara otomatis",
+      },
+      {
+        id: "act-4",
+        action: "edit",
+        actor: user?.name || "Unknown",
+        timestamp: new Date(baseTs + 86400000 * 2).toISOString(),
+        description: "Metadata dokumen diperbarui",
+      },
+      {
+        id: "act-5",
+        action: "highlight",
+        actor: user?.name || "Unknown",
+        timestamp: new Date(baseTs + 86400000 * 3).toISOString(),
+        description: "Highlight ditambahkan pada halaman 1",
+      },
+    ];
+  }, [document, user]);
+
   const breadcrumbs = location.state?.breadcrumbs || [
     { label: "Beranda", path: "/dashboard" },
     { label: "Dokumen Saya", path: "/documents" },
-    { label: document?.name || "Preview Dokumen" },
+    { label: document?.name || "Detail Dokumen" },
   ];
 
   const handleDownload = () => {
@@ -129,9 +397,279 @@ export function DocumentPreviewPage() {
     anchor.click();
   };
 
+  const handleDocumentLoad = ({ numPages: np }: PDFDocumentProxy) => {
+    setNumPages(np);
+  };
+
+  const handlePageLoad = (pageNumber: number, page: any) => {
+    try {
+      const viewport = page.getViewport({ scale: 1 });
+      setPageInfos((prev) => ({
+        ...prev,
+        [pageNumber]: {
+          pdfWidth: viewport.width,
+          pdfHeight: viewport.height,
+          rotate: page.rotate || 0,
+        },
+      }));
+    } catch {
+      // Silently skip failed pages
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, pageNumber: number) => {
+    const target = e.currentTarget as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    setDragState({
+      startX: e.clientX - rect.left,
+      startY: e.clientY - rect.top,
+      pageNumber,
+      pageEl: target,
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragState) return;
+    const rect = dragState.pageEl.getBoundingClientRect();
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const x = Math.min(dragState.startX, currentX);
+    const y = Math.min(dragState.startY, currentY);
+    const w = Math.abs(currentX - dragState.startX);
+    const h = Math.abs(currentY - dragState.startY);
+
+    if (w < 3 && h < 3) {
+      setPreviewRect(null);
+      return;
+    }
+    setPreviewRect({ x, y, w, h });
+  };
+
+  const handleMouseUp = async () => {
+    if (!dragState || !previewRect || !kepemilikanId) {
+      setDragState(null);
+      setPreviewRect(null);
+      return;
+    }
+    pushHistory();
+
+    const pageInfo = pageInfos[dragState.pageNumber];
+    if (!pageInfo) {
+      setDragState(null);
+      setPreviewRect(null);
+      return;
+    }
+
+    const scale = renderWidth / pageInfo.pdfWidth;
+    const pdfX = previewRect.x / scale;
+    const pdfY = previewRect.y / scale;
+    const pdfW = previewRect.w / scale;
+    const pdfH = previewRect.h / scale;
+
+    setDragState(null);
+    setPreviewRect(null);
+
+    if (pdfW < 5 || pdfH < 3) return;
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const newHighlight: Highlight = {
+      id: tempId,
+      page_number: dragState.pageNumber,
+      highlighted_text: "",
+      highlight_rect: [
+        {
+          x1: pdfX,
+          x2: pdfX + pdfW,
+          y1: pdfY,
+          y2: pdfY + pdfH,
+          width: pdfW,
+          height: pdfH,
+          boundary_rect: false,
+        },
+      ],
+    };
+    setHighlights((prev) => [...prev, newHighlight]);
+  };
+
+  const handleUpdateHighlight = async (highlightId: string, text: string) => {
+    pushHistory();
+    setHighlights((prev) =>
+      prev.map((hl) =>
+        hl.id === highlightId ? { ...hl, highlighted_text: text } : hl,
+      ),
+    );
+    
+    // Save to backend
+    try {
+      if (!highlightId.startsWith("temp-")) {
+        await updateHighlight(highlightId, { highlighted_text: text });
+        toast.success("Highlight berhasil diperbarui");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui highlight");
+      setHighlights((prev) =>
+        prev.map((hl) =>
+          hl.id === highlightId ? { ...hl, highlighted_text: "" } : hl,
+        ),
+      );
+    }
+  };
+
+  const handleDeleteHighlight = async (highlightId: string) => {
+    pushHistory();
+    const deletedHighlight = highlights.find((hl) => hl.id === highlightId);
+    setHighlights((prev) => prev.filter((hl) => hl.id !== highlightId));
+    
+    // Delete from backend
+    try {
+      if (!highlightId.startsWith("temp-")) {
+        await deleteHighlight(highlightId);
+        toast.success("Highlight berhasil dihapus");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus highlight");
+      if (deletedHighlight) {
+        setHighlights((prev) => [...prev, deletedHighlight]);
+      }
+    }
+  };
+
+  const pushHistory = useCallback(() => {
+    setHistoryStack((prev) => [...prev, [...highlights]]);
+  }, [highlights]);
+
+  const handleUndo = () => {
+    if (historyStack.length === 0) return;
+    const previous = historyStack[historyStack.length - 1];
+    setHistoryStack((prev) => prev.slice(0, -1));
+    setHighlights(previous);
+  };
+
+  const toggleAddMode = async () => {
+    if (!kepemilikanId) return;
+    if (addMode) {
+      // Save highlights to backend when exiting add mode
+      try {
+        const syncData = highlights.map(h => ({
+          page_number: h.page_number,
+          highlighted_text: h.highlighted_text,
+          highlight_rect: h.highlight_rect,
+        }));
+        await syncHighlights(kepemilikanId, syncData);
+        toast.success("Highlight berhasil disimpan");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Gagal menyimpan highlight");
+      }
+    }
+    setAddMode((prev) => !prev);
+    setMenuHighlight(null);
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await res.json();
+      if (!res.ok || result.status === "error") throw new Error(result.error);
+      toast.success("Dokumen berhasil dihapus.");
+      navigate("/documents");
+    } catch {
+      toast.error("Gagal menghapus dokumen.");
+    } finally {
+      setDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const handleEdit = () => {
+    if (!document) return;
+    setEditForm({
+      name: document.name,
+      jenis: document.jenis,
+      tanggal: document.tanggalUpload ? new Date(document.tanggalUpload) : undefined,
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleDeleteAllHighlights = async () => {
+    if (!kepemilikanId) return;
+    pushHistory();
+    setHighlights([]);
+    
+    // Sync empty array to backend
+    try {
+      await syncHighlights(kepemilikanId, []);
+      toast.success("Semua highlight berhasil dihapus");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus semua highlight");
+    }
+  };
+
+  const handleNavigateToPage = (pageNumber: number) => {
+    if (numPages && pageNumber >= 1 && pageNumber <= numPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!document || !editForm.name || !editForm.jenis || !editForm.tanggal) {
+      toast.error("Mohon lengkapi semua field.");
+      return;
+    }
+    setSaving(true);
+    try {
+      // 1. Update metadata in backend
+      const metadataRes = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/metadata`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          nama: editForm.name,
+          jenis_dokumen: editForm.jenis,
+          tanggal_upload: editForm.tanggal.toISOString(),
+        }),
+      });
+      const metadataResult = await metadataRes.json();
+      if (!metadataRes.ok || metadataResult.status === "error") {
+        throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
+      }
+
+      setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: editForm.tanggal.toISOString() });
+
+      // 2. Replace file if changed
+      if (hasFileChange && newFile) {
+        const formData = new FormData();
+        formData.append("file", newFile);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/replace-file`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        const result = await res.json();
+        if (!res.ok || result.status === "error") throw new Error(result.error);
+        setHasFileChange(false);
+        setNewFile(null);
+      }
+
+      setShowEditDialog(false);
+      toast.success("Dokumen berhasil diperbarui.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal menyimpan perubahan.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
-      <MainLayout title="Preview Dokumen" breadcrumbs={breadcrumbs}>
+      <MainLayout title="Detail Dokumen" breadcrumbs={breadcrumbs}>
         <div className="flex min-h-[420px] items-center justify-center gap-3 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Memuat file dan memeriksa integritas...</span>
@@ -142,10 +680,12 @@ export function DocumentPreviewPage() {
 
   if (error || !document || !fileUrl || !integrity) {
     return (
-      <MainLayout title="Preview Dokumen" breadcrumbs={breadcrumbs}>
+      <MainLayout title="Detail Dokumen" breadcrumbs={breadcrumbs}>
         <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 text-center">
           <AlertCircle className="h-10 w-10 text-destructive" />
-          <p className="text-sm text-destructive">{error || "Dokumen tidak dapat dimuat."}</p>
+          <p className="text-sm text-destructive">
+            {error || "Dokumen tidak dapat dimuat."}
+          </p>
           <Button variant="outline" onClick={() => navigate(-1)}>
             Kembali
           </Button>
@@ -157,7 +697,7 @@ export function DocumentPreviewPage() {
   const isPdf = document.contentType === "application/pdf";
 
   return (
-    <MainLayout title="Preview Dokumen" breadcrumbs={breadcrumbs}>
+    <MainLayout title="Detail Dokumen" breadcrumbs={breadcrumbs}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div className="flex min-w-0 items-center gap-3">
@@ -172,10 +712,91 @@ export function DocumentPreviewPage() {
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Unduh
-          </Button>
+          <div className="flex items-center gap-2">
+            {isDocumentOwner && (
+              <Button
+                variant={addMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (!isPdf) {
+                    toast.error("Highlight hanya tersedia untuk file PDF. File DOCX belum mendukung fitur highlight.");
+                    return;
+                  }
+                  toggleAddMode();
+                }}
+                disabled={isPdf && !kepemilikanId}
+                title={
+                  !isPdf
+                    ? "Highlight hanya tersedia untuk file PDF"
+                    : !kepemilikanId
+                      ? "Backend gap: kepemilikanId tidak tersedia"
+                      : addMode
+                        ? "Keluar mode highlight"
+                        : "Mode highlight"
+                }
+              >
+                <Highlighter className="mr-2 h-4 w-4" />
+                {addMode ? "Simpan Highlight" : "Tambah Highlight"}
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Hapus
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={() => setShowShareDialog(true)}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Bagikan
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleDownload}>
+              <Download className="mr-2 h-4 w-4" />
+              Unduh
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 rounded-lg border bg-card p-4 text-sm">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Jenis Dokumen</p>
+            <p className="font-medium">{document.jenis}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Sumber</p>
+            <p className="font-medium">{document.sumber}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Tanggal Upload</p>
+            <p className="font-medium">
+              {document.tanggalUpload
+                ? format(new Date(document.tanggalUpload), "dd MMMM yyyy")
+                : "-"}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Format</p>
+            <p className="font-medium">{document.contentType}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Ukuran</p>
+            <p className="font-medium">
+              {(document.size / 1024).toFixed(1)} KB
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Hash Database</p>
+            <p className="font-mono text-xs break-all">
+              {document.databaseHash || "-"}
+            </p>
+          </div>
         </div>
 
         <div
@@ -227,12 +848,252 @@ export function DocumentPreviewPage() {
           </div>
         )}
 
-        {isPdf ? (
-          <iframe
-            title={document.name}
-            src={fileUrl}
-            className="h-[calc(100vh-280px)] min-h-[620px] w-full border bg-white"
-          />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="document" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Dokumen
+            </TabsTrigger>
+            <TabsTrigger value="versions" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Riwayat Versi
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Riwayat Aktivitas
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="document">
+            {isPdf ? (
+          <div
+            ref={containerRef}
+            className={`relative mx-auto max-w-full transition-all duration-200 ${
+              addMode
+                ? "ring-2 ring-yellow-400 ring-offset-2 rounded-lg bg-yellow-50/30"
+                : ""
+            }`}
+          >
+            {!kepemilikanId && allowHighlight && (
+              <div className="mb-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                Mode highlight tidak tersedia karena kepemilikan dokumen belum
+                dapat diidentifikasi. Backend perlu diperbarui agar
+                mengembalikan kepemilikanId.
+              </div>
+            )}
+
+            {addMode && (
+              <div className="mb-3 flex items-center gap-2 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-900">
+                <Highlighter className="h-4 w-4 shrink-0" />
+                <span>
+                  <strong>Mode Highlight aktif.</strong> Seret mouse di halaman PDF untuk membuat highlight
+                  baru. Klik highlight yang ada untuk mengedit atau menghapusnya.
+                </span>
+              </div>
+            )}
+
+            {highlightsError && (
+              <div className="mb-3 flex items-center gap-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {highlightsError}
+              </div>
+            )}
+
+            {highlightsLoading && (
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Memuat highlight...
+              </div>
+            )}
+
+            {numPages && numPages > 1 && (
+              <div className="mb-3 flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  &larr; Sebelumnya
+                </Button>
+                <span className="text-sm text-muted-foreground min-w-[60px] text-center">
+                  {currentPage} / {numPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= numPages}
+                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                >
+                  Selanjutnya &rarr;
+                </Button>
+              </div>
+            )}
+
+            <Document
+              file={fileUrl}
+              onLoadSuccess={handleDocumentLoad}
+              onLoadError={(err) =>
+                setPdfError(err.message || "Gagal memuat PDF")
+              }
+              loading={
+                <div className="flex min-h-[420px] items-center justify-center gap-3 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <span>Memuat PDF...</span>
+                </div>
+              }
+              error={
+                <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 text-center">
+                  <AlertCircle className="h-10 w-10 text-destructive" />
+                  <p className="text-sm text-destructive">
+                    {pdfError || "Gagal memuat PDF"}
+                  </p>
+                </div>
+              }
+              className="flex flex-col items-center"
+            >
+              {numPages && currentPage && (
+                  <div key={currentPage} id={`pdf-page-${currentPage}`} className="relative">
+                  <div
+                    className={`relative overflow-hidden rounded border bg-white shadow-sm ${
+                      addMode ? "cursor-crosshair" : ""
+                    }`}
+                  >
+                    <Page
+                      pageNumber={currentPage}
+                      width={renderWidth}
+                      rotate={currentPageInfo?.rotate}
+                      onLoadSuccess={(page) =>
+                        handlePageLoad(currentPage, page)
+                      }
+                      onRenderError={() => {}}
+                      loading={
+                        <div
+                          style={{
+                            width: renderWidth,
+                            height: pageHeightPx,
+                          }}
+                          className="flex items-center justify-center bg-gray-50"
+                        >
+                          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                        </div>
+                      }
+                    />
+
+                    {currentPageInfo && (
+                      <HighlightOverlay
+                        pageWidth={renderWidth}
+                        pageHeight={pageHeightPx}
+                        pdfWidth={currentPageInfo.pdfWidth}
+                        pdfHeight={currentPageInfo.pdfHeight}
+                        highlights={currentPageHighlights}
+                        addMode={addMode}
+                        dragRect={
+                          dragState?.pageNumber === currentPage
+                            ? previewRect
+                            : null
+                        }
+                        onMouseDown={(e) =>
+                          handleMouseDown(e, currentPage)
+                        }
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onHighlightClick={(hlId, e) => {
+                          const hl = highlights.find(
+                            (h) => h.id === hlId,
+                          );
+                          if (hl) {
+                            setMenuHighlight({
+                              highlight: hl,
+                              position: {
+                                x: e.clientX,
+                                y: e.clientY,
+                              },
+                            });
+                          }
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center py-1 text-xs text-muted-foreground">
+                    Halaman {currentPage} dari {numPages}
+                    {currentPageHighlights.length > 0 &&
+                      ` • ${currentPageHighlights.length} highlight`}
+                  </div>
+                </div>
+              )}
+
+            </Document>
+
+            {menuHighlight && (
+              <HighlightMenu
+                highlight={menuHighlight.highlight}
+                position={menuHighlight.position}
+                onEdit={handleUpdateHighlight}
+                onDelete={handleDeleteHighlight}
+                onClose={() => setMenuHighlight(null)}
+              />
+            )}
+
+            {addMode && highlights.length > 0 && (
+              <div className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-yellow-900">
+                    <List className="h-4 w-4" />
+                    Daftar Highlight ({highlights.length})
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      disabled={historyStack.length === 0}
+                      onClick={handleUndo}
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-yellow-800 hover:bg-yellow-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Batalkan perubahan terakhir"
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Undo
+                    </button>
+                    {highlights.length > 1 && (
+                      <button
+                        onClick={handleDeleteAllHighlights}
+                        className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-red-600 hover:bg-red-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Hapus Semua
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {highlights.map((hl) => (
+                    <div
+                      key={hl.id}
+                      className="group flex items-center gap-2 rounded-md border border-yellow-200 bg-white px-2.5 py-1.5 text-xs shadow-sm"
+                    >
+                      <button
+                        onClick={() => handleNavigateToPage(hl.page_number)}
+                        className="text-yellow-700 hover:text-yellow-900 hover:underline"
+                      >
+                        Hal. {hl.page_number}
+                      </button>
+                      {hl.highlighted_text && (
+                        <span className="max-w-[120px] truncate text-gray-500">
+                          {hl.highlighted_text}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleDeleteHighlight(hl.id)}
+                        className="ml-1 rounded p-0.5 text-gray-400 opacity-0 hover:bg-red-100 hover:text-red-600 group-hover:opacity-100 transition-opacity"
+                        title="Hapus highlight ini"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="flex min-h-[520px] flex-col items-center justify-center gap-4 border bg-muted/20 text-center">
             <FileText className="h-14 w-14 text-muted-foreground" />
@@ -241,6 +1102,9 @@ export function DocumentPreviewPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Preview langsung tidak tersedia untuk DOCX.
               </p>
+              <p className="mt-1 text-xs text-yellow-600">
+                Fitur highlight hanya tersedia untuk file PDF.
+              </p>
             </div>
             <Button onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" />
@@ -248,7 +1112,196 @@ export function DocumentPreviewPage() {
             </Button>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="versions" className="space-y-4">
+            <div className="rounded-lg border bg-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Data versi bersifat simulasi (frontend). Backend endpoint <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">GET /api/dosen/dokumen/:id/versions</code> belum tersedia.</span>
+              </div>
+              <FileVersionHistory
+                versions={mockVersions}
+                onRestore={() => toast.info("Restore versi: backend belum tersedia")}
+                onDelete={() => toast.info("Hapus versi: backend belum tersedia")}
+                onDownload={() => handleDownload()}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-4">
+            <div className="rounded-lg border bg-card p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>Riwayat aktivitas bersifat simulasi (frontend). Backend endpoint <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">GET /api/dosen/dokumen/:id/activity</code> belum tersedia.</span>
+              </div>
+              <div className="space-y-0">
+                {mockActivities.map((act, idx) => (
+                  <div key={act.id} className="relative flex gap-4 pb-8 last:pb-0">
+                    {idx < mockActivities.length - 1 && (
+                      <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
+                    )}
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background">
+                      {act.action === "upload" ? (
+                        <Upload className="h-4 w-4 text-blue-500" />
+                      ) : act.action === "blockchain" ? (
+                        <ShieldCheck className="h-4 w-4 text-green-500" />
+                      ) : act.action === "edit" ? (
+                        <Pencil className="h-4 w-4 text-amber-500" />
+                      ) : act.action === "highlight" ? (
+                        <Highlighter className="h-4 w-4 text-purple-500" />
+                      ) : act.action === "verify" ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">
+                          {act.action === "upload" ? "Upload" : act.action === "blockchain" ? "Blockchain" : act.action === "edit" ? "Edit" : act.action === "highlight" ? "Highlight" : act.action === "verify" ? "Verifikasi" : "Aktivitas"}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(act.timestamp), "dd MMM yyyy, HH:mm")}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{act.description}</p>
+                      <p className="text-xs text-muted-foreground">Oleh: {act.actor}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        if (!open) {
+          setNewFile(null);
+          setHasFileChange(false);
+        }
+        setShowEditDialog(open);
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Dokumen</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama Dokumen</Label>
+              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Nama dokumen" />
+            </div>
+            <div className="space-y-2">
+              <Label>Jenis Dokumen</Label>
+              <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
+                <SelectTrigger><SelectValue placeholder="Pilih jenis" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
+                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
+                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
+                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
+                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
+                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
+                  <SelectItem value="FOTO">FOTO</SelectItem>
+                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Tanggal Dokumen</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !editForm.tanggal && "text-muted-foreground")}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editForm.tanggal ? format(editForm.tanggal, "dd MMMM yyyy") : "Pilih tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={editForm.tanggal} onSelect={(d) => setEditForm({ ...editForm, tanggal: d })} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ganti File (opsional)</Label>
+              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.docx" onChange={() => {
+                const file = fileInputRef.current?.files?.[0];
+                if (!file) return;
+                if (file.size > 20 * 1024 * 1024) {
+                  toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
+                  return;
+                }
+                setNewFile(file);
+                setHasFileChange(true);
+              }} />
+              {!hasFileChange ? (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-3 text-sm text-muted-foreground hover:border-gray-400 hover:bg-gray-50"
+                >
+                  <FileText className="h-5 w-5 shrink-0" />
+                  <span className="flex-1 truncate">{document?.name}</span>
+                  <span className="shrink-0 text-xs">
+                    {(document.size / 1024).toFixed(1)} KB
+                  </span>
+                  <span className="ml-2 shrink-0 rounded border bg-white px-2 py-0.5 text-xs font-medium text-gray-600">
+                    Ganti
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                  <FileWarning className="h-5 w-5 shrink-0 text-amber-600" />
+                  <span className="flex-1 truncate">{newFile?.name}</span>
+                  <span className="shrink-0 text-xs text-amber-600">
+                    {(newFile!.size / 1024).toFixed(1)} KB
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setNewFile(null); setHasFileChange(false); }}
+                    className="shrink-0 text-red-500 hover:text-red-700"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Batal</Button>
+            <Button onClick={saveEdit} disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Dialog */}
+      {document && (
+        <DocumentSharing
+          documentId={document.id}
+          documentName={document.name}
+          hideButton
+          open={showShareDialog}
+          onOpenChange={setShowShareDialog}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dokumen <strong>{document?.name}</strong> akan dihapus dari portofolio Anda.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
+              {deleting ? "Menghapus..." : "Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }

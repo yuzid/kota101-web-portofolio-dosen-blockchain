@@ -33,7 +33,7 @@ const DEFAULT_ACCEPTED_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
-const DEFAULT_MAX_SIZE_MB = 10;
+const DEFAULT_MAX_SIZE_MB = 20;
 
 export function FileUploader({
   onFilesSelected,

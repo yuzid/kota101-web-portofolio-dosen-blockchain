@@ -120,7 +120,7 @@ export function AMIActivityDetailPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "pengajaran":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
+        return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "penelitian":
         return <Badge className="bg-green-500">Penelitian</Badge>;
       case "pengabdian":
@@ -364,6 +364,7 @@ export function AMIActivityDetailPage() {
                             onClick={() =>
                               navigate(`/documents/${doc.id}/preview`, {
                                 state: {
+                                  isDocumentOwner: false,
                                   activityId: activity.id,
                                   breadcrumbs: [
                                     { label: "Beranda", path: "/dashboard" },

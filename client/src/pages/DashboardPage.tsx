@@ -247,7 +247,7 @@ export function DashboardPage() {
               <CardContent>
                 <div className="text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
-                    <span>Pengajaran</span>
+                    <span>Pendidikan</span>
                     <span className="font-medium">{stats?.pengajaran || 0}</span>
                   </div>
                   <div className="flex justify-between">

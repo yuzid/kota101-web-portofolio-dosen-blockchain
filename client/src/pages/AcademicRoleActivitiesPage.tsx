@@ -65,6 +65,10 @@ import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { createRekap } from "../lib/rekapStorage";
+import {
+  setMonitoringActivityDetail,
+  setMonitoringContext,
+} from "../lib/monitoringStorage";
 
 interface Activity {
   id: string;
@@ -252,7 +256,7 @@ export function AcademicRoleActivitiesPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "PENDIDIKAN":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
+        return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "PENELITIAN":
         return <Badge className="bg-green-500">Penelitian</Badge>;
       case "PENGABDIAN":
@@ -291,6 +295,27 @@ export function AcademicRoleActivitiesPage() {
     filterKelengkapan !== "all" ||
     filterDateFrom ||
     filterDateTo;
+
+  const handleViewDetail = async (activityId: string) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${activityId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const result = await response.json();
+      if (result.status === "success") {
+        setMonitoringActivityDetail(result.data);
+        setMonitoringContext({ role: isKajur ? "jurusan" : "prodi" });
+        navigate(`/monitoring/${endpoint}/kegiatan/${activityId}`);
+      } else {
+        toast.error("Gagal memuat detail kegiatan");
+        navigate(`/activities/${activityId}`);
+      }
+    } catch {
+      toast.error("Terjadi kesalahan koneksi");
+      navigate(`/activities/${activityId}`);
+    }
+  };
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -518,7 +543,7 @@ export function AcademicRoleActivitiesPage() {
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="PENDIDIKAN">
-              Pengajaran
+              Pendidikan
               <Badge variant="secondary" className="ml-2">
                 {counts.PENDIDIKAN}
               </Badge>
@@ -777,7 +802,7 @@ export function AcademicRoleActivitiesPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/activities/${activity.id}`)}
+                            onClick={() => handleViewDetail(activity.id)}
                           >
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -842,7 +867,7 @@ export function AcademicRoleActivitiesPage() {
                   id="rekap-nama"
                   value={rekapForm.nama}
                   onChange={(e) => setRekapForm({ ...rekapForm, nama: e.target.value })}
-                  placeholder="Contoh: Rekap Pengajaran Ganjil 2025"
+                  placeholder="Contoh: Rekap Pendidikan Ganjil 2025"
                   className="border-muted-foreground/20"
                 />
               </div>

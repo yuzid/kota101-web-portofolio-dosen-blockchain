@@ -3,3 +3,4 @@ docker-compose.prod.yml
 docs
 .env
 GEMINI.md
+.DS_Store

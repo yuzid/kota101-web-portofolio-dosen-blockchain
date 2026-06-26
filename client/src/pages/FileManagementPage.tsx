@@ -14,6 +14,16 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -61,6 +71,8 @@ export function FileManagementPage() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [showDeleteFileDialog, setShowDeleteFileDialog] = useState(false);
+  const [deleteFileTarget, setDeleteFileTarget] = useState<string | null>(null);
 
   // Mock user for demo
   const user = { name: 'Dr. John Doe' };
@@ -106,7 +118,15 @@ export function FileManagementPage() {
   };
 
   const handleDeleteFile = (fileId: string) => {
-    deleteFile(fileId);
+    setDeleteFileTarget(fileId);
+    setShowDeleteFileDialog(true);
+  };
+
+  const confirmDeleteFile = () => {
+    if (!deleteFileTarget) return;
+    deleteFile(deleteFileTarget);
+    setShowDeleteFileDialog(false);
+    setDeleteFileTarget(null);
   };
 
   const handleDownloadVersion = (version: any) => {
@@ -124,6 +144,7 @@ export function FileManagementPage() {
   };
 
   const selectedFile = selectedFileId ? getFile(selectedFileId) : null;
+  const deleteFileData = deleteFileTarget ? getFile(deleteFileTarget) : null;
 
   const getFileTypeIcon = (type: string) => {
     if (type.startsWith('image/')) {
@@ -449,6 +470,24 @@ export function FileManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete File Confirmation */}
+      <AlertDialog open={showDeleteFileDialog} onOpenChange={setShowDeleteFileDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus File?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus file <strong>{deleteFileData?.name}</strong> beserta seluruh versinya? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteFile} className="bg-destructive hover:bg-destructive/90">
+              Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }

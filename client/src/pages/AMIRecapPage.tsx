@@ -515,7 +515,7 @@ export function AMIRecapPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "pengajaran":
-        return <Badge className="bg-blue-500">Pengajaran</Badge>;
+        return <Badge className="bg-blue-500">Pendidikan</Badge>;
       case "penelitian":
         return <Badge className="bg-green-500">Penelitian</Badge>;
       case "pengabdian":
@@ -662,7 +662,7 @@ export function AMIRecapPage() {
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="pengajaran">
-              Pengajaran{" "}
+              Pendidikan{" "}
               <Badge variant="secondary" className="ml-2">
                 {counts.pengajaran}
               </Badge>

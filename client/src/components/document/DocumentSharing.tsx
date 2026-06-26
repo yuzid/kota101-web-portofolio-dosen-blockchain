@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -13,20 +12,22 @@ import {
   DialogTitle,
 } from '../ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import { Share2, Link2, Copy, Mail, Users, X, Check, Clock } from 'lucide-react';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
+import { Share2, Link2, Copy, Mail, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SharedUser {
   id: string;
   name: string;
   email: string;
-  permission: 'view' | 'comment' | 'edit';
   sharedAt: string;
 }
 
@@ -34,30 +35,34 @@ interface DocumentSharingProps {
   documentId: string;
   documentName: string;
   iconOnly?: boolean;
+  hideButton?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function DocumentSharing({ documentId, documentName, iconOnly = false }: DocumentSharingProps) {
-  const [showDialog, setShowDialog] = useState(false);
+const storageKey = (docId: string) => `dokumen_share_${docId}`;
+
+export function DocumentSharing({ documentId, documentName, iconOnly = false, hideButton = false, open, onOpenChange }: DocumentSharingProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const showDialog = open !== undefined ? open : internalOpen;
+  const setShowDialog = onOpenChange || setInternalOpen;
   const [shareEmail, setShareEmail] = useState('');
-  const [sharePermission, setSharePermission] = useState<'view' | 'comment' | 'edit'>('view');
-  const [linkSharing, setLinkSharing] = useState(false);
-  const [linkExpiry, setLinkExpiry] = useState<string>('7d');
-  const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([
-    {
-      id: '1',
-      name: 'Dr. Ahmad Fauzi',
-      email: 'ahmad.fauzi@polban.ac.id',
-      permission: 'edit',
-      sharedAt: '2026-05-10T10:00:00',
-    },
-    {
-      id: '2',
-      name: 'Dr. Siti Nurhaliza',
-      email: 'siti.nurhaliza@polban.ac.id',
-      permission: 'view',
-      sharedAt: '2026-05-12T14:30:00',
-    },
-  ]);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [removeTargetId, setRemoveTargetId] = useState<string | null>(null);
+  const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(storageKey(documentId));
+    if (stored) {
+      try {
+        setSharedUsers(JSON.parse(stored));
+      } catch {}
+    }
+  }, [documentId]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey(documentId), JSON.stringify(sharedUsers));
+  }, [sharedUsers, documentId]);
 
   const handleShare = () => {
     if (!shareEmail) {
@@ -65,7 +70,6 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
       return;
     }
 
-    // Check if already shared
     if (sharedUsers.some((u) => u.email === shareEmail)) {
       toast.error('Dokumen sudah dibagikan ke email ini');
       return;
@@ -75,39 +79,44 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
       id: `user-${Date.now()}`,
       name: shareEmail.split('@')[0],
       email: shareEmail,
-      permission: sharePermission,
       sharedAt: new Date().toISOString(),
     };
 
     setSharedUsers([...sharedUsers, newSharedUser]);
     setShareEmail('');
-    toast.success(`Dokumen berhasil dibagikan ke ${shareEmail}`);
+
+    toast.success(
+      `Undangan akan dikirim ke ${shareEmail}`,
+      { description: 'Notifikasi email akan dikirimkan oleh sistem setelah backend tersedia.' }
+    );
   };
 
   const handleRemoveShare = (userId: string) => {
-    setSharedUsers(sharedUsers.filter((u) => u.id !== userId));
+    setRemoveTargetId(userId);
+    setShowRemoveDialog(true);
+  };
+
+  const confirmRemoveShare = () => {
+    if (!removeTargetId) return;
+    const updated = sharedUsers.filter((u) => u.id !== removeTargetId);
+    setSharedUsers(updated);
+    localStorage.setItem(storageKey(documentId), JSON.stringify(updated));
     toast.success('Akses dibatalkan');
+    setShowRemoveDialog(false);
+    setRemoveTargetId(null);
   };
 
-  const handleUpdatePermission = (userId: string, permission: 'view' | 'comment' | 'edit') => {
-    setSharedUsers(
-      sharedUsers.map((u) => (u.id === userId ? { ...u, permission } : u))
-    );
-    toast.success('Izin akses diperbarui');
+  const handleCopyLink = async () => {
+    const link = `${window.location.origin}/public/dokumen/${documentId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Link berhasil disalin ke clipboard');
+    } catch {
+      toast.info(`Link: ${link}`);
+    }
   };
 
-  const handleCopyLink = () => {
-    const link = `https://portofolio.polban.ac.id/shared/${documentId}`;
-    navigator.clipboard.writeText(link);
-    toast.success('Link berhasil disalin ke clipboard');
-  };
-
-  const handleGenerateShareLink = () => {
-    setLinkSharing(true);
-    toast.success('Link berbagi diaktifkan', {
-      description: 'Siapapun dengan link ini dapat mengakses dokumen',
-    });
-  };
+  const removeTargetUser = removeTargetId ? sharedUsers.find(u => u.id === removeTargetId) : null;
 
   const getInitials = (name: string) => {
     return name
@@ -118,25 +127,32 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
       .substring(0, 2);
   };
 
-  const getPermissionBadge = (permission: string) => {
-    switch (permission) {
-      case 'view':
-        return <Badge variant="secondary">Lihat</Badge>;
-      case 'comment':
-        return <Badge className="bg-blue-500">Komentar</Badge>;
-      case 'edit':
-        return <Badge className="bg-green-500">Edit</Badge>;
-      default:
-        return <Badge variant="secondary">{permission}</Badge>;
-    }
-  };
-
   return (
     <>
-      <Button variant={iconOnly ? "ghost" : "outline"} size={iconOnly ? "sm" : "default"} onClick={() => setShowDialog(true)}>
-        <Share2 className="w-4 h-4" />
-        {!iconOnly && <span className="ml-2">Bagikan</span>}
-      </Button>
+      {!hideButton && (
+        <Button variant={iconOnly ? "ghost" : "outline"} size={iconOnly ? "sm" : "default"} onClick={() => setShowDialog(true)}>
+          <Share2 className="w-4 h-4" />
+          {!iconOnly && <span className="ml-2">Bagikan</span>}
+        </Button>
+      )}
+
+      {/* Remove Share Confirmation */}
+      <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Akses?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus akses <strong>{removeTargetUser?.name}</strong> ({removeTargetUser?.email}) dari dokumen ini?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveShare} className="bg-destructive hover:bg-destructive/90">
+              Hapus Akses
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-2xl">
@@ -149,14 +165,14 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Add People */}
+            {/* Add People (Disabled temporarily)
             <div className="space-y-3">
               <Label>Bagikan ke Orang</Label>
               <div className="flex gap-2">
-                <div className="flex-1 space-y-2">
+                <div className="flex-1">
                   <Input
                     type="email"
-                    placeholder="Masukkan email..."
+                    placeholder="Masukkan email penerima..."
                     value={shareEmail}
                     onChange={(e) => setShareEmail(e.target.value)}
                     onKeyDown={(e) => {
@@ -166,24 +182,15 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
                     }}
                   />
                 </div>
-                <Select value={sharePermission} onValueChange={(value: any) => setSharePermission(value)}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="view">Lihat saja</SelectItem>
-                    <SelectItem value="comment">Bisa komentar</SelectItem>
-                    <SelectItem value="edit">Bisa edit</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Button onClick={handleShare}>
                   <Mail className="w-4 h-4 mr-2" />
                   Kirim
                 </Button>
               </div>
             </div>
+            */}
 
-            {/* Shared Users List */}
+            {/* Shared Users List (Disabled temporarily)
             {sharedUsers.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -202,19 +209,6 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
                         <p className="font-medium text-sm">{user.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                       </div>
-                      <Select
-                        value={user.permission}
-                        onValueChange={(value: any) => handleUpdatePermission(user.id, value)}
-                      >
-                        <SelectTrigger className="w-[130px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="view">Lihat saja</SelectItem>
-                          <SelectItem value="comment">Bisa komentar</SelectItem>
-                          <SelectItem value="edit">Bisa edit</SelectItem>
-                        </SelectContent>
-                      </Select>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -224,65 +218,42 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false }: 
                       </Button>
                     </div>
                   ))}
-                </div>
               </div>
+            </div>
             )}
+            */}
+
+            {/* Email notification banner (Disabled temporarily)
+            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+              <p className="text-blue-900">
+                Notifikasi email akan dikirimkan oleh sistem ke penerima.
+              </p>
+            </div>
+            */}
 
             {/* Share Link */}
             <div className="space-y-3 border-t pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Link2 className="w-4 h-4 text-muted-foreground" />
-                  <Label>Link Berbagi</Label>
-                </div>
-                {!linkSharing ? (
-                  <Button variant="outline" size="sm" onClick={handleGenerateShareLink}>
-                    Buat Link
-                  </Button>
-                ) : (
-                  <Badge className="bg-green-500">
-                    <Check className="w-3 h-3 mr-1" />
-                    Aktif
-                  </Badge>
-                )}
+              <div className="flex items-center gap-2">
+                <Link2 className="w-4 h-4 text-muted-foreground" />
+                <Label>Link Berbagi</Label>
               </div>
-
-              {linkSharing && (
-                <>
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={`https://portofolio.polban.ac.id/shared/${documentId}`}
-                      className="font-mono text-sm"
-                    />
-                    <Button variant="outline" onClick={handleCopyLink}>
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Link kadaluarsa dalam:</Label>
-                    <Select value={linkExpiry} onValueChange={setLinkExpiry}>
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1d">1 hari</SelectItem>
-                        <SelectItem value="7d">7 hari</SelectItem>
-                        <SelectItem value="30d">30 hari</SelectItem>
-                        <SelectItem value="never">Tidak pernah</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm">
-                    <Clock className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                    <p className="text-orange-900">
-                      Siapapun dengan link ini dapat melihat dokumen
-                    </p>
-                  </div>
-                </>
-              )}
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={`${window.location.origin}/public/dokumen/${documentId}`}
+                  className="font-mono text-sm"
+                />
+                <Button variant="outline" onClick={handleCopyLink}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <Link2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <p className="text-blue-900">
+                  Siapapun dengan link ini dapat melihat dokumen
+                </p>
+              </div>
             </div>
           </div>
 
