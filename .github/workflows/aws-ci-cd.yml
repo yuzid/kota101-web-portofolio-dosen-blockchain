@@ -98,12 +98,14 @@ jobs:
            --arg d4_user "$D4_RPC_USERNAME" \
            --arg d4_pass "$D4_RPC_PASSWORD" \
            --arg aws_access_key "$AWS_ACCESS_KEY_ID" \
-           --arg aws_secret_key "$AWS_SECRET_ACCESS_KEY" \           --arg smtp_host "$SMTP_HOST" 
-           --arg smtp_port "$SMTP_PORT" 
-           --arg smtp_secure "$SMTP_SECURE" 
-           --arg smtp_user "$SMTP_USER" 
-           --arg smtp_pass "$SMTP_PASS" 
-           --arg smtp_from "$SMTP_FROM"            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
+           --arg aws_secret_key "$AWS_SECRET_ACCESS_KEY" \
+           --arg smtp_host "$SMTP_HOST" \
+           --arg smtp_port "$SMTP_PORT" \
+           --arg smtp_secure "$SMTP_SECURE" \
+           --arg smtp_user "$SMTP_USER" \
+           --arg smtp_pass "$SMTP_PASS" \
+           --arg smtp_from "$SMTP_FROM" \
+           'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
             (.containerDefinitions[] | select(.name == $container) | .environment) |= 
             (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID" and . != "DATABASE_URL" and . != "AWS_S3_BUCKET" and . != "AUDIT_STREAM_NAME" and . != "D3_IP" and . != "D4_IP" and . != "D3_RPC_PORT" and . != "D3_RPC_USERNAME" and . != "D3_RPC_PASSWORD" and . != "D4_RPC_PORT" and . != "D4_RPC_USERNAME" and . != "D4_RPC_PASSWORD" and . != "SMTP_HOST" and . != "SMTP_PORT" and . != "SMTP_SECURE" and . != "SMTP_USER" and . != "SMTP_PASS" and . != "SMTP_FROM")) + [
               {"name": "JWT_SECRET",       "value": $jwt},
