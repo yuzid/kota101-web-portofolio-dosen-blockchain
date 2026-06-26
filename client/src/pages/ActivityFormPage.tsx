@@ -52,6 +52,7 @@ import {
   Plus,
   Loader2,
   Upload,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -883,10 +884,16 @@ export function ActivityFormPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            {isEdit && !isCurrentUserPencatat && (
+              <p className="text-xs text-amber-600 mb-3 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                Hanya pencatat yang dapat mengubah jenis bukti
+              </p>
+            )}
+            <div className={cn("space-y-3", isEdit && !isCurrentUserPencatat && "pointer-events-none opacity-50")}>
               <div
                 className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary/5" : ""}`}
-                onClick={() => setFormData({ ...formData, jenisBukti: "MASING_MASING" })}
+                onClick={() => !(isEdit && !isCurrentUserPencatat) && setFormData({ ...formData, jenisBukti: "MASING_MASING" })}
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "MASING_MASING" ? "border-primary bg-primary" : ""}`}>
@@ -904,7 +911,7 @@ export function ActivityFormPage() {
               </div>
               <div
                 className={`p-4 border rounded-lg cursor-pointer ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary/5" : ""}`}
-                onClick={() => setFormData({ ...formData, jenisBukti: "BERSAMA" })}
+                onClick={() => !(isEdit && !isCurrentUserPencatat) && setFormData({ ...formData, jenisBukti: "BERSAMA" })}
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-4 h-4 rounded-full border-2 ${formData.jenisBukti === "BERSAMA" ? "border-primary bg-primary" : ""}`}>

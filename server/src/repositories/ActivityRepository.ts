@@ -62,7 +62,11 @@ export class ActivityRepository {
         where,
         include: {
           dosen: { include: { program_studi: true } },
-          lampiran_bukti: true,
+          lampiran_bukti: {
+            include: {
+              dokumen: true
+            }
+          },
           partisipasi: { include: { dosen: true } }
         },
         orderBy: { tanggal_mulai: 'desc' },
@@ -110,7 +114,11 @@ export class ActivityRepository {
         where,
         include: {
           dosen: { include: { program_studi: true } },
-          lampiran_bukti: true,
+          lampiran_bukti: {
+            include: {
+              dokumen: true
+            }
+          },
           partisipasi: { include: { dosen: true } }
         },
         orderBy: { tanggal_mulai: 'desc' },

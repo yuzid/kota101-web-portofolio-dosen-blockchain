@@ -170,6 +170,8 @@ export function DocumentPreviewPage() {
     return (location.state as Record<string, unknown>)?.allowHighlight === true;
   });
 
+  const isDocumentOwner = (location.state as Record<string, unknown>)?.isDocumentOwner !== false;
+
   const [historyStack, setHistoryStack] = useState<Highlight[][]>([]);
   const [showHighlightPanel, setShowHighlightPanel] = useState(false);
   const [activeTab, setActiveTab] = useState("document");
@@ -197,6 +199,18 @@ export function DocumentPreviewPage() {
     if (containerWidth < 100) return 800;
     return Math.max(500, containerWidth - 2);
   }, [containerWidth]);
+
+  // Only apply localStorage edits once to avoid infinite re-render loop
+  const editAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!document || editAppliedRef.current) return;
+    const edits = JSON.parse(localStorage.getItem("dokumen_edits") || "{}");
+    const edit = edits[document.id];
+    if (edit) {
+      editAppliedRef.current = true;
+      setDocument({ ...document, name: edit.name, jenis: edit.jenis, tanggalUpload: edit.tanggal });
+    }
+  }, [document]);
 
   useEffect(() => {
     if (!id) return;
@@ -256,15 +270,6 @@ export function DocumentPreviewPage() {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [activityId, apiPrefix, id, token]);
-
-  useEffect(() => {
-    if (!document) return;
-    const edits = JSON.parse(localStorage.getItem("dokumen_edits") || "{}");
-    const edit = edits[document.id];
-    if (edit) {
-      setDocument({ ...document, name: edit.name, jenis: edit.jenis, tanggalUpload: edit.tanggal });
-    }
-  }, [document]);
 
   const loadHighlights = useCallback(async () => {
     if (!id) return;
@@ -408,7 +413,7 @@ export function DocumentPreviewPage() {
         },
       }));
     } catch {
-      console.warn(`getViewport failed for page ${pageNumber}`);
+      // Silently skip failed pages
     }
   };
 
@@ -618,11 +623,27 @@ export function DocumentPreviewPage() {
     }
     setSaving(true);
     try {
-      const edits = JSON.parse(localStorage.getItem("dokumen_edits") || "{}");
-      edits[document.id] = { name: editForm.name, jenis: editForm.jenis, tanggal: editForm.tanggal.toISOString() };
-      localStorage.setItem("dokumen_edits", JSON.stringify(edits));
+      // 1. Update metadata in backend
+      const metadataRes = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/metadata`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          nama: editForm.name,
+          jenis_dokumen: editForm.jenis,
+          tanggal_upload: editForm.tanggal.toISOString(),
+        }),
+      });
+      const metadataResult = await metadataRes.json();
+      if (!metadataRes.ok || metadataResult.status === "error") {
+        throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
+      }
+
       setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: editForm.tanggal.toISOString() });
 
+      // 2. Replace file if changed
       if (hasFileChange && newFile) {
         const formData = new FormData();
         formData.append("file", newFile);
@@ -692,42 +713,50 @@ export function DocumentPreviewPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant={addMode ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                if (!isPdf) {
-                  toast.error("Highlight hanya tersedia untuk file PDF. File DOCX belum mendukung fitur highlight.");
-                  return;
+            {isDocumentOwner && (
+              <Button
+                variant={addMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (!isPdf) {
+                    toast.error("Highlight hanya tersedia untuk file PDF. File DOCX belum mendukung fitur highlight.");
+                    return;
+                  }
+                  toggleAddMode();
+                }}
+                disabled={isPdf && !kepemilikanId}
+                title={
+                  !isPdf
+                    ? "Highlight hanya tersedia untuk file PDF"
+                    : !kepemilikanId
+                      ? "Backend gap: kepemilikanId tidak tersedia"
+                      : addMode
+                        ? "Keluar mode highlight"
+                        : "Mode highlight"
                 }
-                toggleAddMode();
-              }}
-              disabled={isPdf && !kepemilikanId}
-              title={
-                !isPdf
-                  ? "Highlight hanya tersedia untuk file PDF"
-                  : !kepemilikanId
-                    ? "Backend gap: kepemilikanId tidak tersedia"
-                    : addMode
-                      ? "Keluar mode highlight"
-                      : "Mode highlight"
-              }
-            >
-              <Highlighter className="mr-2 h-4 w-4" />
-              {addMode ? "Simpan Highlight" : "Tambah Highlight"}
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleEdit}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Hapus
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setShowShareDialog(true)}>
-              <Share2 className="mr-2 h-4 w-4" />
-              Bagikan
-            </Button>
+              >
+                <Highlighter className="mr-2 h-4 w-4" />
+                {addMode ? "Simpan Highlight" : "Tambah Highlight"}
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Hapus
+              </Button>
+            )}
+            {isDocumentOwner && (
+              <Button variant="outline" size="sm" onClick={() => setShowShareDialog(true)}>
+                <Share2 className="mr-2 h-4 w-4" />
+                Bagikan
+              </Button>
+            )}
             <Button variant="outline" onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" />
               Unduh

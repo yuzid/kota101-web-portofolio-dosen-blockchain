@@ -106,4 +106,53 @@ export class HighlightRepository {
     });
     return kepemilikan?.id;
   }
+
+  /**
+   * Verify if a highlight belongs to the specified dosen
+   * Returns true if the dosen owns the highlight, false otherwise
+   */
+  async verifyOwnership(highlightId: string, dosenId: string): Promise<boolean> {
+    const highlight = await prisma.highlight.findUnique({
+      where: { id: highlightId },
+      include: {
+        kepemilikan: {
+          select: { dosen_id: true },
+        },
+      },
+    });
+
+    if (!highlight) {
+      return false;
+    }
+
+    return highlight.kepemilikan.dosen_id === dosenId;
+  }
+
+  /**
+   * Verify if a kepemilikan dokumen belongs to the specified dosen
+   * Returns true if the dosen owns the kepemilikan, false otherwise
+   */
+  async verifyKepemilikanOwnership(kepemilikanId: string, dosenId: string): Promise<boolean> {
+    const kepemilikan = await prisma.kepemilikanDokumen.findUnique({
+      where: { id: kepemilikanId },
+      select: { dosen_id: true },
+    });
+
+    if (!kepemilikan) {
+      return false;
+    }
+
+    return kepemilikan.dosen_id === dosenId;
+  }
+
+  async findByDokumenId(dokumenId: string) {
+    return await prisma.highlight.findMany({
+      where: {
+        kepemilikan: {
+          dokumen_id: dokumenId,
+        },
+      },
+      include: { highlight_rect: true },
+    });
+  }
 }

@@ -172,6 +172,7 @@ export class DocumentRepository {
         kepemilikan: {
           where: { status: 'DISETUJUI' },
           select: {
+            id: true,
             dosen: {
               select: {
                 id: true,

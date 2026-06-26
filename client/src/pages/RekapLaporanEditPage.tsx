@@ -400,12 +400,12 @@ export function RekapLaporanEditPage() {
                             kegiatan.lampiran_bukti.map((lb: any, j: number) => (
                               <a
                                 key={j}
-                                href={lb.file_url || lb.path || '#'}
+                                href={`/documents/${lb.dokumen?.id || lb.dokumen_id}/preview`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
                               >
-                                {lb.nama_file || lb.nama || `Dokumen ${j + 1}`}
+                                {lb.dokumen?.nama || lb.nama_file || lb.nama || `Dokumen ${j + 1}`}
                               </a>
                             ))
                           ) : (

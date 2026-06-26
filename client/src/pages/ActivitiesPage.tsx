@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Plus, Search, Eye, Share2, X, Copy, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -83,6 +83,8 @@ export function ActivitiesPage() {
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [shareMode, setShareMode] = useState<"detail" | "dokumen">("detail");
+  const [copied, setCopied] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -123,7 +125,6 @@ export function ActivitiesPage() {
       }
     } catch (error) {
       // Backend belum menyediakan endpoint ini - catat sebagai Backend Requirement
-      console.log('Endpoint permintaan-konfirmasi belum tersedia');
     }
   };
 
@@ -194,19 +195,24 @@ export function ActivitiesPage() {
 
   const handleShare = (activity: Activity) => {
     setSelectedActivity(activity);
-    const link = `${window.location.origin}/activities/${activity.id}`;
-    setShareLink(link);
+    setShareLink(`${window.location.origin}/public/kegiatan/${activity.id}`);
+    setShareMode("detail");
+    setCopied(false);
     setShowShareDialog(true);
   };
 
   const copyShareLink = async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
+      setCopied(true);
       toast.success('Link berhasil disalin!');
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       toast.info(`Link: ${shareLink}`);
     }
   };
+
+  const activeShareLink = shareLink;
 
   const uniqueYears = Array.from(new Set(activities.map(a => a.periode))).sort().reverse();
   const uniqueKategoris = Array.from(new Set(activities.map(a => a.kategori))).sort();
@@ -484,21 +490,85 @@ export function ActivitiesPage() {
         </Tabs>
       </div>
 
-      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showShareDialog} onOpenChange={(open) => { if (!open) { setShowShareDialog(false); } }}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Bagikan Kegiatan Ini</DialogTitle>
-            <DialogDescription>
-              Link ini akan menampilkan detail kegiatan <strong>{selectedActivity?.name}</strong> beserta dokumen buktinya.
-            </DialogDescription>
+            <DialogTitle>Bagikan Kegiatan</DialogTitle>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input value={shareLink} readOnly className="font-mono text-sm" />
-              <Button onClick={copyShareLink} size="icon">
-                <Copy className="w-4 h-4" />
-              </Button>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-3">
+              <div
+                className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
+                  shareMode === "detail"
+                    ? "border-primary bg-primary/5"
+                    : "hover:bg-muted/50"
+                }`}
+                onClick={() => { setShareMode("detail"); setCopied(false); setShareLink(`${window.location.origin}/public/kegiatan/${selectedActivity?.id}`); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full border-2 ${
+                      shareMode === "detail" ? "border-primary bg-primary" : ""
+                    }`}>
+                      {shareMode === "detail" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Detail Kegiatan</p>
+                      <p className="text-xs text-muted-foreground">
+                        Bagikan halaman detail kegiatan lengkap
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    shareMode === "dokumen"
+                      ? "border-primary bg-primary/5"
+                      : "hover:bg-muted/50"
+                  }`}
+                  onClick={() => { setShareMode("dokumen"); setCopied(false); setShareLink(`${window.location.origin}/public/kegiatan/${selectedActivity?.id}/dokumen`); }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full border-2 ${
+                    shareMode === "dokumen" ? "border-primary bg-primary" : ""
+                  }`}>
+                    {shareMode === "dokumen" && <div className="w-1.5 h-1.5 rounded-full bg-white m-0.5" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Dokumen Saja</p>
+                    <p className="text-xs text-muted-foreground">
+                      Bagikan dokumen tanpa detail kegiatan
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">
+                {shareMode === "detail" ? "Link detail kegiatan" : "Link dokumen"}
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={activeShareLink}
+                  readOnly
+                  className="font-mono text-sm flex-1 min-w-0"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copyShareLink}
+                  className="shrink-0"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-1 text-green-600" /> Tersalin
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-1" /> Salin
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

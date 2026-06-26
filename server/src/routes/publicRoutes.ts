@@ -48,5 +48,6 @@ router.get('/kegiatan/:id', asyncHandler(activityController.getPublicActivityByI
 // Document routes (public)
 router.get('/dokumen', asyncHandler(documentController.getPublicDocuments));
 router.get('/dokumen/:id', asyncHandler(documentController.getPublicDocumentById));
+router.get('/dokumen/:id/content', asyncHandler(documentController.getPublicDocumentContent));
 
 export default router;

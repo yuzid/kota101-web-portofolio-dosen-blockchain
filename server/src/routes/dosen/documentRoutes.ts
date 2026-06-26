@@ -34,6 +34,8 @@ router.get('/riwayat-distribusi', asyncHandler(documentController.getDosenDistri
 router.get('/:id/preview', asyncHandler(documentController.getDocumentPreview));
 router.get('/:id/content', asyncHandler(documentController.getDocumentContent));
 router.post('/upload', upload.single('file'), asyncHandler(documentController.uploadDosenDocument));
+router.put('/:id/metadata', asyncHandler(documentController.updateMetadata));
+router.put('/:id/replace-file', upload.single('file'), asyncHandler(documentController.replaceFile));
 router.patch('/:id/terima', asyncHandler(documentController.acceptDocument));
 router.patch('/:id/tolak', asyncHandler(documentController.rejectDocument));
 router.delete('/:id', asyncHandler(documentController.deleteDocument));
