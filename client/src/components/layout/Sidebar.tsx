@@ -37,55 +37,55 @@ const navigationItems: NavItem[] = [
     label: "Beranda",
     icon: Home,
     path: "/dashboard",
-    roles: ["admin_tu", "dosen", "kaprodi", "kajur"],
+    roles: ["staf_tu", "dosen", "kaprodi", "kajur"],
   },
   {
     label: "Dashboard",
     icon: Home,
     path: "/dashboard",
-    roles: ["administrator"],
+    roles: ["admin"],
   },
   {
     label: "Manajemen Akun",
     icon: Users,
     path: "/manage-accounts",
-    roles: ["administrator"],
+    roles: ["admin"],
   },
   {
     label: "Akademik",
     icon: Building2,
-    roles: ["administrator"],
+    roles: ["admin"],
     children: [
       {
         label: "Jurusan",
         icon: Landmark,
         path: "/admin/akademik/jurusan",
-        roles: ["administrator"],
+        roles: ["admin"],
       },
       {
         label: "Program Studi",
         icon: GraduationCap,
         path: "/admin/akademik/prodi",
-        roles: ["administrator"],
+        roles: ["admin"],
       },
     ],
   },
   {
     label: "Jabatan",
     icon: Briefcase,
-    roles: ["administrator"],
+    roles: ["admin"],
     children: [
       {
         label: "Ketua Jurusan",
         icon: Landmark,
         path: "/admin/jabatan/kajur",
-        roles: ["administrator"],
+        roles: ["admin"],
       },
       {
         label: "Ketua Prodi",
         icon: GraduationCap,
         path: "/admin/jabatan/kaprodi",
-        roles: ["administrator"],
+        roles: ["admin"],
       },
     ],
   },
@@ -93,7 +93,7 @@ const navigationItems: NavItem[] = [
     label: "Distribusi Dokumen",
     icon: Send,
     path: "/document-distribution",
-    roles: ["admin_tu"],
+    roles: ["staf_tu"],
   },
   {
     label: "Kegiatan Tridharma",
@@ -149,7 +149,7 @@ const navigationItems: NavItem[] = [
     label: "Notifikasi",
     icon: Bell,
     path: "/notifications",
-    roles: ["admin_tu", "dosen", "kaprodi", "kajur"],
+    roles: ["staf_tu", "dosen", "kaprodi", "kajur"],
   },
 ];
 

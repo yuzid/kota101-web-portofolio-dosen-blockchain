@@ -57,18 +57,18 @@ interface Account {
 
 const roleLabels: Record<string, string> = {
   dosen: 'Dosen',
-  admin_tu: 'Admin TU',
+  staf_tu: 'Staf Tata Usaha',
   kaprodi: 'Kaprodi',
   kajur: 'Kajur',
-  administrator: 'Administrator'
+  admin: 'Admin'
 };
 
 const roleBadgeColors: Record<string, string> = {
   dosen: 'bg-green-500',
-  admin_tu: 'bg-blue-500',
+  staf_tu: 'bg-blue-500',
   kaprodi: 'bg-purple-500',
   kajur: 'bg-orange-500',
-  administrator: 'bg-red-500'
+  admin: 'bg-red-500'
 };
 
 // Internal mapping helper
@@ -76,8 +76,8 @@ const mapRolesFromBackend = (u: any): string[] => {
   const roles: string[] = [];
   const dbRole = u.role?.toUpperCase();
   
-  if (dbRole === 'ADMIN') roles.push('administrator');
-  if (dbRole === 'TATA_USAHA') roles.push('admin_tu');
+  if (dbRole === 'ADMIN') roles.push('admin');
+  if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
   if (dbRole === 'DOSEN') roles.push('dosen');
 
   if (u.dosen?.jabatan_kajur && u.dosen.jabatan_kajur.length > 0) roles.push('kajur');
@@ -87,8 +87,8 @@ const mapRolesFromBackend = (u: any): string[] => {
 };
 
 const mapRoleToBackend = (frontendRole: string): string => {
-  if (frontendRole === 'admin_tu') return 'TATA_USAHA';
-  if (frontendRole === 'administrator') return 'ADMIN';
+  if (frontendRole === 'staf_tu') return 'TATA_USAHA';
+  if (frontendRole === 'admin') return 'ADMIN';
   return frontendRole.toUpperCase();
 };
 
@@ -125,6 +125,9 @@ export function ManageAccountsPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [usernameError, setUsernameError] = useState('');
+  const [nipError, setNipError] = useState('');
+  const [nidnError, setNidnError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const token = localStorage.getItem('token');
@@ -136,6 +139,21 @@ export function ManageAccountsPage() {
 
   const fetchUsers = async () => {
     setIsLoading(true);
+    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
+
+    if (MOCK_MODE) {
+      const stored = localStorage.getItem('MOCK_ACCOUNTS');
+      if (stored) {
+        try {
+          setAccounts(JSON.parse(stored));
+          setIsLoading(false);
+          return;
+        } catch (_) {
+          // corrupted, re-fetch or seed
+        }
+      }
+    }
+
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -159,10 +177,25 @@ export function ManageAccountsPage() {
             lastLogin: 'Belum pernah',
           };
         });
+        if (MOCK_MODE) {
+          localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mapped));
+        }
         setAccounts(mapped);
       }
     } catch (error) {
-      toast.error('Gagal memuat data pengguna');
+      if (MOCK_MODE) {
+        const seed: Account[] = [
+          { id: 'seed-1', name: 'Dr. Andi Pratama', username: 'andi@example.com', nip: '198001012005011001', nidn: '0010018001', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
+          { id: 'seed-2', name: 'Dewi Sartika', username: 'dewi@example.com', nip: '198502102010012002', nidn: '0010028502', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Sistem Informasi', programStudiId: 'prodi-2', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
+          { id: 'seed-3', name: 'Budi Santoso', username: 'budi@example.com', nip: '199003152015031003', roles: ['staf_tu'], mainRole: 'staf_tu', programStudi: 'JTK', programStudiId: '', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
+          { id: 'seed-4', name: 'Admin Sistem', username: 'admin@example.com', roles: ['admin'], mainRole: 'admin', programStudi: 'Sistem', programStudiId: '', jurusanId: '', status: 'active', lastLogin: 'Belum pernah' },
+          { id: 'seed-5', name: 'Prof. Sri Wahyuni', username: 'sri@example.com', nip: '197512102003122003', nidn: '0010127505', roles: ['dosen', 'kaprodi'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
+        ];
+        localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(seed));
+        setAccounts(seed);
+      } else {
+        toast.error('Gagal memuat data pengguna');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -222,7 +255,7 @@ export function ManageAccountsPage() {
       nidn: account.nidn || '',
       nip: account.nip || '',
       password: '',
-      role: account.mainRole === 'tata_usaha' ? 'admin_tu' : account.mainRole === 'admin' ? 'administrator' : account.mainRole,
+      role: account.mainRole === 'tata_usaha' ? 'staf_tu' : account.mainRole === 'admin' ? 'admin' : account.mainRole,
       programStudi: account.programStudi,
       programStudiId: account.programStudiId || '',
       jurusanId: account.jurusanId || '',
@@ -245,6 +278,10 @@ export function ManageAccountsPage() {
   const handleSubmitAdd = () => {
     if (!formData.name || !formData.username || !formData.password || !formData.role) {
       toast.error('Semua field wajib diisi');
+      return;
+    }
+    if (formData.password.length < 8) {
+      setPasswordError('Password minimal 8 karakter');
       return;
     }
     setSubmitMode('add');
@@ -287,10 +324,32 @@ export function ManageAccountsPage() {
   };
 
   const handleSubmitEdit = () => {
+    let hasError = false;
+
     if (!selectedAccount || !formData.name || !formData.role) {
       toast.error('Field yang wajib tidak boleh kosong');
       return;
     }
+
+    if (formData.role === 'dosen' || formData.role === 'staf_tu') {
+      if (!formData.nip.trim()) {
+        setNipError('NIP wajib diisi');
+        hasError = true;
+      }
+    }
+
+    if (formData.role === 'dosen' && !formData.nidn.trim()) {
+      setNidnError('NIDN wajib diisi');
+      hasError = true;
+    }
+
+    if (formData.password && formData.password.length < 8) {
+      setPasswordError('Password minimal 8 karakter');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
     setSubmitMode('edit');
     setShowSubmitConfirm(true);
   };
@@ -299,12 +358,35 @@ export function ManageAccountsPage() {
     if (!selectedAccount) return;
     setShowSubmitConfirm(false);
     setIsSubmitting(true);
+
+    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
+
+    if (MOCK_MODE) {
+      const updatedAccount: Account = {
+        ...selectedAccount,
+        name: formData.name,
+        nip: formData.nip || selectedAccount.nip,
+        nidn: formData.nidn || selectedAccount.nidn,
+      };
+      const mockData = JSON.parse(localStorage.getItem('MOCK_ACCOUNTS') || '[]');
+      const idx = mockData.findIndex((a: any) => a.id === selectedAccount.id);
+      if (idx >= 0) mockData[idx] = updatedAccount;
+      else mockData.push(updatedAccount);
+      localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mockData));
+
+      setAccounts(prev => prev.map(a => a.id === selectedAccount.id ? updatedAccount : a));
+      toast.success(`Akun ${formData.name} berhasil diperbarui. (Mock Mode)`);
+      setShowEditDialog(false);
+      setIsSubmitting(false);
+      return;
+    }
+
     const token = localStorage.getItem('token');
     try {
       const payload: any = {
         nama: formData.name,
-        nip: formData.nip || undefined,
-        nidn: formData.nidn || undefined,
+        nip: formData.nip,
+        nidn: formData.nidn,
         program_studi_id: formData.programStudiId || undefined,
         jurusan_id: formData.jurusanId || undefined,
       };
@@ -375,8 +457,8 @@ export function ManageAccountsPage() {
             <SelectContent>
               <SelectItem value="all">Semua Role</SelectItem>
               <SelectItem value="dosen">Dosen</SelectItem>
-              <SelectItem value="admin_tu">Admin TU</SelectItem>
-              <SelectItem value="administrator">Administrator</SelectItem>
+              <SelectItem value="staf_tu">Staf Tata Usaha</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
             </SelectContent>
           </Select>
 
@@ -554,16 +636,6 @@ export function ManageAccountsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="add-nip">NIP *</Label>
-              <Input
-                id="add-nip"
-                value={formData.nip}
-                onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-                placeholder="Masukkan NIP"
-              />
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
               <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
                 <SelectTrigger>
@@ -571,11 +643,23 @@ export function ManageAccountsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="administrator">Administrator</SelectItem>
+                  <SelectItem value="staf_tu">Staf Tata Usaha</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {(formData.role === 'dosen' || formData.role === 'staf_tu') && (
+              <div className="space-y-2">
+                <Label htmlFor="add-nip">NIP *</Label>
+                <Input
+                  id="add-nip"
+                  value={formData.nip}
+                  onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
+                  placeholder="Masukkan NIP"
+                />
+              </div>
+            )}
 
             {formData.role === 'dosen' && (
               <div className="space-y-2">
@@ -633,7 +717,10 @@ export function ManageAccountsPage() {
                   id="add-password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    setPasswordError('');
+                  }}
                   placeholder="Minimal 8 karakter"
                 />
                 <button
@@ -644,9 +731,10 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
             </div>
 
-            {formData.role === 'admin_tu' && (
+            {formData.role === 'staf_tu' && (
               <div className="space-y-2">
                 <Label htmlFor="add-jurusan">Jurusan *</Label>
                 <Select value={formData.jurusanId} onValueChange={(value) => setFormData({ ...formData, jurusanId: value })}>
@@ -703,27 +791,30 @@ export function ManageAccountsPage() {
               <p className="text-xs text-muted-foreground">Email tidak dapat diubah</p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-nip">NIP *</Label>
-              <Input
-                id="edit-nip"
-                value={formData.nip}
-                onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
-              />
-            </div>
+            {(formData.role === 'dosen' || formData.role === 'staf_tu') && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-nip">NIP *</Label>
+                <Input
+                  id="edit-nip"
+                  value={formData.nip}
+                  onChange={(e) => {
+                    setFormData({ ...formData, nip: e.target.value });
+                    setNipError('');
+                  }}
+                />
+                {nipError && <p className="text-sm text-destructive">{nipError}</p>}
+              </div>
+            )}
 
             <div className="space-y-2">
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dosen">Dosen</SelectItem>
-                  <SelectItem value="admin_tu">Admin TU</SelectItem>
-                  <SelectItem value="administrator">Administrator</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-role">Role</Label>
+              <Input
+                id="edit-role"
+                value={roleLabels[formData.role] || formData.role}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">Role tidak dapat diubah</p>
             </div>
 
             {formData.role === 'dosen' && (
@@ -732,9 +823,13 @@ export function ManageAccountsPage() {
                 <Input
                   id="edit-nidn"
                   value={formData.nidn}
-                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, nidn: e.target.value });
+                    setNidnError('');
+                  }}
                   placeholder="Masukkan NIDN"
                 />
+                {nidnError && <p className="text-sm text-destructive">{nidnError}</p>}
               </div>
             )}
 
@@ -782,7 +877,10 @@ export function ManageAccountsPage() {
                   id="edit-password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value });
+                    setPasswordError('');
+                  }}
                   placeholder="Kosongkan jika tidak ingin mengubah"
                 />
                 <button
@@ -793,6 +891,7 @@ export function ManageAccountsPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
             </div>
           </div>
 

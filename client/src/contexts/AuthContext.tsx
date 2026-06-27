@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
 
 export type UserRole =
-  | "administrator"
-  | "admin_tu"
+  | "admin"
+  | "staf_tu"
   | "dosen"
   | "kaprodi"
   | "kajur";
@@ -46,8 +46,8 @@ const mapBackendUserToFrontend = (backendData: any): User => {
   
   const dbRole = backendData.role?.toUpperCase();
   
-  if (dbRole === 'ADMIN') roles.push('administrator');
-  if (dbRole === 'TATA_USAHA') roles.push('admin_tu');
+  if (dbRole === 'ADMIN') roles.push('admin');
+  if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
   if (dbRole === 'DOSEN') roles.push('dosen');
 
   if (backendData.jabatan?.is_kajur) roles.push('kajur');

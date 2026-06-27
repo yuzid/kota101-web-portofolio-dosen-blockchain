@@ -263,7 +263,7 @@ export function DocumentDistributionDetailPage() {
                 <Separator className="my-4" />
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <MetaItem label="Diunggah oleh" value={doc.sumber_dokumen === "TATA_USAHA" ? "Staff Tata Usaha" : doc.sumber_dokumen} />
+                  <MetaItem label="Diunggah oleh" value={doc.sumber_dokumen === "TATA_USAHA" ? "Staf Tata Usaha" : doc.sumber_dokumen} />
                   <MetaItem label="Terakhir diubah" value={format(new Date(doc.tanggal_upload), "dd MMM yyyy", { locale: localeId })} />
                   <MetaItem label="Ukuran file" value="—" />
                   <MetaItem label="Format" value={fileExt} />

@@ -16,16 +16,16 @@ interface TopBarProps {
 }
 
 const roleLabels: Record<string, string> = {
-  administrator: 'Administrator',
-  admin_tu: 'Admin TU',
+  admin: 'Admin',
+  staf_tu: 'Staf Tata Usaha',
   dosen: 'Dosen',
   kaprodi: 'Kaprodi',
   kajur: 'Kajur',
 };
 
 const roleBadgeColors: Record<string, string> = {
-  administrator: 'bg-red-500 text-white',
-  admin_tu: 'bg-blue-500 text-white',
+  admin: 'bg-red-500 text-white',
+  staf_tu: 'bg-blue-500 text-white',
   dosen: 'bg-green-500 text-white',
   kaprodi: 'bg-purple-500 text-white',
   kajur: 'bg-orange-500 text-white',
@@ -60,7 +60,7 @@ export function TopBar({ title }: TopBarProps) {
         {/* Right Section */}
         <div className="flex items-center gap-4">
           {/* Notification Bell - Hidden for Administrator-only users */}
-          {user?.roles && !(user.roles.includes('administrator') && user.roles.length === 1) && (
+          {user?.roles && !(user.roles.includes('admin') && user.roles.length === 1) && (
             <NotificationBell />
           )}
 

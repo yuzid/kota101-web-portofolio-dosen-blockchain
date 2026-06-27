@@ -22,14 +22,14 @@ export function DashboardPage() {
 
   const token = localStorage.getItem('token');
 
-  const [adminStats, setAdminStats] = useState({ total: 0, dosen: 0, admin_tu: 0, admin: 0 });
+  const [adminStats, setAdminStats] = useState({ total: 0, dosen: 0, staf_tu: 0, admin: 0 });
   const [isAdminLoading, setIsAdminLoading] = useState(false);
 
   useEffect(() => {
     if (user?.roles?.includes('dosen')) {
       fetchDosenDashboardData();
     }
-    if (user?.roles?.includes('administrator')) {
+    if (user?.roles?.includes('admin')) {
       fetchAdminDashboardData();
     }
   }, [user]);
@@ -45,9 +45,9 @@ export function DashboardPage() {
         const users = result.data;
         const total = users.length;
         const dosen = users.filter((u: any) => u.role === 'DOSEN').length;
-        const admin_tu = users.filter((u: any) => u.role === 'TATA_USAHA').length;
+        const staf_tu = users.filter((u: any) => u.role === 'TATA_USAHA').length;
         const admin = users.filter((u: any) => u.role === 'ADMIN').length;
-        setAdminStats({ total, dosen, admin_tu, admin });
+        setAdminStats({ total, dosen, staf_tu, admin });
       }
     } catch {
       console.error('Gagal memuat statistik admin');
@@ -88,7 +88,7 @@ export function DashboardPage() {
   };
 
   // Dashboard for Admin TU
-  if (user?.roles?.includes('admin_tu')) {
+  if (user?.roles?.includes('staf_tu')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -622,7 +622,7 @@ export function DashboardPage() {
   }
 
   // Dashboard for Administrator
-  if (user?.roles?.includes('administrator')) {
+  if (user?.roles?.includes('admin')) {
     return (
       <MainLayout title="Beranda" breadcrumbs={[{ label: 'Beranda' }]}>
         <div className="space-y-6">
@@ -665,7 +665,7 @@ export function DashboardPage() {
               <CardHeader className="pb-2">
                 <CardDescription>Tata Usaha</CardDescription>
                 <CardTitle className="text-3xl text-blue-500">
-                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.admin_tu}
+                  {isAdminLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : adminStats.staf_tu}
                 </CardTitle>
               </CardHeader>
               <CardContent>
