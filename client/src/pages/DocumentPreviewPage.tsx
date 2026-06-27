@@ -178,7 +178,7 @@ export function DocumentPreviewPage() {
 
   const token = localStorage.getItem("token");
   const activityId = location.state?.activityId as string | undefined;
-  const apiPrefix = user?.roles.includes("admin_tu")
+  const apiPrefix = user?.roles.includes("staf_tu")
     ? "/api/tatausaha/dokumen"
     : "/api/dosen/dokumen";
 

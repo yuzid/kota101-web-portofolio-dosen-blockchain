@@ -149,7 +149,7 @@ const getMockNotifications = (role: string): Notification[] => {
         category: "Pengingat",
       },
     ],
-    admin_tu: [
+    staf_tu: [
       {
         id: "10",
         type: "document",
