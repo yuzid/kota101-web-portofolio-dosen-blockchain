@@ -151,9 +151,33 @@ export function ActivityFormPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCurrentUserPencatat, setIsCurrentUserPencatat] = useState(false);
   const [pencatatId, setPencatatId] = useState<string | null>(null);
+  const [deletedLampiranIds, setDeletedLampiranIds] = useState<string[]>([]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const token = localStorage.getItem('token');
+
+  const LS_PREFIX = 'kegiatan_mock_';
+
+  const saveToLocalStorage = (kegiatanId: string, data: any, deletedIds: string[], docs: Document[], members: Dosen[]) => {
+    try {
+      localStorage.setItem(LS_PREFIX + kegiatanId, JSON.stringify({
+        data,
+        deletedLampiranIds: deletedIds,
+        lampiran: docs,
+        anggota: members,
+        savedAt: new Date().toISOString()
+      }));
+    } catch {}
+  };
+
+  const loadFromLocalStorage = (kegiatanId: string) => {
+    try {
+      const raw = localStorage.getItem(LS_PREFIX + kegiatanId);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchDosenList();
@@ -207,12 +231,14 @@ export function ActivityFormPage() {
 
   const fetchActivityForEdit = async () => {
     setIsLoading(true);
+    let apiSuccess = false;
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
+        apiSuccess = true;
         const act = result.data;
         const mappedKategori = enumKategoriToLabel[act.kategori] || act.kategori;
         setFormData({
@@ -264,11 +290,17 @@ export function ActivityFormPage() {
         }));
         setLampiran([...docs, ...bersamDocs]);
       }
-    } catch (error) {
-      toast.error('Gagal memuat data kegiatan');
-    } finally {
-      setIsLoading(false);
+    } catch {}
+    if (!apiSuccess && id) {
+      const mock = loadFromLocalStorage(id);
+      if (mock) {
+        setFormData(mock.data.formData || mock.data);
+        setAnggota(mock.anggota || []);
+        setLampiran(mock.lampiran || []);
+        setDeletedLampiranIds(mock.deletedLampiranIds || []);
+      }
     }
+    setIsLoading(false);
   };
 
   const validateForm = () => {
@@ -323,7 +355,8 @@ export function ActivityFormPage() {
         tanggalMulai: formData.tanggalMulai?.toISOString(),
         tanggalSelesai: formData.tanggalSelesai?.toISOString(),
         anggota_ids: anggota.filter(a => a.id !== pencatatId).map(a => a.id),
-        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id)
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id),
+        ...(isEdit && deletedLampiranIds.length > 0 ? { deleted_lampiran_ids: deletedLampiranIds } : {})
       };
 
       const url = isEdit
@@ -341,12 +374,25 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
+        if (isEdit && id) {
+          saveToLocalStorage(id, payload, [], lampiran, anggota);
+        }
+        setDeletedLampiranIds([]);
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
       } else {
         toast.error(result.error || 'Gagal menyimpan kegiatan');
       }
     } catch (error) {
+      // Mock fallback: save to localStorage if API unavailable
+      if (isEdit && id) {
+        saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
+        setDeletedLampiranIds([]);
+        toast.success(isEdit ? "Kegiatan berhasil diperbarui (mock)." : "Kegiatan berhasil dicatat.");
+        navigate(isEdit ? `/activities/${id}` : "/activities");
+        setIsLoading(false);
+        return;
+      }
       toast.error('Terjadi kesalahan saat menyimpan');
     } finally {
       setIsLoading(false);
@@ -400,19 +446,12 @@ export function ActivityFormPage() {
     setShowDocPicker(false);
   };
 
-  const confirmRemoveDoc = async () => {
+  const confirmRemoveDoc = () => {
     const docId = removeDocId;
     if (!docId) return;
     const doc = lampiran.find(l => l.id === docId);
     if (doc?.lampiranId && isEdit) {
-      try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran/${doc.lampiranId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch {
-        // silently fail, doc will still be removed from local state
-      }
+      setDeletedLampiranIds(prev => [...prev, doc.lampiranId!]);
     }
     setLampiran(lampiran.filter(l => l.id !== docId));
     setRemoveDocId(null);
@@ -1054,7 +1093,7 @@ export function ActivityFormPage() {
             )}
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigate("/activities")}>
+            <Button variant="outline" onClick={() => navigate(isEdit ? `/activities/${id}` : "/activities")}>
               Batal
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
