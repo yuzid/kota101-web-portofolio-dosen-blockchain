@@ -87,11 +87,6 @@ const AMIActivityDetailPage = lazy(() =>
     default: m.AMIActivityDetailPage,
   }))
 );
-const NotificationsPage = lazy(() =>
-  import("./pages/NotificationsPage").then((m) => ({
-    default: m.NotificationsPage,
-  }))
-);
 const AcademicRoleActivitiesPage = lazy(() =>
   import("./pages/AcademicRoleActivitiesPage").then((m) => ({
     default: m.AcademicRoleActivitiesPage,
@@ -349,16 +344,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <AMIActivityDetailPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Notifications */}
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute>
-              <NotificationsPage />
             </ProtectedRoute>
           }
         />

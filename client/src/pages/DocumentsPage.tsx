@@ -407,6 +407,13 @@ export function DocumentsPage() {
                   <div className="flex gap-2 ml-4 flex-shrink-0">
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/documents/${req.dokumenId}/preview`, { state: { fromPendingRequest: true } })}
+                    >
+                      <Eye className="w-4 h-4 mr-1" /> Lihat Detail
+                    </Button>
+                    <Button
+                      size="sm"
                       className="bg-green-600 hover:bg-green-700"
                       onClick={() => handleAccept(req.dokumenId)}
                     >

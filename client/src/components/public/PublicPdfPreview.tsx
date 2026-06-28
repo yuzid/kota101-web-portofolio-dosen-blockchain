@@ -3,11 +3,20 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Plus, Minus } from "lucide-react";
 import { Button } from "../ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { HighlightOverlay } from "../document/HighlightOverlay";
 
 import type { Highlight } from "../../services/highlightService";
+
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -29,6 +38,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInfos, setPageInfos] = useState<Record<number, PageInfo>>({});
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [zoom, setZoom] = useState(1);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -111,29 +121,59 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
 
   return (
     <div ref={containerRef}>
-      {numPages && numPages > 1 && (
-        <div className="mb-3 flex items-center justify-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage <= 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          >
-            &larr; Sebelumnya
-          </Button>
-          <span className="text-sm text-muted-foreground min-w-[60px] text-center">
-            {currentPage} / {numPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage >= numPages}
-            onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-          >
-            Selanjutnya &rarr;
-          </Button>
-        </div>
-      )}
+      <div className="mb-3 flex items-center justify-center gap-3">
+        {numPages && numPages > 1 && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              &larr; Sebelumnya
+            </Button>
+            <span className="text-sm text-muted-foreground min-w-[60px] text-center">
+              {currentPage} / {numPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= numPages}
+              onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+            >
+              Selanjutnya &rarr;
+            </Button>
+          </>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.25).toFixed(2)))}
+          disabled={zoom <= 0.25}
+        >
+          <Minus className="w-4 h-4" />
+        </Button>
+        <Select value={String(zoom)} onValueChange={(v) => setZoom(Number(v))}>
+          <SelectTrigger className="w-20 h-8 text-xs">
+            <SelectValue>{Math.round(zoom * 100)}%</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {ZOOM_LEVELS.map((z) => (
+              <SelectItem key={z} value={String(z)}>
+                {Math.round(z * 100)}%
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+          disabled={zoom >= 3}
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
+      </div>
 
       <Document
         file={fileUrl}
@@ -160,7 +200,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
             <div className="relative overflow-hidden rounded border bg-white shadow-sm">
               <Page
                 pageNumber={currentPage}
-                width={renderWidth}
+                width={Math.round(renderWidth * zoom)}
                 rotate={currentPageInfo?.rotate}
                 onLoadSuccess={(page) => handlePageLoad(currentPage, page)}
                 onRenderError={() => {}}
@@ -179,8 +219,8 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
 
               {currentPageInfo && (
                 <HighlightOverlay
-                  pageWidth={renderWidth}
-                  pageHeight={pageHeightPx}
+                  pageWidth={Math.round(renderWidth * zoom)}
+                  pageHeight={Math.round(pageHeightPx * zoom)}
                   pdfWidth={currentPageInfo.pdfWidth}
                   pdfHeight={currentPageInfo.pdfHeight}
                   highlights={currentPageHighlights}
