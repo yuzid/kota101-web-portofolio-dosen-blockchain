@@ -1,164 +1,219 @@
-# Backend Requirements
+# Backend Requirements — Fix Cancel Button di Form Edit Kegiatan
 
-## 1. Public Audit Trail Endpoint
+## Latar Belakang
 
-**Endpoint:** `GET /api/public/kegiatan/:id/audit-trail`
+Bug: Tombol "Batal" di form edit kegiatan tetap menyimpan perubahan (khususnya penghapusan dokumen) karena DELETE lampiran dipanggil langsung dari frontend saat user mengkonfirmasi hapus dokumen, bukan saat "Simpan".
 
-**Purpose:** Menyediakan riwayat perubahan kegiatan untuk ditampilkan di halaman publik (PublicActivityPage).
+## Solusi: Backend + Frontend
 
-**Response (success):**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "id": "string",
-      "action": "created | updated | deleted | member_added | member_removed | dokumen_uploaded | dokumen_removed | status_changed",
-      "actor": { "id": "string", "name": "string" },
-      "timestamp": "ISO 8601",
-      "description": "string",
-      "changes": {
-        "nama_kegiatan": { "old": "value", "new": "value" },
-        "jenis_tridharma": { "old": "value", "new": "value" }
-      },
-      "collectionChanges": {
-        "dosen_terlibat": {
-          "added": ["item1"],
-          "removed": [],
-          "modified": []
-        }
-      }
-    }
-  ]
-}
-```
+**Pendekatan:** Defer penghapusan lampiran ke waktu "Simpan" dengan mengirim `deleted_lampiran_ids` dari frontend ke backend di dalam payload PUT `/api/dosen/kegiatan/:id`.
 
-**Note:** `changes` berisi field yang berubah (key = field name, value = { old, new }).
-`collectionChanges` berisi perubahan relasi (dosen_terlibat, dokumen, partisipasi).
-Setiap field name di `changes` harus sesuai dengan key di `activityFieldLabels`.
+Frontend sudah diubah. Berikut kebutuhan untuk backend:
 
-**Frontend implementation saat ini:** localStorage mock dengan key `mock_public_audit_trail`, dengan fallback ke `client/src/mocks/mockPublicAuditTrail.ts` jika localStorage kosong. Ketika endpoint backend sudah siap, ganti `useEffect` di PublicActivityPage.tsx (line ~230-240) yang membaca localStorage + import mock dengan fetch ke endpoint di atas.
+---
 
-## 2. Confirmasi Dokumen Endpoint
+## Perubahan yang Diperlukan
 
-**Endpoint:** `PATCH /api/dosen/dokumen/:dokumenId/terima`
+### 1. Server — `ActivityService.ts` — method `updateActivity`
 
-**Status:** ✅ Already exists in backend
+**File:** `server/src/services/ActivityService.ts`
 
-**Endpoint:** `PATCH /api/dosen/dokumen/:dokumenId/tolak`
+**Apa yang berubah:**
 
-**Status:** ✅ Already exists in backend
+Sekarang backend perlu menerima field `deleted_lampiran_ids` (opsional, array of strings — UUID dari `lampiran_bukti.id`) di request body `PUT /api/dosen/kegiatan/:id`.
 
-## 3. Confirmasi Kegiatan Endpoint
+**Logika yang perlu ditambahkan** (setelah handle anggota, sebelum atau bersamaan dengan handle lampiran):
 
-**Endpoint:** `PATCH /api/dosen/kegiatan/:kegiatanId/partisipasi/:partisipasiId/terima`
-
-**Status:** ✅ Already exists in backend
-
-**Endpoint:** `PATCH /api/dosen/kegiatan/:kegiatanId/partisipasi/:partisipasiId/tolak`
-
-**Status:** ✅ Already exists in backend
-
-## 4. Pending Dokumen Endpoint
-
-**Endpoint:** `GET /api/dosen/dokumen/permintaan`
-
-**Status:** ✅ Already exists in backend
-
-**Response format yang diharapkan frontend:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "id": "string",
-      "dokumen_id": "string",
-      "dokumen": {
-        "nama": "string",
-        "jenis_dokumen": "string"
-      },
-      "tanggal_distribusi": "ISO 8601",
-      "status": "string",
-      "didistribusikan_oleh": {
-        "tata_usaha": { "nama": "string" }
-      }
-    }
-  ]
-}
-```
-
-## 5. Pending Kegiatan Endpoint
-
-**Endpoint:** `GET /api/dosen/kegiatan/permintaan-konfirmasi`
-
-**Status:** ✅ Already exists in backend
-
-**Response format yang diharapkan frontend:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "id": "string",
-      "kegiatanId": "string",
-      "namaKegiatan": "string",
-      "pengundang": "string",
-      "status": "string"
-    }
-  ]
-}
-```
-
-## 6. Detail Dokumen (Preview) Endpoint
-
-**Endpoint:** `GET /api/dosen/dokumen/:dokumenId/preview`
-
-**Status:** ✅ Already exists in backend
-
-**Response format:**
-```json
-{
-  "status": "success",
-  "data": {
-    "id": "string",
-    "name": "string",
-    "jenis": "string",
-    "sumber": "string",
-    "tanggalUpload": "ISO 8601",
-    "contentType": "string",
-    "size": "number",
-    "databaseHash": "string",
-    "contentHash": "string",
-    "contentMatchesDatabase": "boolean",
-    "blockchainIntegrity": {
-      "status": "valid | invalid | not_recorded",
-      "blockchainHash": "string|null",
-      "txId": "string|null",
-      "activityId": "string|null",
-      "blockHeight": "number|null",
-      "confirmations": "number",
-      "checkedAt": "ISO 8601"
-    }
+```typescript
+// Hapus lampiran yang di-delete oleh user
+if (data.deleted_lampiran_ids && Array.isArray(data.deleted_lampiran_ids)) {
+  for (const lampiranId of data.deleted_lampiran_ids) {
+    // Validasi: hanya boleh hapus milik sendiri (sama seperti di deleteLampiran)
+    const lampiran = activity.lampiran_bukti.find((lb: any) => lb.id === lampiranId);
+    if (!lampiran) continue;
+    
+    const isUploader = lampiran.dokumen.kepemilikan.some(
+      (k: any) => k.dosen_id === dosenId
+    );
+    if (!isUploader) continue; // skip jika bukan uploader
+    
+    await this.activityRepository.deleteLampiran(lampiranId);
   }
 }
 ```
 
-## 7. Public Kegiatan Endpoint
+**Penting:** 
+- Tetap jaga validasi bahwa hanya uploader yang bisa hapus lampiran-nya (sama seperti di `deleteLampiran`)
+- Letakkan kode ini **setelah validasi authorization** dan **sebelum blockchain publish**
+- Jangan hapus method `deleteLampiran` yang lama (masih dipakai untuk direct DELETE endpoint)
 
-**Endpoint:** `GET /api/public/kegiatan/:id`
+### 2. Tidak ada perubahan di Controller atau Routes
 
-**Status:** ✅ Already exists in backend
+Controller dan routes tidak perlu diubah karena `deleted_lampiran_ids` diterima sebagai bagian dari `req.body` di handler `updateActivity` yang sudah ada.
 
-Menampilkan data publik kegiatan + dosen terlibat + dokumen.
+### 3. Tidak ada perubahan di Repository
 
-## 8. Public Dokumen Content Endpoint
+Method `deleteLampiran` sudah tersedia di `ActivityRepository.ts`.
 
-**Endpoint:** `GET /api/public/dokumen/:dokumenId/content`
+---
 
-**Status:** ✅ Already exists in backend
+## Urutan Eksekusi di `updateActivity` (setelah perubahan)
 
-## Notes
+1. Validasi UUID & authorization
+2. Update metadata kegiatan (seperti biasa)
+3. Handle anggota — add new members (seperti biasa)
+4. **Handle deleted_lampiran_ids — hapus lampiran yang di-remove user**
+5. Handle lampiran_ids — add new attachments (seperti biasa)
+6. Publish ke blockchain
+7. Update tx_id
+8. Notify invited members
 
-- All endpoints that are not yet implemented use localStorage mock for frontend testing.
-- Check `client/src/pages/DocumentPreviewPage.tsx` for the `fromPendingRequest` flow — banner hanya muncul jika `location.state.fromPendingRequest === true`.
-- Check `client/src/pages/ActivityDetailPage.tsx` for the `fromPendingConfirmation` flow — banner hanya muncul jika `location.state.fromPendingConfirmation === true`.
+---
+
+## Testing
+
+1. Buka form edit kegiatan
+2. Hapus salah satu dokumen bukti
+3. Klik "Batal" → redirect ke detail kegiatan, dokumen **tidak** terhapus
+4. Klik "Simpan" → dokumen **benar-benar** terhapus
+
+---
+
+# Backend Requirements — Validasi Edit Akun (NIP/NIDN)
+
+## Latar Belakang
+
+Frontend sudah diupdate untuk:
+- Menampilkan role sebagai **read-only** di edit dialog (role tidak bisa diubah)
+- Menampilkan field **NIP hanya untuk role Dosen & Staff Tata Usaha**
+- Menampilkan field **NIDN hanya untuk role Dosen**
+- Validasi: NIP wajib (Dosen & Staff TU), NIDN wajib (Dosen)
+
+**Saat ini frontend menggunakan mock mode** (`localStorage.setItem('VITE_MOCK_API', 'true')`) untuk testing tanpa backend. Semua kode mock (cek `VITE_MOCK_API` dan `MOCK_ACCOUNTS`) harus dihapus setelah backend selesai.
+
+## Perubahan yang Diperlukan
+
+### 1. Server — `AdminUserService.ts` — method `updateUser`
+
+**File:** `server/src/services/AdminUserService.ts`
+
+**Apa yang berubah:**
+
+Backend perlu menambahkan validasi NIP dan NIDN di method `updateUser()` (line 121-170).
+
+**Validasi yang ditambahkan** (setelah line 139, sebelum update email):
+
+```typescript
+// Validasi NIP — wajib untuk DOSEN dan TATA_USAHA
+if (existing.role === 'TATA_USAHA' && (!nip || !nip.trim())) {
+  throw new Error('NIP wajib diisi untuk Tata Usaha.');
+}
+if (existing.role === 'DOSEN' && (!nip || !nip.trim())) {
+  throw new Error('NIP wajib diisi untuk Dosen.');
+}
+// Validasi NIDN — wajib untuk DOSEN
+if (existing.role === 'DOSEN' && (!nidn || !nidn.trim())) {
+  throw new Error('NIDN wajib diisi untuk Dosen.');
+}
+```
+
+> **Catatan:** Karena role sudah read-only di frontend, role tidak akan berubah saat edit. Validasi menggunakan `existing.role` sudah aman.
+
+### 2. Perubahan setelah validasi — NIP/NIDN update logic
+
+Saat ini (line 152-153):
+```typescript
+if (nip) profileData.nip = nip;
+if (nidn) profileData.nidn = nidn;
+```
+
+Karena frontend sudah validasi NIP/NIDN tidak boleh kosong, code ini sudah aman. **Tidak perlu diubah.** Jika suatu saat NIDN boleh dikosongkan, ubah menjadi:
+```typescript
+if (data.hasOwnProperty('nidn')) profileData.nidn = nidn || null;
+```
+
+### 3. Tidak ada perubahan di Controller/Routes
+
+Controller dan routes tidak perlu diubah. Payload sudah dikirim sebagai `req.body` di handler `updateUser` yang sudah ada.
+
+### 4. Bersihkan Mock Mode di Frontend
+
+Setelah backend selesai, cari dan hapus semua kode terkait di `ManageAccountsPage.tsx`:
+
+| Yang dicari | Kegunaan | Aksi |
+|-------------|----------|------|
+| `localStorage.getItem('VITE_MOCK_API')` | Cek mock mode | Hapus seluruh block `if (MOCK_MODE)` |
+| `localStorage.getItem('MOCK_ACCOUNTS')` | Baca data mock | Hapus |
+| `localStorage.setItem('MOCK_ACCOUNTS', ...)` | Simpan data mock | Hapus |
+| Seed data (5 akun sample) | Fallback data mock | Hapus |
+
+Tersisa di 2 tempat:
+- `fetchUsers()` — block mock
+- `confirmSubmitEdit()` — block mock
+
+## Testing
+
+### Frontend (Mock Mode):
+1. Buka console browser → `localStorage.setItem('VITE_MOCK_API', 'true')`
+2. Refresh → 5 akun seed muncul
+3. Edit Dosen → kosongkan NIP → error "NIP wajib diisi"
+4. Edit Dosen → kosongkan NIDN → error "NIDN wajib diisi"
+5. Edit Staff TU → NIP wajib, NIDN tidak muncul
+6. Edit Administrator → NIP & NIDN tidak muncul
+
+### Real (setelah backend selesai):
+1. Hapus mock: `localStorage.removeItem('VITE_MOCK_API')`
+2. Login sebagai admin, buka Manajemen Akun
+3. Edit Dosen → NIP & NIDN wajib
+4. Edit Staff TU → NIP wajib
+5. Edit Administrator → NIP & NIDN tidak muncul
+6. Coba kirim PATCH tanpa NIP via Postman → dapat error 400 "NIP wajib diisi"
+
+---
+
+# Backend Requirements — Validasi Password (OWASP 2023 & NIST SP 800-63B)
+
+## Latar Belakang
+
+Frontend sudah diupdate dengan validasi password:
+- Add dialog: password wajib, minimal 8 karakter
+- Edit dialog: password opsional, jika diisi minimal 8 karakter
+
+**Standar:** OWASP 2023 & NIST SP 800-63B — minimal 8 karakter, tanpa aturan kompleksitas (tidak wajib angka/huruf besar/simbol).
+
+**Perubahan di frontend:** `ManageAccountsPage.tsx` — state `passwordError`, validasi di `handleSubmitAdd` & `handleSubmitEdit`, inline error.
+
+## Perubahan yang Diperlukan
+
+### 1. Server — `AdminUserService.ts` — method `createUser`
+
+**Lokasi:** Setelah line 64 (`throw new Error('email, password, role, dan nama wajib diisi.')`)
+
+**Tambahkan:**
+```typescript
+if (password.length < 8) {
+  throw new Error('Password minimal 8 karakter');
+}
+```
+
+### 2. Server — `AdminUserService.ts` — method `updateUser`
+
+**Lokasi:** Di dalam block `if (password)` — sebelum hash (line 148)
+
+**Tambahkan:**
+```typescript
+if (password.length < 8) {
+  throw new Error('Password minimal 8 karakter');
+}
+```
+
+### 3. Bersihkan Mock Mode (sama seperti task sebelumnya)
+
+Cari & hapus semua kode `VITE_MOCK_API` dan `MOCK_ACCOUNTS` di `ManageAccountsPage.tsx` setelah backend siap.
+
+## Testing
+
+1. Register user via API dengan password "abc1234" (7 karakter) → error 400 "Password minimal 8 karakter"
+2. Register user via API dengan password "abcdefgh" (8 karakter) → sukses
+3. Update user via PATCH dengan password "short" → error 400
+4. Update user via PATCH tanpa password → sukses (tidak ganti password)

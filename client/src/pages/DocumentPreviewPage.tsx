@@ -74,7 +74,7 @@ import {
 } from "../components/ui/popover";
 import { Calendar } from "../components/ui/calendar";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, getAllJenisDokumen } from "@/lib/utils";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { isHighlightMockMode } from "../services/highlightService";
 
@@ -165,6 +165,8 @@ export function DocumentPreviewPage() {
   const [saving, setSaving] = useState(false);
   const [newFile, setNewFile] = useState<File | null>(null);
   const [hasFileChange, setHasFileChange] = useState(false);
+
+  const [docxWarning, setDocxWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [allowHighlight] = useState(() => {
     return (location.state as Record<string, unknown>)?.allowHighlight === true;
@@ -322,9 +324,14 @@ export function DocumentPreviewPage() {
     setHighlightsError(null);
     try {
       const result = await getHighlightsByDokumenId(id);
-      setHighlights(result.highlights);
-      if (result.kepemilikanId) {
-        setKepemilikanId(result.kepemilikanId);
+      // Filter: hanya highlight milik user yg login (kepemilikan_id sama)
+      const myKepemilikanId = result.kepemilikanId;
+      const filtered = myKepemilikanId
+        ? result.highlights.filter(hl => hl.kepemilikan_id === myKepemilikanId)
+        : result.highlights;
+      setHighlights(filtered);
+      if (myKepemilikanId) {
+        setKepemilikanId(myKepemilikanId);
       }
     } catch (err) {
       setHighlightsError(
@@ -1171,14 +1178,9 @@ export function DocumentPreviewPage() {
               <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
                 <SelectTrigger><SelectValue placeholder="Pilih jenis" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1206,6 +1208,7 @@ export function DocumentPreviewPage() {
                   toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
                   return;
                 }
+                setDocxWarning(file.name.endsWith('.docx') ? 'File yang dipilih tipenya DOCX. Preview hanya tersedia untuk file PDF.' : null);
                 setNewFile(file);
                 setHasFileChange(true);
               }} />
@@ -1239,6 +1242,12 @@ export function DocumentPreviewPage() {
                 </div>
               )}
             </div>
+            {docxWarning && (
+              <div className="flex items-start gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg text-sm text-amber-900">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{docxWarning}</span>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Batal</Button>

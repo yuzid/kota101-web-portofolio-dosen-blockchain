@@ -92,6 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const decoded = decodeJwtPayload(parsed.token);
           parsed.uuid = decoded?.id || parsed.id;
         }
+        // Re-derive roles jika kosong (data user lama sebelum fitur roles ditambahkan)
+        if ((!parsed.roles || parsed.roles.length === 0) && parsed.token) {
+          const decoded = decodeJwtPayload(parsed.token);
+          if (decoded) {
+            const roles: UserRole[] = [];
+            const dbRole = (decoded.role || '').toUpperCase();
+            if (dbRole === 'ADMIN') roles.push('admin');
+            if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
+            if (dbRole === 'DOSEN') roles.push('dosen');
+            if (decoded.jabatan?.is_kajur) roles.push('kajur');
+            if (decoded.jabatan?.is_kaprodi) roles.push('kaprodi');
+            parsed.roles = roles;
+            localStorage.setItem("user", JSON.stringify(parsed));
+          }
+        }
         setUser(parsed);
       } catch {
         localStorage.removeItem("user");

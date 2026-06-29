@@ -446,7 +446,7 @@ function AppWithProviders() {
   return (
     <NotificationProvider userRoles={user?.roles}>
       <AppRoutes />
-      <Toaster />
+      <Toaster position="top-right" />
     </NotificationProvider>
   );
 }

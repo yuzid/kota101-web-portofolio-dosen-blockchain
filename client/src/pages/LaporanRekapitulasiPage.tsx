@@ -298,9 +298,7 @@ export function LaporanRekapitulasiPage() {
                         <div>
                           <p className="text-sm">{rekap.dibuatOleh.nama}</p>
                           <p className="text-xs text-muted-foreground">
-                            {rekap.dibuatOleh.role === "kajur"
-                              ? `Kajur ${rekap.jurusanNama || ""}`
-                              : `Kaprodi ${rekap.prodiNama || ""}`}
+                            {rekap.dibuatOleh.role === "kajur" ? "Kajur" : "Kaprodi"}
                           </p>
                         </div>
                       </TableCell>
