@@ -7,6 +7,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
   AlertCircle,
   CalendarIcon,
+  Check,
   CheckCircle2,
   Download,
   Eye,
@@ -15,15 +16,14 @@ import {
   Highlighter,
   List,
   Loader2,
+  Minus,
   Pencil,
+  Plus,
   ShieldAlert,
   ShieldCheck,
   Share2,
-  Clock,
-  History,
   Trash2,
   Undo2,
-  Upload,
   X,
 } from "lucide-react";
 import { MainLayout } from "../components/layout/MainLayout";
@@ -74,14 +74,13 @@ import {
 } from "../components/ui/popover";
 import { Calendar } from "../components/ui/calendar";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, getAllJenisDokumen } from "@/lib/utils";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { isHighlightMockMode } from "../services/highlightService";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { FileVersionHistory } from "../components/file/FileVersionHistory";
-import type { FileVersion } from "../hooks/useFileManagement";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+
+const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 type IntegrityStatus = "valid" | "invalid" | "not_recorded";
 
@@ -136,6 +135,7 @@ export function DocumentPreviewPage() {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInfos, setPageInfos] = useState<Record<number, PageInfo>>({});
+  const [zoom, setZoom] = useState(1);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -165,6 +165,8 @@ export function DocumentPreviewPage() {
   const [saving, setSaving] = useState(false);
   const [newFile, setNewFile] = useState<File | null>(null);
   const [hasFileChange, setHasFileChange] = useState(false);
+
+  const [docxWarning, setDocxWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [allowHighlight] = useState(() => {
     return (location.state as Record<string, unknown>)?.allowHighlight === true;
@@ -174,13 +176,58 @@ export function DocumentPreviewPage() {
 
   const [historyStack, setHistoryStack] = useState<Highlight[][]>([]);
   const [showHighlightPanel, setShowHighlightPanel] = useState(false);
-  const [activeTab, setActiveTab] = useState("document");
 
   const token = localStorage.getItem("token");
   const activityId = location.state?.activityId as string | undefined;
   const apiPrefix = user?.roles.includes("staf_tu")
     ? "/api/tatausaha/dokumen"
     : "/api/dosen/dokumen";
+  const fromPendingRequest = (location.state as Record<string, unknown>)?.fromPendingRequest === true;
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  const handleConfirmAccept = async () => {
+    if (!id) return;
+    setIsConfirming(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${id}/terima`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Dokumen berhasil diterima.");
+        navigate("/documents");
+      } else {
+        toast.error(result.error || "Gagal menerima dokumen.");
+      }
+    } catch {
+      toast.error("Gagal menerima dokumen.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!id) return;
+    setIsConfirming(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${id}/tolak`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await res.json();
+      if (result.status === "success") {
+        toast.success("Dokumen ditolak.");
+        navigate("/documents");
+      } else {
+        toast.error(result.error || "Gagal menolak dokumen.");
+      }
+    } catch {
+      toast.error("Gagal menolak dokumen.");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -277,9 +324,14 @@ export function DocumentPreviewPage() {
     setHighlightsError(null);
     try {
       const result = await getHighlightsByDokumenId(id);
-      setHighlights(result.highlights);
-      if (result.kepemilikanId) {
-        setKepemilikanId(result.kepemilikanId);
+      // Filter: hanya highlight milik user yg login (kepemilikan_id sama)
+      const myKepemilikanId = result.kepemilikanId;
+      const filtered = myKepemilikanId
+        ? result.highlights.filter(hl => hl.kepemilikan_id === myKepemilikanId)
+        : result.highlights;
+      setHighlights(filtered);
+      if (myKepemilikanId) {
+        setKepemilikanId(myKepemilikanId);
       }
     } catch (err) {
       setHighlightsError(
@@ -325,63 +377,6 @@ export function DocumentPreviewPage() {
     return { ...document.blockchainIntegrity, status, exactServedHash };
   }, [document, servedHash]);
 
-  const mockVersions: FileVersion[] = useMemo(() => {
-    if (!document || !fileUrl) return [];
-    return [
-      {
-        id: `${document.id}-v1`,
-        versionNumber: 1,
-        fileName: document.name,
-        fileSize: document.size,
-        uploadedBy: user?.name || "Unknown",
-        uploadedAt: document.tanggalUpload,
-        url: fileUrl,
-        isCurrent: true,
-      },
-    ];
-  }, [document, fileUrl, user]);
-
-  const mockActivities = useMemo(() => {
-    if (!document) return [];
-    const baseTs = new Date(document.tanggalUpload).getTime();
-    return [
-      {
-        id: "act-1",
-        action: "upload",
-        actor: user?.name || "Unknown",
-        timestamp: document.tanggalUpload,
-        description: "Dokumen diupload ke sistem portofolio",
-      },
-      {
-        id: "act-2",
-        action: "blockchain",
-        actor: "Sistem Blockchain",
-        timestamp: new Date(baseTs + 60000).toISOString(),
-        description: "Hash dokumen dicatat di blockchain",
-      },
-      {
-        id: "act-3",
-        action: "verify",
-        actor: "Sistem",
-        timestamp: document.blockchainIntegrity.checkedAt,
-        description: "Integritas blockchain diverifikasi secara otomatis",
-      },
-      {
-        id: "act-4",
-        action: "edit",
-        actor: user?.name || "Unknown",
-        timestamp: new Date(baseTs + 86400000 * 2).toISOString(),
-        description: "Metadata dokumen diperbarui",
-      },
-      {
-        id: "act-5",
-        action: "highlight",
-        actor: user?.name || "Unknown",
-        timestamp: new Date(baseTs + 86400000 * 3).toISOString(),
-        description: "Highlight ditambahkan pada halaman 1",
-      },
-    ];
-  }, [document, user]);
 
   const breadcrumbs = location.state?.breadcrumbs || [
     { label: "Beranda", path: "/dashboard" },
@@ -799,6 +794,38 @@ export function DocumentPreviewPage() {
           </div>
         </div>
 
+        {fromPendingRequest && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-blue-900">Dokumen dari Tata Usaha</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Dokumen ini perlu dikonfirmasi sebelum dapat digunakan dalam portofolio Anda.
+                </p>
+              </div>
+              <div className="flex gap-2 ml-4 flex-shrink-0">
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleConfirmAccept}
+                  disabled={isConfirming}
+                >
+                  <Check className="w-4 h-4 mr-1" /> Terima
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={handleConfirmReject}
+                  disabled={isConfirming}
+                >
+                  <X className="w-4 h-4 mr-1" /> Tolak
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           className={`flex items-start gap-3 border p-4 ${
             integrity.status === "valid"
@@ -848,23 +875,7 @@ export function DocumentPreviewPage() {
           </div>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="document" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Dokumen
-            </TabsTrigger>
-            <TabsTrigger value="versions" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Riwayat Versi
-            </TabsTrigger>
-            <TabsTrigger value="activity" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Riwayat Aktivitas
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="document">
             {isPdf ? (
           <div
             ref={containerRef}
@@ -906,29 +917,59 @@ export function DocumentPreviewPage() {
               </div>
             )}
 
-            {numPages && numPages > 1 && (
-              <div className="mb-3 flex items-center justify-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                >
-                  &larr; Sebelumnya
-                </Button>
-                <span className="text-sm text-muted-foreground min-w-[60px] text-center">
-                  {currentPage} / {numPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= numPages}
-                  onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
-                >
-                  Selanjutnya &rarr;
-                </Button>
-              </div>
-            )}
+            <div className="mb-3 flex items-center justify-center gap-3">
+              {numPages && numPages > 1 && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    &larr; Sebelumnya
+                  </Button>
+                  <span className="text-sm text-muted-foreground min-w-[60px] text-center">
+                    {currentPage} / {numPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage >= numPages}
+                    onClick={() => setCurrentPage((p) => Math.min(numPages, p + 1))}
+                  >
+                    Selanjutnya &rarr;
+                  </Button>
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.25).toFixed(2)))}
+                disabled={zoom <= 0.25}
+              >
+                <Minus className="w-4 h-4" />
+              </Button>
+              <Select value={String(zoom)} onValueChange={(v) => setZoom(Number(v))}>
+                <SelectTrigger className="w-20 h-8 text-xs">
+                  <SelectValue>{Math.round(zoom * 100)}%</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ZOOM_LEVELS.map((z) => (
+                    <SelectItem key={z} value={String(z)}>
+                      {Math.round(z * 100)}%
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setZoom((z) => Math.min(3, +(z + 0.25).toFixed(2)))}
+                disabled={zoom >= 3}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
 
             <Document
               file={fileUrl}
@@ -961,7 +1002,7 @@ export function DocumentPreviewPage() {
                   >
                     <Page
                       pageNumber={currentPage}
-                      width={renderWidth}
+                      width={Math.round(renderWidth * zoom)}
                       rotate={currentPageInfo?.rotate}
                       onLoadSuccess={(page) =>
                         handlePageLoad(currentPage, page)
@@ -982,8 +1023,8 @@ export function DocumentPreviewPage() {
 
                     {currentPageInfo && (
                       <HighlightOverlay
-                        pageWidth={renderWidth}
-                        pageHeight={pageHeightPx}
+                        pageWidth={Math.round(renderWidth * zoom)}
+                        pageHeight={Math.round(pageHeightPx * zoom)}
                         pdfWidth={currentPageInfo.pdfWidth}
                         pdfHeight={currentPageInfo.pdfHeight}
                         highlights={currentPageHighlights}
@@ -1112,68 +1153,7 @@ export function DocumentPreviewPage() {
             </Button>
           </div>
         )}
-          </TabsContent>
 
-          <TabsContent value="versions" className="space-y-4">
-            <div className="rounded-lg border bg-card p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>Data versi bersifat simulasi (frontend). Backend endpoint <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">GET /api/dosen/dokumen/:id/versions</code> belum tersedia.</span>
-              </div>
-              <FileVersionHistory
-                versions={mockVersions}
-                onRestore={() => toast.info("Restore versi: backend belum tersedia")}
-                onDelete={() => toast.info("Hapus versi: backend belum tersedia")}
-                onDownload={() => handleDownload()}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="activity" className="space-y-4">
-            <div className="rounded-lg border bg-card p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>Riwayat aktivitas bersifat simulasi (frontend). Backend endpoint <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">GET /api/dosen/dokumen/:id/activity</code> belum tersedia.</span>
-              </div>
-              <div className="space-y-0">
-                {mockActivities.map((act, idx) => (
-                  <div key={act.id} className="relative flex gap-4 pb-8 last:pb-0">
-                    {idx < mockActivities.length - 1 && (
-                      <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
-                    )}
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background">
-                      {act.action === "upload" ? (
-                        <Upload className="h-4 w-4 text-blue-500" />
-                      ) : act.action === "blockchain" ? (
-                        <ShieldCheck className="h-4 w-4 text-green-500" />
-                      ) : act.action === "edit" ? (
-                        <Pencil className="h-4 w-4 text-amber-500" />
-                      ) : act.action === "highlight" ? (
-                        <Highlighter className="h-4 w-4 text-purple-500" />
-                      ) : act.action === "verify" ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">
-                          {act.action === "upload" ? "Upload" : act.action === "blockchain" ? "Blockchain" : act.action === "edit" ? "Edit" : act.action === "highlight" ? "Highlight" : act.action === "verify" ? "Verifikasi" : "Aktivitas"}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(act.timestamp), "dd MMM yyyy, HH:mm")}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{act.description}</p>
-                      <p className="text-xs text-muted-foreground">Oleh: {act.actor}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
       </div>
 
       {/* Edit Dialog */}
@@ -1198,14 +1178,9 @@ export function DocumentPreviewPage() {
               <Select value={editForm.jenis} onValueChange={(v) => setEditForm({ ...editForm, jenis: v })}>
                 <SelectTrigger><SelectValue placeholder="Pilih jenis" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1233,6 +1208,7 @@ export function DocumentPreviewPage() {
                   toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
                   return;
                 }
+                setDocxWarning(file.name.endsWith('.docx') ? 'File yang dipilih tipenya DOCX. Preview hanya tersedia untuk file PDF.' : null);
                 setNewFile(file);
                 setHasFileChange(true);
               }} />
@@ -1266,6 +1242,12 @@ export function DocumentPreviewPage() {
                 </div>
               )}
             </div>
+            {docxWarning && (
+              <div className="flex items-start gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg text-sm text-amber-900">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{docxWarning}</span>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Batal</Button>

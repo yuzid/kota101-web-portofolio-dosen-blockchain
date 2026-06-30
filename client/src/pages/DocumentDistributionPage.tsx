@@ -50,7 +50,6 @@ import {
   Check,
   X,
   Clock,
-  Save,
   Send,
   FilterX,
   Tag,
@@ -69,6 +68,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { getAllJenisDokumen, tambahJenisDokumen } from "@/lib/utils";
 
 interface DistribusiItem {
   id: string;
@@ -89,16 +89,6 @@ interface Document {
   sumber_dokumen: string;
   status?: string;
   distribusi: DistribusiItem[];
-  draft_recipients?: string[];
-}
-
-interface LocalDraft {
-  id: string;
-  nama: string;
-  jenis_dokumen: string;
-  tanggal_upload: string;
-  status: "DRAFT";
-  draft_recipients: string[];
 }
 
 interface Dosen {
@@ -129,6 +119,8 @@ export function DocumentDistributionPage() {
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
 
   const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
+  const [showNewJenisInput, setShowNewJenisInput] = useState(false);
+  const [newJenisName, setNewJenisName] = useState("");
   const [recipientSearch, setRecipientSearch] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,29 +132,7 @@ export function DocumentDistributionPage() {
     recipients: [] as string[],
   });
 
-  const [submitAction, setSubmitAction] = useState<"draft" | "distribute" | null>(null);
-
   const token = localStorage.getItem("token");
-
-  // ── Local draft storage ──
-  const DRAFT_KEY = "tu_draft_docs";
-
-  function loadLocalDrafts(): LocalDraft[] {
-    try {
-      return JSON.parse(localStorage.getItem(DRAFT_KEY) || "[]");
-    } catch { return []; }
-  }
-
-  function saveLocalDraft(draft: LocalDraft) {
-    const drafts = loadLocalDrafts().filter(d => d.id !== draft.id);
-    drafts.push(draft);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
-  }
-
-  function removeLocalDraft(id: string) {
-    const drafts = loadLocalDrafts().filter(d => d.id !== id);
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
-  }
 
   // ── Filter state ──
   const [searchTerm, setSearchTerm] = useState("");
@@ -198,25 +168,7 @@ export function DocumentDistributionPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const dataDocs = await resDocs.json();
-      const apiDocs: Document[] = dataDocs.status === "success" ? dataDocs.data : [];
-      // Merge local drafts into API docs (ensure drafts always visible)
-      const localDrafts: Document[] = loadLocalDrafts().map(d => ({
-        id: d.id,
-        nama: d.nama,
-        jenis_dokumen: d.jenis_dokumen,
-        tanggal_upload: d.tanggal_upload,
-        file_path: "",
-        sumber_dokumen: "UPLOAD",
-        status: "DRAFT",
-        distribusi: [],
-        draft_recipients: d.draft_recipients,
-      }));
-      const merged = [...apiDocs];
-      for (const draft of localDrafts) {
-        const existing = merged.findIndex(d => d.id === draft.id);
-        if (existing === -1) merged.push(draft);
-      }
-      setDocuments(merged);
+      setDocuments(dataDocs.status === "success" ? dataDocs.data : []);
     } catch {
       toast.error("Gagal memuat data dari server.");
     }
@@ -225,9 +177,8 @@ export function DocumentDistributionPage() {
   // ── Computed ──
   const stats = useMemo(() => ({
     total: documents.length,
-    draft: documents.filter(d => d.status === "DRAFT").length,
     terdistribusi: documents.filter(d => d.distribusi && d.distribusi.length > 0).length,
-    belumDistribusi: documents.filter(d => (!d.distribusi || d.distribusi.length === 0) && d.status !== "DRAFT").length,
+    belumDistribusi: documents.filter(d => !d.distribusi || d.distribusi.length === 0).length,
     jenisUnik: new Set(documents.map(d => d.jenis_dokumen)).size,
   }), [documents]);
 
@@ -242,9 +193,8 @@ export function DocumentDistributionPage() {
     let result = [...documents];
     if (searchTerm) result = result.filter(d => d.nama.toLowerCase().includes(searchTerm.toLowerCase()));
     if (jenisFilter) result = result.filter(d => d.jenis_dokumen === jenisFilter);
-    if (statusFilter === "draft") result = result.filter(d => d.status === "DRAFT");
     if (statusFilter === "terdistribusi") result = result.filter(d => d.distribusi && d.distribusi.length > 0);
-    if (statusFilter === "belum") result = result.filter(d => (!d.distribusi || d.distribusi.length === 0) && d.status !== "DRAFT");
+    if (statusFilter === "belum") result = result.filter(d => !d.distribusi || d.distribusi.length === 0);
     switch (sortBy) {
       case "terlama": result.sort((a, b) => new Date(a.tanggal_upload).getTime() - new Date(b.tanggal_upload).getTime()); break;
       case "a-z": result.sort((a, b) => a.nama.localeCompare(b.nama)); break;
@@ -290,18 +240,20 @@ export function DocumentDistributionPage() {
     }));
   };
 
-  const handleAction = (action: "draft" | "distribute") => {
+  const handleDistribute = () => {
     if (!uploadForm.name || !uploadForm.jenis || !uploadForm.file) {
       toast.error("Nama, Jenis, dan File dokumen wajib diisi!"); return;
     }
     if (uploadForm.file.size > 20 * 1024 * 1024) { toast.error("Ukuran file terlalu besar. Maksimal 20MB!"); return; }
-    if (action === "distribute" && uploadForm.recipients.length === 0) { toast.error("Pilih minimal satu dosen penerima!"); return; }
-    setSubmitAction(action);
-    setShowUploadDialog(false);
+    if (uploadForm.recipients.length === 0) { toast.error("Pilih minimal satu dosen penerima!"); return; }
+    setShowConfirm(true);
   };
 
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const confirmSubmit = async () => {
-    if (!uploadForm.file || !submitAction) return;
+    if (!uploadForm.file) return;
+    setShowConfirm(false);
     setIsSubmitting(true);
     const formData = new FormData();
     formData.append("nama", uploadForm.name);
@@ -309,33 +261,16 @@ export function DocumentDistributionPage() {
     formData.append("tanggal_upload", new Date().toISOString().split("T")[0]);
     formData.append("file", uploadForm.file);
     formData.append("dosen_penerima_ids", JSON.stringify(uploadForm.recipients));
-    const endpoint = submitAction === "draft"
-      ? `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/draft`
-      : `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribute`;
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribute`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
       const result = await response.json();
       if (!response.ok || result.status === "error") throw new Error(result.error);
 
-      if (submitAction === "draft") {
-        // Save as local draft so it always appears in table
-        const docId = result.data?.id || `draft-${Date.now()}`;
-        saveLocalDraft({
-          id: docId,
-          nama: uploadForm.name,
-          jenis_dokumen: uploadForm.jenis,
-          tanggal_upload: new Date().toISOString().split("T")[0],
-          status: "DRAFT",
-          draft_recipients: uploadForm.recipients,
-        });
-      }
-
-      toast.success(submitAction === "draft" ? "Dokumen berhasil disimpan sebagai Draft." : "Dokumen berhasil didistribusikan!");
+      toast.success("Dokumen berhasil didistribusikan!");
       setShowUploadDialog(false);
       setUploadForm({ name: "", jenis: "", file: null, recipients: [] });
       setSelectedProdiId("all");
       setRecipientSearch("");
-      setSubmitAction(null);
       fetchData();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Terjadi kesalahan sistem."); }
     finally { setIsSubmitting(false); }
@@ -346,7 +281,6 @@ export function DocumentDistributionPage() {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     setShowDeleteDialog(false);
-    removeLocalDraft(deleteTarget.id);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${deleteTarget.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await response.json();
@@ -357,11 +291,7 @@ export function DocumentDistributionPage() {
   };
 
   // ── Status Summary helpers ──
-  const recipientBadge = (distribusi: DistribusiItem[], doc?: Document) => {
-    if (doc?.status === "DRAFT") {
-      const n = doc.draft_recipients?.length || 0;
-      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">{n}</Badge>;
-    }
+  const recipientBadge = (distribusi: DistribusiItem[]) => {
     if (!distribusi || distribusi.length === 0) {
       return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">0</Badge>;
     }
@@ -372,10 +302,7 @@ export function DocumentDistributionPage() {
     );
   };
 
-  const statusBadges = (distribusi: DistribusiItem[], doc?: Document) => {
-    if (doc?.status === "DRAFT") {
-      return <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-100 text-xs">Draft</Badge>;
-    }
+  const statusBadges = (distribusi: DistribusiItem[]) => {
     if (!distribusi || distribusi.length === 0) {
       return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">Belum didistribusi</Badge>;
     }
@@ -424,9 +351,8 @@ export function DocumentDistributionPage() {
         </div>
 
         {/* ── Stats Cards ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard icon={<FileText className="w-5 h-5 text-indigo-600" />} value={stats.total} label="Total Dokumen" bg="bg-indigo-50 border-indigo-200" />
-          <StatCard icon={<Save className="w-5 h-5 text-gray-600" />} value={stats.draft} label="Draft" bg="bg-gray-50 border-gray-200" />
           <StatCard icon={<Check className="w-5 h-5 text-emerald-600" />} value={stats.terdistribusi} label="Sudah Terdistribusi" bg="bg-emerald-50 border-emerald-200" />
           <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />} value={stats.belumDistribusi} label="Belum Terdistribusi" bg="bg-amber-50 border-amber-200" />
           <StatCard icon={<Tag className="w-5 h-5 text-purple-600" />} value={stats.jenisUnik} label="Jenis Dokumen" bg="bg-purple-50 border-purple-200" />
@@ -459,7 +385,6 @@ export function DocumentDistributionPage() {
                     <SelectItem value=" ">Semua Status</SelectItem>
                     <SelectItem value="terdistribusi">Sudah Terdistribusi</SelectItem>
                     <SelectItem value="belum">Belum Terdistribusi</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={sortBy} onValueChange={setSortBy}>
@@ -542,8 +467,8 @@ export function DocumentDistributionPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 px-4 text-sm whitespace-nowrap">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
-                          <TableCell className="py-3 px-4">{recipientBadge(doc.distribusi, doc)}</TableCell>
-                          <TableCell className="py-3 px-4">{statusBadges(doc.distribusi, doc)}</TableCell>
+                          <TableCell className="py-3 px-4">{recipientBadge(doc.distribusi)}</TableCell>
+                          <TableCell className="py-3 px-4">{statusBadges(doc.distribusi)}</TableCell>
                           <TableCell className="py-3 px-4 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -631,21 +556,45 @@ export function DocumentDistributionPage() {
               <Label className="text-sm font-medium">
                 Jenis Dokumen <span className="text-red-500">*</span>
               </Label>
-              <Select value={uploadForm.jenis} onValueChange={(val) => setUploadForm({ ...uploadForm, jenis: val })}>
+              <Select value={uploadForm.jenis} onValueChange={(val) => {
+                if (val === '__TAMBAH__') {
+                  setShowNewJenisInput(true);
+                  setNewJenisName("");
+                  return;
+                }
+                setShowNewJenisInput(false);
+                setUploadForm({ ...uploadForm, jenis: val });
+              }}>
                 <SelectTrigger className="border-gray-300 focus-visible:ring-indigo-500">
                   <SelectValue placeholder="Pilih jenis dokumen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__TAMBAH__">+ Tambah Jenis Baru...</SelectItem>
                 </SelectContent>
               </Select>
+              {showNewJenisInput && (
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="Nama jenis dokumen baru..."
+                    value={newJenisName}
+                    onChange={(e) => setNewJenisName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={() => {
+                    if (newJenisName.trim()) {
+                      const formatted = newJenisName.trim().toUpperCase().replace(/\s+/g, '_');
+                      tambahJenisDokumen(formatted);
+                      setUploadForm({ ...uploadForm, jenis: formatted });
+                      setShowNewJenisInput(false);
+                      setNewJenisName("");
+                      toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan`);
+                    }
+                  }}>Tambah</Button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">Pilih kategori yang sesuai dengan dokumen.</p>
             </div>
 
@@ -793,11 +742,8 @@ export function DocumentDistributionPage() {
 
           <div className="sticky bottom-0 bg-background border-t p-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>Batal</Button>
-            <Button variant="secondary" onClick={() => handleAction("draft")} disabled={isSubmitting}>
-              <Save className="w-4 h-4 mr-2" />{isSubmitting && submitAction === "draft" ? "Menyimpan..." : "Simpan Draft"}
-            </Button>
-            <Button onClick={() => handleAction("distribute")} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
-              <Upload className="w-4 h-4 mr-2" />{isSubmitting && submitAction === "distribute" ? "Mengupload..." : "Upload & Distribusikan"}
+            <Button onClick={handleDistribute} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+              <Upload className="w-4 h-4 mr-2" />{isSubmitting ? "Mengupload..." : "Upload"}
             </Button>
           </div>
         </DialogContent>
@@ -818,19 +764,17 @@ export function DocumentDistributionPage() {
       </AlertDialog>
 
       {/* ── Submit Confirmation ── */}
-      <AlertDialog open={submitAction !== null} onOpenChange={(open) => { if (!open) setSubmitAction(null); }}>
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{submitAction === "draft" ? "Simpan sebagai Draft?" : "Konfirmasi Distribusi"}</AlertDialogTitle>
+            <AlertDialogTitle>Konfirmasi Distribusi</AlertDialogTitle>
             <AlertDialogDescription>
-              {submitAction === "draft"
-                ? `Dokumen "${uploadForm.name}" akan disimpan sebagai Draft dan tidak akan dikirim ke dosen mana pun.`
-                : `Apakah Anda yakin ingin mendistribusikan dokumen "${uploadForm.name}" ke ${uploadForm.recipients.length} dosen?`}
+              Apakah Anda yakin ingin mendistribusikan dokumen "{uploadForm.name}" ke {uploadForm.recipients.length} dosen?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSubmit}>{submitAction === "draft" ? "Simpan Draft" : "Ya, Distribusikan"}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmSubmit}>Ya, Distribusikan</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

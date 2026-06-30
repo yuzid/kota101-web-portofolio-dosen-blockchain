@@ -8,7 +8,6 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '../ui/avatar';
-import { NotificationBell } from './NotificationBell';
 import { useNavigate } from 'react-router';
 
 interface TopBarProps {
@@ -59,11 +58,6 @@ export function TopBar({ title }: TopBarProps) {
 
         {/* Right Section */}
         <div className="flex items-center gap-4">
-          {/* Notification Bell - Hidden for Administrator-only users */}
-          {user?.roles && !(user.roles.includes('admin') && user.roles.length === 1) && (
-            <NotificationBell />
-          )}
-
           {/* User Menu */}
           <div className="flex items-center gap-3">
             <div className="text-right">

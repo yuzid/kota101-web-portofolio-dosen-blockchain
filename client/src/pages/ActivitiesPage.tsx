@@ -270,6 +270,13 @@ export function ActivitiesPage() {
                     </Badge>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/activities/${item.kegiatanId}`, { state: { fromPendingConfirmation: true, partisipasiId: item.id } })}
+                    >
+                      <Eye className="w-4 h-4 mr-1" /> Lihat Detail
+                    </Button>
                     <Button size="sm" onClick={() => handleTerima(item.id, item.kegiatanId)}>
                       <CheckCircle className="w-4 h-4 mr-1" />
                       Terima

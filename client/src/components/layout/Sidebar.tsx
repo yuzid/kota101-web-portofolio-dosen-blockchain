@@ -6,7 +6,6 @@ import {
   Activity,
   FolderOpen,
   History,
-  Bell,
   Users,
   BarChart3,
   Menu,
@@ -144,12 +143,6 @@ const navigationItems: NavItem[] = [
         roles: ["kaprodi"],
       },
     ],
-  },
-  {
-    label: "Notifikasi",
-    icon: Bell,
-    path: "/notifications",
-    roles: ["staf_tu", "dosen", "kaprodi", "kajur"],
   },
 ];
 

@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import {
   Calendar,
@@ -20,9 +21,28 @@ import {
   Loader2,
   ShieldCheck,
   AlertTriangle,
+  Eye,
+  History,
+  Pencil,
+  Upload,
+  UserCheck,
+  UserX,
+  X,
+  Check,
+  XCircle,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+
+import { ScrollArea } from "../components/ui/scroll-area";
 import {
   transformPublicActivity,
   getFileType,
@@ -53,14 +73,162 @@ const jenisIcon: Record<string, React.ReactNode> = {
   tugas_tambahan: <FileText className="w-4 h-4" />,
 };
 
+interface ActivityLog {
+  id: string;
+  action: string;
+  actor: { id: string; name: string };
+  timestamp: string;
+  description: string;
+  changes?: Record<string, { old: unknown; new: unknown }>;
+  collectionChanges?: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }>;
+}
+
+interface DocPreviewItem {
+  id: string;
+  name: string;
+  fileUrl: string;
+  kepemilikanId?: string;
+}
+
+const activityFieldLabels: Record<string, string> = {
+  nama_kegiatan: "Nama Kegiatan",
+  jenis_tridharma: "Jenis Tridharma",
+  kategori: "Kategori",
+  tanggal_mulai: "Tanggal Mulai",
+  tanggal_selesai: "Tanggal Selesai",
+  tahun_akademik: "Tahun Akademik",
+  semester: "Semester",
+  program_studi: "Program Studi",
+};
+
+function formatAuditValue(val: unknown): string {
+  if (val === null || val === undefined) return "-";
+  if (typeof val === "boolean") return val ? "Ya" : "Tidak";
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+function getRecordId(record: Record<string, unknown>, key: string) {
+  return typeof record[key] === "string" ? String(record[key]) : "";
+}
+
+function getActivityChanges(
+  changes: Record<string, { old: unknown; new: unknown }>
+): Array<{ field: string; oldValue: string; newValue: string }> {
+  return Object.entries(changes)
+    .filter(([key]) => key !== "updated_at")
+    .map(([key, change]) => ({
+      field: activityFieldLabels[key] || key,
+      oldValue: formatAuditValue(change.old),
+      newValue: formatAuditValue(change.new),
+    }));
+}
+
+function getCollectionChanges(
+  collectionChanges: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }>
+): Array<{ collection: string; added: number; removed: number; modified: number }> {
+  return Object.entries(collectionChanges).map(([collection, data]) => ({
+    collection,
+    added: data.added?.length || 0,
+    removed: data.removed?.length || 0,
+    modified: data.modified?.length || 0,
+  }));
+}
+
+function getTimelineIcon(action: string) {
+  switch (action) {
+    case "created":
+      return <Plus className="w-4 h-4 text-green-600" />;
+    case "updated":
+      return <Pencil className="w-4 h-4 text-blue-600" />;
+    case "deleted":
+      return <Trash2 className="w-4 h-4 text-red-600" />;
+    case "member_added":
+      return <UserCheck className="w-4 h-4 text-purple-600" />;
+    case "member_removed":
+      return <UserX className="w-4 h-4 text-orange-600" />;
+    case "dokumen_uploaded":
+      return <Upload className="w-4 h-4 text-cyan-600" />;
+    case "dokumen_removed":
+      return <X className="w-4 h-4 text-red-600" />;
+    case "status_changed":
+      return <CheckCircle className="w-4 h-4 text-green-600" />;
+    default:
+      return <History className="w-4 h-4 text-gray-600" />;
+  }
+}
+
+function getTimelineColor(action: string) {
+  switch (action) {
+    case "created":
+      return "border-green-300 bg-green-50";
+    case "updated":
+      return "border-blue-300 bg-blue-50";
+    case "deleted":
+      return "border-red-300 bg-red-50";
+    case "member_added":
+      return "border-purple-300 bg-purple-50";
+    case "member_removed":
+      return "border-orange-300 bg-orange-50";
+    case "dokumen_uploaded":
+      return "border-cyan-300 bg-cyan-50";
+    case "dokumen_removed":
+      return "border-red-300 bg-red-50";
+    case "status_changed":
+      return "border-green-300 bg-green-50";
+    default:
+      return "border-gray-300 bg-gray-50";
+  }
+}
+
+function getTimelineDot(action: string) {
+  switch (action) {
+    case "created":
+      return "bg-green-500";
+    case "updated":
+      return "bg-blue-500";
+    case "deleted":
+      return "bg-red-500";
+    case "member_added":
+      return "bg-purple-500";
+    case "member_removed":
+      return "bg-orange-500";
+    case "dokumen_uploaded":
+      return "bg-cyan-500";
+    case "dokumen_removed":
+      return "bg-red-500";
+    case "status_changed":
+      return "bg-green-500";
+    default:
+      return "bg-gray-500";
+  }
+}
+
 export function PublicActivityPage() {
   const { id } = useParams();
   const location = useLocation();
   const [activity, setActivity] = useState<PublicActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocPreviewItem | null>(null);
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
 
   const isDokumenMode = location.pathname.endsWith("/dokumen");
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = localStorage.getItem("mock_public_audit_trail");
+    if (stored) {
+      try {
+        setLogs(JSON.parse(stored));
+        return;
+      } catch {
+        // ignore
+      }
+    }
+    import("../mocks/mockPublicAuditTrail").then((m) => setLogs(m.mockAuditTrail));
+  }, [id]);
 
   useEffect(() => {
     if (id) fetchActivity();
@@ -215,34 +383,27 @@ export function PublicActivityPage() {
     return renderDokumenMode(activity, jType, getInitials, statusBadge);
   }
 
-  return renderFullMode(activity, jType, getInitials, statusBadge);
+  return renderFullMode(activity, jType, getInitials, statusBadge, previewDoc, setPreviewDoc, logs, selectedLog, setSelectedLog);
 }
 
 function renderFullMode(
   activity: PublicActivity,
   jType: string,
   getInitials: (name: string) => string,
-  statusBadge: (status: string) => React.ReactNode
+  statusBadge: (status: string) => React.ReactNode,
+  previewDoc: DocPreviewItem | null,
+  setPreviewDoc: React.Dispatch<React.SetStateAction<DocPreviewItem | null>>,
+  logs: ActivityLog[],
+  selectedLog: ActivityLog | null,
+  setSelectedLog: React.Dispatch<React.SetStateAction<ActivityLog | null>>
 ) {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Detail Kegiatan Tridharma
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Informasi publik kegiatan dosen
-          </p>
-        </div>
-
-        <Card
-          className={`overflow-hidden border-l-4 ${
-            jenisColor[jType] || "border-l-gray-300"
-          }`}
-        >
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* ── Full-width Info Card (merged header + info) ── */}
+        <Card className={`overflow-hidden border-l-4 ${jenisColor[jType] || "border-l-gray-300"}`}>
           <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-3 flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={jenisBadge[jType] || ""}>
@@ -258,8 +419,7 @@ function renderFullMode(
                     </Badge>
                   ) : (
                     <Badge className="bg-red-500 text-white text-xs">
-                      <AlertCircle className="w-3 h-3 mr-1" /> Dokumen Tidak
-                      Lengkap
+                      <AlertCircle className="w-3 h-3 mr-1" /> Dokumen Tidak Lengkap
                     </Badge>
                   )}
                 </div>
@@ -271,183 +431,266 @@ function renderFullMode(
                 </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              Informasi Kegiatan
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <InfoItem
-                icon={<Calendar className="w-4 h-4" />}
-                label="Tanggal Mulai"
-                value={formatDate(activity.tanggalMulai)}
-              />
-              <InfoItem
-                icon={<Calendar className="w-4 h-4" />}
-                label="Tanggal Selesai"
-                value={formatDate(activity.tanggalSelesai)}
-              />
-              <InfoItem
-                icon={<GraduationCap className="w-4 h-4" />}
-                label="Tahun Akademik"
-                value={activity.tahunAkademik}
-              />
-              <InfoItem
-                icon={<BookOpen className="w-4 h-4" />}
-                label="Semester"
-                value={activity.semester}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t">
+              <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Mulai" value={formatDate(activity.tanggalMulai)} />
+              <InfoItem icon={<Calendar className="w-4 h-4" />} label="Tanggal Selesai" value={formatDate(activity.tanggalSelesai)} />
+              <InfoItem icon={<GraduationCap className="w-4 h-4" />} label="Tahun Akademik" value={activity.tahunAkademik} />
+              <InfoItem icon={<BookOpen className="w-4 h-4" />} label="Semester" value={activity.semester} />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                Dosen Terlibat
-              </CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {activity.dosenTerlibat.length} dosen
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {activity.dosenTerlibat.map((dosen) => (
-              <div
-                key={dosen.id}
-                className="border rounded-xl overflow-hidden"
-              >
-                <div className="flex items-center justify-between p-4 bg-muted/20 border-b">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Avatar className="h-10 w-10 ring-2 ring-background shrink-0">
-                      <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                        {getInitials(dosen.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-medium text-sm truncate">
-                          {dosen.name}
-                        </span>
-                        {dosen.peran === "KETUA" && (
-                          <Badge className="bg-purple-500 text-xs h-5">
-                            {dosen.peran}
-                          </Badge>
+        {/* ── 2-Column Grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          {/* Left Column (col-span-2) */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Dosen Terlibat */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    Dosen Terlibat
+                  </CardTitle>
+                  <Badge variant="outline" className="text-xs">
+                    {activity.dosenTerlibat.length} dosen
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {activity.dosenTerlibat.map((dosen) => (
+                  <div key={dosen.id} className="border rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between p-4 bg-muted/20 border-b">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="h-10 w-10 ring-2 ring-background shrink-0">
+                          <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                            {getInitials(dosen.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-medium text-sm truncate">{dosen.name}</span>
+                            {dosen.peran === "KETUA" && (
+                              <Badge className="bg-purple-500 text-xs h-5">{dosen.peran}</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">NIDN: {dosen.nidn}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {statusBadge(dosen.status)}
+                      </div>
+                    </div>
+
+                    {activity.jenisBukti !== "BERSAMA" && (
+                      <div className="p-4 space-y-2">
+                        {dosen.dokumen.length > 0 ? (
+                          dosen.dokumen.map((doc) => (
+                            <div
+                              key={doc.id}
+                              onClick={() =>
+                                setPreviewDoc({
+                                  id: doc.id,
+                                  name: doc.name,
+                                  fileUrl: `${API_URL}/api/public/dokumen/${doc.id}/content`,
+                                  kepemilikanId: doc.kepemilikanId,
+                                })
+                              }
+                              className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                            >
+                              <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                              <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
+                              <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic px-2">
+                            Belum ada dokumen bukti
+                          </p>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                        NIDN: {dosen.nidn}
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Dokumen Bersama (only if BERSAMA) */}
+            {activity.jenisBukti === "BERSAMA" && activity.dokumenBersama.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    Dokumen Bersama
+                    <Badge variant="secondary" className="text-xs">
+                      {activity.dokumenBersama.length} file
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {activity.dokumenBersama.map((doc) => (
+                    <div
+                      key={doc.id}
+                      onClick={() =>
+                        setPreviewDoc({
+                          id: doc.id,
+                          name: doc.name,
+                          fileUrl: `${API_URL}/api/public/dokumen/${doc.id}/content`,
+                          kepemilikanId: doc.kepemilikanId,
+                        })
+                      }
+                      className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                    >
+                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                      <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
+                      <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Right Column (col-span-1) — Riwayat Blockchain */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-24 space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <History className="w-4 h-4 text-muted-foreground" />
+                    Riwayat Blockchain
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {logs.length === 0 ? (
+                    <div className="text-center py-6">
+                      <History className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="text-xs text-muted-foreground">
+                        Riwayat perubahan akan muncul setelah tersedia.
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {statusBadge(dosen.status)}
-                  </div>
-                </div>
-
-                {dosen.dokumen.length > 0 && (
-                  <div className="p-4 space-y-4">
-                    {dosen.dokumen.map((doc) => (
-                      <DocPreviewBlock
-                        key={doc.id}
-                        doc={doc}
-                        label={doc.name}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {activity.jenisBukti !== "BERSAMA" && dosen.dokumen.length === 0 && (
-                  <div className="p-4">
-                    <p className="text-sm text-muted-foreground italic">
-                      Belum ada dokumen bukti
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {activity.jenisBukti === "BERSAMA" && activity.dokumenBersama.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                Dokumen Bersama
-                <Badge variant="secondary" className="text-xs">
-                  {activity.dokumenBersama.length} file
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {activity.dokumenBersama.map((doc) => (
-                <DocPreviewBlock
-                  key={doc.id}
-                  doc={doc}
-                  label={doc.name}
-                />
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <SummaryCard
-            icon={<Users className="w-5 h-5 text-blue-600" />}
-            label="Total Dosen Terlibat"
-            value={activity.dosenTerlibat.length.toString()}
-            bg="bg-blue-50 border-blue-200"
-          />
-          <SummaryCard
-            icon={<FileText className="w-5 h-5 text-green-600" />}
-            label={
-              activity.jenisBukti === "BERSAMA"
-                ? "Total Dokumen Bersama"
-                : "Total Dokumen Bukti"
-            }
-            value={
-              activity.jenisBukti === "BERSAMA"
-                ? activity.dokumenBersama.length.toString()
-                : activity.dosenTerlibat
-                    .reduce((s, d) => s + d.dokumen.length, 0)
-                    .toString()
-            }
-            bg="bg-green-50 border-green-200"
-          />
-          <SummaryCard
-            icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
-            label={
-              activity.jenisBukti === "BERSAMA"
-                ? "Status Dokumen"
-                : "Dosen Belum Upload"
-            }
-            value={
-              activity.jenisBukti === "BERSAMA"
-                ? activity.dokumenBersama.length > 0
-                  ? "Ada"
-                  : "Kosong"
-                : activity.dosenTerlibat
-                    .filter(
-                      (d) => d.dokumen.length === 0 && d.status === "DITERIMA"
-                    )
-                    .length.toString()
-            }
-            bg="bg-amber-50 border-amber-200"
-          />
+                  ) : (
+                    <ScrollArea className="max-h-[600px] pr-2">
+                      <div className="space-y-0">
+                        {logs.map((log, idx) => (
+                          <button
+                            key={log.id}
+                            onClick={() => setSelectedLog(log)}
+                            className="w-full text-left group"
+                          >
+                            <div className="relative flex gap-4 pb-6 last:pb-0">
+                              {idx < logs.length - 1 && (
+                                <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
+                              )}
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
+                                <div className={`h-2.5 w-2.5 rounded-full ${getTimelineDot(log.action)}`} />
+                              </div>
+                              <div className="min-w-0 flex-1 pt-0.5">
+                                <div className="flex items-center gap-2">
+                                  {getTimelineIcon(log.action)}
+                                  <p className="text-xs font-medium capitalize">
+                                    {log.action.replace(/_/g, " ")}
+                                  </p>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm", { locale: localeId })}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Oleh: {log.actor.name}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground py-4">
-          Data ini bersifat publik dan dapat dibagikan. Terakhir diperbarui
-          melalui sistem blockchain.
-        </p>
+        {/* ── Timeline Detail Dialog ── */}
+        <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null); }}>
+          <DialogContent className="max-w-2xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 capitalize">
+                {selectedLog && getTimelineIcon(selectedLog.action)}
+                {selectedLog && selectedLog.action.replace(/_/g, " ")}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedLog && (
+              <ScrollArea className="max-h-[60vh] pr-4">
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    {format(new Date(selectedLog.timestamp), "dd MMMM yyyy, HH:mm", { locale: localeId })} &mdash; Oleh: {selectedLog.actor.name}
+                  </div>
+                  <p className="text-sm">{selectedLog.description}</p>
+
+                  {selectedLog.changes && getActivityChanges(selectedLog.changes).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Perubahan Data</h4>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-muted/50">
+                              <th className="text-left p-2 font-medium">Field</th>
+                              <th className="text-left p-2 font-medium">Nilai Lama</th>
+                              <th className="text-left p-2 font-medium">Nilai Baru</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {getActivityChanges(selectedLog.changes).map((change, i) => (
+                              <tr key={i} className="border-t">
+                                <td className="p-2 font-medium">{change.field}</td>
+                                <td className="p-2 text-muted-foreground">{change.oldValue}</td>
+                                <td className="p-2">{change.newValue}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedLog.collectionChanges && getCollectionChanges(selectedLog.collectionChanges).length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Perubahan Koleksi</h4>
+                      <div className="space-y-2">
+                        {getCollectionChanges(selectedLog.collectionChanges).map((cc, i) => (
+                          <div key={i} className="rounded-lg border p-3 text-xs">
+                            <p className="font-medium capitalize mb-1">{cc.collection.replace(/_/g, " ")}</p>
+                            <div className="flex gap-3 text-muted-foreground">
+                              {cc.added > 0 && <span className="text-green-600">+{cc.added} ditambah</span>}
+                              {cc.removed > 0 && <span className="text-red-600">-{cc.removed} dihapus</span>}
+                              {cc.modified > 0 && <span className="text-blue-600">~{cc.modified} diubah</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Document Preview Dialog ── */}
+        <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) setPreviewDoc(null); }}>
+          <DialogContent className="!max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                {previewDoc?.name}
+              </DialogTitle>
+            </DialogHeader>
+            {previewDoc && (
+              <PublicPdfPreview fileUrl={previewDoc.fileUrl} kepemilikanId={previewDoc.kepemilikanId} />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -682,30 +925,6 @@ function InfoItem({
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-sm font-medium capitalize mt-0.5">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({
-  icon,
-  label,
-  value,
-  bg,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  bg: string;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 ${bg}`}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
       </div>
     </div>
   );

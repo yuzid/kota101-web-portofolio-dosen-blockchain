@@ -69,6 +69,7 @@ import {
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
+import { unlinkKegiatan } from "../lib/dokumenKegiatanMap";
 
 interface DosenDoc {
   id: string;
@@ -227,8 +228,55 @@ export function ActivityDetailPage() {
   const [copied, setCopied] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   const token = localStorage.getItem("token");
+  const fromPendingConfirmation = (location.state as Record<string, unknown>)?.fromPendingConfirmation === true;
+  const partisipasiId = (location.state as Record<string, unknown>)?.partisipasiId as string | undefined;
+
+  const handleConfirmAccept = async () => {
+    if (!id || !partisipasiId) return;
+    setIsConfirming(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/partisipasi/${partisipasiId}/terima`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === "success") {
+        toast.success("Undangan kegiatan diterima");
+        navigate("/activities");
+      } else {
+        toast.error(result.error || "Gagal menerima undangan");
+      }
+    } catch {
+      toast.error("Gagal menerima undangan");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!id || !partisipasiId) return;
+    setIsConfirming(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/partisipasi/${partisipasiId}/tolak`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.status === "success") {
+        toast.success("Undangan kegiatan ditolak");
+        navigate("/activities");
+      } else {
+        toast.error(result.error || "Gagal menolak undangan");
+      }
+    } catch {
+      toast.error("Gagal menolak undangan");
+    } finally {
+      setIsConfirming(false);
+    }
+  };
 
   useEffect(() => {
     if (id) fetchActivityDetail();
@@ -245,7 +293,21 @@ export function ActivityDetailPage() {
       );
       const result = await response.json();
       if (result.status === "success") {
-        setActivity(result.data);
+        const act = result.data;
+        // Filter deleted docs dari localStorage mock
+        if (id) {
+          const savedDeleted = JSON.parse(localStorage.getItem('kegiatan_mock_' + id + '_deleted') || '[]');
+          if (savedDeleted.length > 0) {
+            act.dosenTerlibat = act.dosenTerlibat.map((d: any) => ({
+              ...d,
+              dokumen: d.dokumen.filter((doc: any) => !savedDeleted.includes(doc.lampiranId))
+            }));
+            if (act.dokumenBersama) {
+              act.dokumenBersama = act.dokumenBersama.filter((doc: any) => !savedDeleted.includes(doc.lampiranId));
+            }
+          }
+        }
+        setActivity(act);
       } else {
         toast.error(result.error || "Gagal mengambil detail kegiatan");
         navigate("/activities");
@@ -338,6 +400,7 @@ export function ActivityDetailPage() {
 
   const confirmDelete = async () => {
     setShowDeleteDialog(false);
+    if (id) unlinkKegiatan(id);
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`,
@@ -533,6 +596,37 @@ export function ActivityDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {fromPendingConfirmation && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-blue-900">Undangan Kegiatan</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Anda diundang sebagai anggota kegiatan ini. Konfirmasi untuk melanjutkan.
+                </p>
+              </div>
+              <div className="flex gap-2 ml-4 flex-shrink-0">
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleConfirmAccept}
+                  disabled={isConfirming}
+                >
+                  <Check className="w-4 h-4 mr-1" /> Terima
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleConfirmReject}
+                  disabled={isConfirming}
+                >
+                  <XCircle className="w-4 h-4 mr-1" /> Tolak
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Hero Card ── */}
         <Card
