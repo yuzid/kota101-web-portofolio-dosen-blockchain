@@ -47,6 +47,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getAllJenisDokumen, tambahJenisDokumen } from "@/lib/utils";
 
 interface Dosen {
   id: string;
@@ -77,6 +78,8 @@ export function DocumentDistributionEditPage() {
   const [initialRecipientIds, setInitialRecipientIds] = useState<string[]>([]);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
+  const [showNewJenisInput, setShowNewJenisInput] = useState(false);
+  const [newJenisName, setNewJenisName] = useState("");
 
   const uniqueProdis = useMemo(
     () => Array.from(new Map(allDosen.filter(d => d.program_studi).map(d => [d.program_studi!.id, d.program_studi])).values()),
@@ -323,22 +326,46 @@ export function DocumentDistributionEditPage() {
               </Label>
               <Select
                 value={formData.jenis_dokumen}
-                onValueChange={(val) => setFormData({ ...formData, jenis_dokumen: val })}
+                onValueChange={(val) => {
+                  if (val === '__TAMBAH__') {
+                    setShowNewJenisInput(true);
+                    setNewJenisName("");
+                    return;
+                  }
+                  setShowNewJenisInput(false);
+                  setFormData({ ...formData, jenis_dokumen: val });
+                }}
               >
                 <SelectTrigger className="border-gray-300 focus-visible:ring-indigo-500">
                   <SelectValue placeholder="Pilih jenis dokumen" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
+                  <SelectItem value="__TAMBAH__">+ Tambah Jenis Baru...</SelectItem>
                 </SelectContent>
               </Select>
+              {showNewJenisInput && (
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="Nama jenis dokumen baru..."
+                    value={newJenisName}
+                    onChange={(e) => setNewJenisName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={() => {
+                    if (newJenisName.trim()) {
+                      const formatted = newJenisName.trim().toUpperCase().replace(/\s+/g, '_');
+                      tambahJenisDokumen(formatted);
+                      setFormData({ ...formData, jenis_dokumen: formatted });
+                      setShowNewJenisInput(false);
+                      setNewJenisName("");
+                      toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan`);
+                    }
+                  }}>Tambah</Button>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">Pilih kategori yang sesuai dengan jenis dokumen.</p>
             </div>
 

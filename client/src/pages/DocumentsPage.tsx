@@ -74,9 +74,10 @@ import {
   Check,
   Clock,
   Download,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { cn, getAllJenisDokumen } from "@/lib/utils";
 import { toast } from "sonner";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { getHighlightStatusByDokumenId, isHighlightMockMode } from "../services/highlightService";
@@ -119,6 +120,7 @@ export function DocumentsPage() {
   const [shareDocument, setShareDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [docxWarning, setDocxWarning] = useState<string | null>(null);
 
   const [uploadForm, setUploadForm] = useState({
     name: "",
@@ -219,6 +221,7 @@ export function DocumentsPage() {
   const handleFilesSelected = (files: File[]) => {
     if (files.length > 0) {
       setSelectedFile(files[0]);
+      setDocxWarning(files[0].name.endsWith('.docx') ? 'File yang dipilih tipenya DOCX. Preview hanya tersedia untuk file PDF.' : null);
     }
   };
 
@@ -292,6 +295,7 @@ export function DocumentsPage() {
 
       setShowUploadDialog(false);
       setSelectedFile(null);
+      setDocxWarning(null);
       setUploadForm({ name: "", jenis: "", tanggal: undefined, addHighlight: false });
 
       if (uploadForm.addHighlight) {
@@ -407,6 +411,13 @@ export function DocumentsPage() {
                   <div className="flex gap-2 ml-4 flex-shrink-0">
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/documents/${req.dokumenId}/preview`, { state: { fromPendingRequest: true } })}
+                    >
+                      <Eye className="w-4 h-4 mr-1" /> Lihat Detail
+                    </Button>
+                    <Button
+                      size="sm"
                       className="bg-green-600 hover:bg-green-700"
                       onClick={() => handleAccept(req.dokumenId)}
                     >
@@ -480,14 +491,10 @@ export function DocumentsPage() {
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-[200px]"><SelectValue placeholder="Jenis Dokumen" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  <SelectItem value="all">Semua Jenis</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -639,14 +646,9 @@ export function DocumentsPage() {
               <Select value={uploadForm.jenis} onValueChange={(value) => setUploadForm({ ...uploadForm, jenis: value })}>
                 <SelectTrigger><SelectValue placeholder="Pilih jenis dokumen" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="SURAT_KEPUTUSAN">SURAT_KEPUTUSAN (SK)</SelectItem>
-                  <SelectItem value="SURAT_TUGAS">SURAT_TUGAS</SelectItem>
-                  <SelectItem value="KONTRAK_PENELITIAN">KONTRAK_PENELITIAN</SelectItem>
-                  <SelectItem value="LAPORAN">LAPORAN</SelectItem>
-                  <SelectItem value="LEMBAR_PENGESAHAN">LEMBAR_PENGESAHAN</SelectItem>
-                  <SelectItem value="SERTIFIKAT">SERTIFIKAT</SelectItem>
-                  <SelectItem value="FOTO">FOTO</SelectItem>
-                  <SelectItem value="BUKTI_PENDUKUNG_LAIN">BUKTI_PENDUKUNG_LAIN</SelectItem>
+                  {getAllJenisDokumen().map(j => (
+                    <SelectItem key={j.value} value={j.value}>{j.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -667,6 +669,13 @@ export function DocumentsPage() {
             </div>
 
             <FileUploader key={uploadKey} onFilesSelected={handleFilesSelected} maxSizeInMB={20} multiple={false} />
+
+            {docxWarning && (
+              <div className="flex items-start gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg text-sm text-amber-900">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{docxWarning}</span>
+              </div>
+            )}
 
             <div className="flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <input type="checkbox" id="add-highlight" checked={uploadForm.addHighlight} onChange={(e) => setUploadForm({ ...uploadForm, addHighlight: e.target.checked })} className="rounded" />

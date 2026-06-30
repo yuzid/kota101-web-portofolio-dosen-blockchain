@@ -59,6 +59,7 @@ import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
+import { getDokumenStatus, linkDokumen, unlinkDokumen, unlinkKegiatan } from "../lib/dokumenKegiatanMap";
 
 interface Dosen {
   id: string;
@@ -78,44 +79,26 @@ interface Document {
   lampiranId?: string;
 }
 
-const enumKategoriToLabel: Record<string, string> = {
-  PENGAJARAN: "Mengajar",
-  BIMBINGAN_MAHASISWA: "Pembimbing TA",
-  PEMBINAAN_MAHASISWA: "Pembimbing TA",
-  PENGUJIAN_MAHASISWA: "Pembimbing TA",
-  BAHAN_AJAR: "Pengembangan Kurikulum",
-  PENELITIAN: "Penelitian Mandiri",
-  PUBLIKASI_KARYA: "Publikasi Jurnal",
-  PATEN: "Penelitian Mandiri",
-  PENGABDIAN: "Pengabdian Kepada Masyarakat",
-  PEMBICARA: "Pengabdian Kepada Masyarakat",
-  PENGELOLA_JURNAL: "Publikasi Jurnal",
-  TUGAS_TAMBAHAN: "Koordinator Laboratorium",
-};
-
-const kategoriByJenis: Record<string, string[]> = {
+const kategoriByJenis: Record<string, { label: string; value: string }[]> = {
   pendidikan: [
-    "Mengajar",
-    "Pembimbing TA",
-    "Pembimbing PKL",
-    "Pengembangan Kurikulum",
+    { label: 'Pengajaran', value: 'PENGAJARAN' },
+    { label: 'Bahan Ajar / Pengembangan Kurikulum', value: 'BAHAN_AJAR' },
+    { label: 'Bimbingan Mahasiswa', value: 'BIMBINGAN_MAHASISWA' },
+    { label: 'Pembinaan Mahasiswa', value: 'PEMBINAAN_MAHASISWA' },
+    { label: 'Pengujian Mahasiswa', value: 'PENGUJIAN_MAHASISWA' },
   ],
   penelitian: [
-    "Penelitian Mandiri",
-    "Penelitian Kelompok",
-    "Publikasi Jurnal",
-    "Publikasi Prosiding",
+    { label: 'Penelitian', value: 'PENELITIAN' },
+    { label: 'Publikasi Karya Ilmiah', value: 'PUBLIKASI_KARYA' },
+    { label: 'Paten / Hak Kekayaan Intelektual', value: 'PATEN' },
+    { label: 'Pengelola Jurnal', value: 'PENGELOLA_JURNAL' },
   ],
   pengabdian: [
-    "Pengabdian Kepada Masyarakat",
-    "Pelatihan Masyarakat",
-    "Konsultasi Masyarakat",
+    { label: 'Pengabdian Masyarakat', value: 'PENGABDIAN' },
+    { label: 'Pembicara / Narasumber', value: 'PEMBICARA' },
   ],
   tugas_tambahan: [
-    "Koordinator Laboratorium",
-    "Sekretaris Prodi",
-    "Koordinator Mata Kuliah",
-    "Lainnya",
+    { label: 'Tugas Tambahan', value: 'TUGAS_TAMBAHAN' },
   ],
 };
 
@@ -151,9 +134,34 @@ export function ActivityFormPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCurrentUserPencatat, setIsCurrentUserPencatat] = useState(false);
   const [pencatatId, setPencatatId] = useState<string | null>(null);
+  const [deletedLampiranIds, setDeletedLampiranIds] = useState<string[]>([]);
+  const [docxWarnings, setDocxWarnings] = useState<string[]>([]);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const token = localStorage.getItem('token');
+
+  const LS_PREFIX = 'kegiatan_mock_';
+
+  const saveToLocalStorage = (kegiatanId: string, data: any, deletedIds: string[], docs: Document[], members: Dosen[]) => {
+    try {
+      localStorage.setItem(LS_PREFIX + kegiatanId, JSON.stringify({
+        data,
+        deletedLampiranIds: deletedIds,
+        lampiran: docs,
+        anggota: members,
+        savedAt: new Date().toISOString()
+      }));
+    } catch {}
+  };
+
+  const loadFromLocalStorage = (kegiatanId: string) => {
+    try {
+      const raw = localStorage.getItem(LS_PREFIX + kegiatanId);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     fetchDosenList();
@@ -207,18 +215,19 @@ export function ActivityFormPage() {
 
   const fetchActivityForEdit = async () => {
     setIsLoading(true);
+    let apiSuccess = false;
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
+        apiSuccess = true;
         const act = result.data;
-        const mappedKategori = enumKategoriToLabel[act.kategori] || act.kategori;
         setFormData({
           namaKegiatan: act.namaKegiatan,
           jenisTridharma: act.jenisTridharma,
-          kategori: mappedKategori,
+          kategori: act.kategori || '',
           tanggalMulai: new Date(act.tanggalMulai),
           tanggalSelesai: new Date(act.tanggalSelesai),
           tahunAkademik: act.tahunAkademik,
@@ -263,12 +272,27 @@ export function ActivityFormPage() {
           lampiranId: doc.lampiranId
         }));
         setLampiran([...docs, ...bersamDocs]);
+
+        // Task 6: filter deleted docs dari localStorage
+        if (id) {
+          const savedDeleted = JSON.parse(localStorage.getItem(LS_PREFIX + id + '_deleted') || '[]');
+          if (savedDeleted.length > 0) {
+            setLampiran(prev => prev.filter(l => !savedDeleted.includes(l.lampiranId)));
+            setDeletedLampiranIds(savedDeleted);
+          }
+        }
       }
-    } catch (error) {
-      toast.error('Gagal memuat data kegiatan');
-    } finally {
-      setIsLoading(false);
+    } catch {}
+    if (!apiSuccess && id) {
+      const mock = loadFromLocalStorage(id);
+      if (mock) {
+        setFormData(mock.data.formData || mock.data);
+        setAnggota(mock.anggota || []);
+        setLampiran(mock.lampiran || []);
+        setDeletedLampiranIds(mock.deletedLampiranIds || []);
+      }
     }
+    setIsLoading(false);
   };
 
   const validateForm = () => {
@@ -323,7 +347,8 @@ export function ActivityFormPage() {
         tanggalMulai: formData.tanggalMulai?.toISOString(),
         tanggalSelesai: formData.tanggalSelesai?.toISOString(),
         anggota_ids: anggota.filter(a => a.id !== pencatatId).map(a => a.id),
-        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id)
+        lampiran_ids: lampiran.filter(l => l.uploadedBy === user?.uuid).map(l => l.id),
+        ...(isEdit && deletedLampiranIds.length > 0 ? { deleted_lampiran_ids: deletedLampiranIds } : {})
       };
 
       const url = isEdit
@@ -341,12 +366,33 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
+        if (isEdit && id) {
+          saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
+          localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
+          lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
+            linkDokumen(doc.id, id, formData.namaKegiatan);
+          });
+        }
+        setDeletedLampiranIds([]);
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
       } else {
         toast.error(result.error || 'Gagal menyimpan kegiatan');
       }
     } catch (error) {
+      // Mock fallback: save to localStorage if API unavailable
+      if (isEdit && id) {
+        saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
+        localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
+        lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
+          linkDokumen(doc.id, id, formData.namaKegiatan);
+        });
+        setDeletedLampiranIds([]);
+        toast.success(isEdit ? "Kegiatan berhasil diperbarui (mock)." : "Kegiatan berhasil dicatat.");
+        navigate(isEdit ? `/activities/${id}` : "/activities");
+        setIsLoading(false);
+        return;
+      }
       toast.error('Terjadi kesalahan saat menyimpan');
     } finally {
       setIsLoading(false);
@@ -355,6 +401,7 @@ export function ActivityFormPage() {
 
   const handleDelete = async () => {
     setIsLoading(true);
+    if (id) unlinkKegiatan(id);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
@@ -362,12 +409,20 @@ export function ActivityFormPage() {
       });
       const result = await response.json();
       if (result.status === 'success') {
+        if (id) localStorage.removeItem(LS_PREFIX + id);
         toast.success(`Kegiatan berhasil dihapus.`);
         navigate("/activities");
       } else {
         toast.error(result.error || 'Gagal menghapus kegiatan');
       }
     } catch (error) {
+      if (isEdit && id) {
+        localStorage.removeItem(LS_PREFIX + id);
+        toast.success('Kegiatan berhasil dihapus (mock).');
+        navigate("/activities");
+        setIsLoading(false);
+        return;
+      }
       toast.error('Terjadi kesalahan koneksi');
     } finally {
       setIsLoading(false);
@@ -394,28 +449,27 @@ export function ActivityFormPage() {
   );
 
   const handleAddDoc = (doc: Document) => {
+    const status = getDokumenStatus(doc.id, id);
+    if (!status.available) {
+      toast.error(`Dokumen "${doc.name}" sudah terikat ke kegiatan "${status.kegiatanNama}"`);
+      return;
+    }
     if (!lampiran.find(l => l.id === doc.id)) {
       setLampiran([...lampiran, doc]);
     }
     setShowDocPicker(false);
   };
 
-  const confirmRemoveDoc = async () => {
+  const confirmRemoveDoc = () => {
     const docId = removeDocId;
     if (!docId) return;
     const doc = lampiran.find(l => l.id === docId);
     if (doc?.lampiranId && isEdit) {
-      try {
-        await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/lampiran/${doc.lampiranId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch {
-        // silently fail, doc will still be removed from local state
-      }
+      setDeletedLampiranIds(prev => [...prev, doc.lampiranId!]);
     }
     setLampiran(lampiran.filter(l => l.id !== docId));
     setRemoveDocId(null);
+    unlinkDokumen(docId);
   };
 
   const handleUploadFile = () => {
@@ -455,6 +509,9 @@ export function ActivityFormPage() {
           };
           setLampiran([...lampiran, newDoc]);
           fetchMyDocuments();
+          if (file.name.endsWith('.docx')) {
+            setDocxWarnings(prev => [...prev, `File "${file.name}" tipenya DOCX. Preview hanya tersedia untuk file PDF.`]);
+          }
           toast.success('Dokumen berhasil diupload');
         } else {
           toast.error(result.error || 'Gagal upload dokumen');
@@ -582,8 +639,8 @@ export function ActivityFormPage() {
                   <SelectContent>
                     {formData.jenisTridharma &&
                       kategoriByJenis[formData.jenisTridharma]?.map((kat) => (
-                        <SelectItem key={kat} value={kat}>
-                          {kat}
+                        <SelectItem key={kat.value} value={kat.value}>
+                          {kat.label}
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -961,6 +1018,16 @@ export function ActivityFormPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {docxWarnings.length > 0 && (
+              <div className="space-y-2">
+                {docxWarnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg text-sm text-amber-900">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{w}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {lampiran.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                 <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -1054,7 +1121,7 @@ export function ActivityFormPage() {
             )}
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => navigate("/activities")}>
+            <Button variant="outline" onClick={() => navigate(isEdit ? `/activities/${id}` : "/activities")}>
               Batal
             </Button>
             <Button onClick={handleSubmit} disabled={isLoading}>
@@ -1065,27 +1132,36 @@ export function ActivityFormPage() {
       </div>
 
       <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Pilih Dokumen Bukti</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(80vh-120px)]">
             {availableDocs.length === 0 ? (
               <p className="text-center py-10 text-muted-foreground">Tidak ada dokumen tersedia. Silakan upload terlebih dahulu.</p>
             ) : (
-              <div className="max-h-[400px] overflow-y-auto space-y-2">
-                {availableDocs.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent cursor-pointer" onClick={() => handleAddDoc(doc)}>
-                    <div className="flex items-center gap-3">
-                      <FileText className="w-5 h-5 text-muted-foreground" />
-                      <div>
+              <div className="space-y-2">
+                {availableDocs.map(doc => {
+                  const status = getDokumenStatus(doc.id, id);
+                  return (
+                    <div key={doc.id}
+                      className={`flex items-start gap-3 p-3 border rounded-lg ${status.available ? 'hover:bg-accent cursor-pointer' : 'bg-muted/30 opacity-70'}`}
+                      onClick={() => status.available && handleAddDoc(doc)}
+                    >
+                      <FileText className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{doc.name}</p>
                         <p className="text-xs text-muted-foreground">{doc.jenis}</p>
+                        {!status.available ? (
+                          <Badge variant="secondary" className="text-xs mt-1">Terpakai di "{status.kegiatanNama}"</Badge>
+                        ) : null}
                       </div>
+                      {status.available ? (
+                        <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
+                      ) : null}
                     </div>
-                    <Button variant="ghost" size="sm">Pilih</Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

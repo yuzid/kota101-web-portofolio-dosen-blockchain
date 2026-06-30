@@ -87,11 +87,6 @@ const AMIActivityDetailPage = lazy(() =>
     default: m.AMIActivityDetailPage,
   }))
 );
-const NotificationsPage = lazy(() =>
-  import("./pages/NotificationsPage").then((m) => ({
-    default: m.NotificationsPage,
-  }))
-);
 const AcademicRoleActivitiesPage = lazy(() =>
   import("./pages/AcademicRoleActivitiesPage").then((m) => ({
     default: m.AcademicRoleActivitiesPage,
@@ -353,16 +348,6 @@ function AppRoutes() {
           }
         />
 
-        {/* Notifications */}
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute>
-              <NotificationsPage />
-            </ProtectedRoute>
-          }
-        />
-
         {/* Academic Role Monitoring */}
         <Route
           path="/monitoring/jurusan"
@@ -461,7 +446,7 @@ function AppWithProviders() {
   return (
     <NotificationProvider userRoles={user?.roles}>
       <AppRoutes />
-      <Toaster />
+      <Toaster position="top-right" />
     </NotificationProvider>
   );
 }

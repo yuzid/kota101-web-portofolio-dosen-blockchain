@@ -13,24 +13,24 @@ import {
 import { UserCog, Check } from "lucide-react";
 
 const roleLabels: Record<UserRole, string> = {
-  administrator: "Administrator",
-  admin_tu: "Admin TU",
+  admin: "Admin",
+  staf_tu: "Staf Tata Usaha",
   dosen: "Dosen",
   kaprodi: "Kaprodi",
   kajur: "Kajur",
 };
 
 const roleBadgeColors: Record<UserRole, string> = {
-  administrator: "bg-red-500 text-white",
-  admin_tu: "bg-blue-500 text-white",
+  admin: "bg-red-500 text-white",
+  staf_tu: "bg-blue-500 text-white",
   dosen: "bg-green-500 text-white",
   kaprodi: "bg-purple-500 text-white",
   kajur: "bg-orange-500 text-white",
 };
 
 const roleDescriptions: Record<UserRole, string> = {
-  administrator: "Kelola akun pengguna dan pengaturan sistem",
-  admin_tu: "Distribusi dokumen dan manajemen administrasi",
+  admin: "Kelola akun pengguna dan pengaturan sistem",
+  staf_tu: "Distribusi dokumen dan manajemen administrasi",
   dosen: "Kelola kegiatan tridharma dan dokumen",
   kaprodi: "Monitor dan rekap kegiatan program studi",
   kajur: "Monitor dan rekap kegiatan jurusan",

@@ -215,9 +215,7 @@ export function RekapLaporanDetailPage() {
                 </p>
                 <p className="font-medium">{rekap.dibuatOleh.nama}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {rekap.dibuatOleh.role === "kajur"
-                    ? `Kajur ${rekap.jurusanNama || ""}`
-                    : `Kaprodi ${rekap.prodiNama || ""}`}
+                  {rekap.dibuatOleh.role === "kajur" ? "Kajur" : "Kaprodi"}
                 </p>
               </div>
               <div>
