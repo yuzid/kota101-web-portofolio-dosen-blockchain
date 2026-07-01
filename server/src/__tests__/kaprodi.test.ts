@@ -27,6 +27,7 @@ const mockPrismaRekapLaporan = {
   update: jest.fn(),
   delete: jest.fn(),
 };
+const mockPrismaProgramStudi = { findMany: jest.fn() };
 const mockPrismaUser = { findUnique: jest.fn() };
 
 jest.mock('../lib/prisma', () => ({
@@ -36,6 +37,7 @@ jest.mock('../lib/prisma', () => ({
     lampiranBukti: mockPrismaLampiranBukti,
     rekapLaporan: mockPrismaRekapLaporan,
     user: mockPrismaUser,
+    programStudi: mockPrismaProgramStudi,
   },
 }));
 
@@ -92,7 +94,8 @@ const JWT_SECRET = 'test-jwt-secret-key';
 process.env.JWT_SECRET = JWT_SECRET;
 
 const KAPRODI_USER_ID = 'kaprodi-dosen-uuid-001';
-const DOSEN_BIASA_ID = 'dosen-biasa-uuid-002';
+const KAJUR_USER_ID = 'kajur-dosen-uuid-002';
+const DOSEN_BIASA_ID = 'dosen-biasa-uuid-003';
 const PRODI_ID = 'prodi-uuid-001';
 const PRODI_LAIN_ID = 'prodi-lain-uuid-002';
 const JURUSAN_ID = 'jurusan-uuid-001';
@@ -142,6 +145,24 @@ const makeDosenBiasaToken = () =>
         is_kajur: false,
         is_kaprodi: false,
         jurusan_id: null,
+        program_studi_id: null,
+      },
+    },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+
+const makeKajurToken = () =>
+  jwt.sign(
+    {
+      id: KAJUR_USER_ID,
+      email: 'kajur@example.com',
+      role: 'DOSEN',
+      name: 'Dr. Kajur Test',
+      jabatan: {
+        is_kajur: true,
+        is_kaprodi: false,
+        jurusan_id: JURUSAN_ID,
         program_studi_id: null,
       },
     },
@@ -607,5 +628,64 @@ describe('Kaprodi — Access Control (Endpoint Terlarang)', () => {
 
     // TU role bukan 'dosen' → middleware menolak
     expect(res.status).toBe(403);
+  });
+});
+
+describe('Kajur — Monitoring Rekap Semua Prodi & Jurusan', () => {
+  let app: express.Application;
+  let kajurToken: string;
+  let kaprodiToken: string;
+
+  beforeAll(() => {
+    app = buildTestApp();
+    kajurToken = makeKajurToken();
+    kaprodiToken = makeKaprodiToken();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('TC-KJ-REKAP-01: Kajur mengambil seluruh rekap (jurusan + semua prodi di bawahnya) → 200', async () => {
+    // Mock JabatanKajur aktif
+    mockPrismaJabatanKajur.findFirst.mockResolvedValue({
+      id: 'jabatan-kajur-001',
+      dosen_id: KAJUR_USER_ID,
+      jurusan_id: JURUSAN_ID,
+      periode_mulai: new Date('2024-01-01'),
+      periode_selesai: new Date('2026-12-31'),
+    });
+
+    // Mock ProgramStudi under jurusan
+    mockPrismaProgramStudi.findMany.mockResolvedValue([
+      { id: PRODI_ID, nama_prodi: 'Prodi Informatika', jurusan_id: JURUSAN_ID }
+    ]);
+
+    // Mock Rekap Laporan
+    mockPrismaRekapLaporan.findMany.mockResolvedValue([
+      { id: 'rekap-jurusan-1', nama: 'Rekap Jurusan', jurusan_id: JURUSAN_ID, prodi_id: null },
+      { id: 'rekap-prodi-1', nama: 'Rekap Prodi', jurusan_id: null, prodi_id: PRODI_ID },
+    ]);
+
+    const res = await request(app)
+      .get('/api/dosen/akademik-role/kajur/rekap/semua')
+      .set('Authorization', `Bearer ${kajurToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('success');
+    expect(res.body.data.length).toBe(2);
+    expect(res.body.data[0].nama).toBe('Rekap Jurusan');
+    expect(res.body.data[1].nama).toBe('Rekap Prodi');
+  });
+
+  it('TC-KJ-REKAP-02: Kaprodi (bukan Kajur) diblokir dari endpoint rekap semua → 403', async () => {
+    mockPrismaJabatanKajur.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/api/dosen/akademik-role/kajur/rekap/semua')
+      .set('Authorization', `Bearer ${kaprodiToken}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/Anda bukan Ketua Jurusan aktif/);
   });
 });

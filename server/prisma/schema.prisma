@@ -189,7 +189,7 @@ model KepemilikanDokumen {
 model Dokumen {
   id             String               @id @default(uuid()) @db.Uuid
   nama           String               @db.VarChar(255)
-  jenis_dokumen  JenisDokumen
+  jenis_dokumen  String               @db.VarChar(100)
   file_path      String               @db.VarChar(512)
   hash_file      String               @db.VarChar(255)
   sumber_dokumen SumberDokumen

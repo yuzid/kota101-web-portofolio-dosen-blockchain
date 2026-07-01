@@ -42,6 +42,11 @@ jest.mock('@prisma/client', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    jenisDokumen: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+    },
   };
   return { PrismaClient: jest.fn(() => mockPrisma) };
 });
@@ -133,14 +138,20 @@ function buildTestApp() {
   app.use(express.json());
 
   // Import middleware dan routes secara dinamis untuk memanfaatkan mock
-  const { verifyToken, requireRole, errorHandler } = require('../middleware/authMiddleware');
+  const { verifyToken, requireRole, errorHandler, asyncHandler } = require('../middleware/authMiddleware');
   const tatausahaDocumentRoutes = require('../routes/tatausaha/documentRoutes').default;
   const adminUserRoutes = require('../routes/admin/userRoutes').default;
   const adminAkademikRoutes = require('../routes/admin/akademik').default;
+  const jenisDokumenRoutes = require('../routes/jenisDokumenRoutes').default;
+  const { JenisDokumenController } = require('../controllers/JenisDokumenController');
 
   app.use('/api/tatausaha/dokumen', verifyToken, requireRole(['tata_usaha']), tatausahaDocumentRoutes);
   app.use('/api/admin/users', verifyToken, requireRole(['admin', 'tata_usaha', 'dosen']), adminUserRoutes);
   app.use('/api/admin/akademik', verifyToken, requireRole(['admin', 'tata_usaha', 'dosen']), adminAkademikRoutes);
+
+  const jenisDokumenController = new JenisDokumenController();
+  app.use('/api/jenis-dokumen', verifyToken, requireRole(['admin', 'tata_usaha', 'dosen']), jenisDokumenRoutes);
+  app.post('/api/tatausaha/jenis-dokumen', verifyToken, requireRole(['tata_usaha', 'admin']), asyncHandler(jenisDokumenController.create));
 
   // Endpoint untuk role lain (untuk test forbidden)
   app.use('/api/dosen/kegiatan', verifyToken, requireRole(['dosen']), (req, res) => {
@@ -373,5 +384,80 @@ describe('Staf TU — Distribusi Dokumen (Validasi Business Rules)', () => {
       .field('tanggal_upload', '2024-01-15');
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/Penerima dokumen wajib dipilih/);
+  });
+});
+
+describe('Staf TU & Dosen — Jenis Dokumen Dinamis', () => {
+  let app: express.Application;
+  let tuToken: string;
+  let dosenToken: string;
+
+  beforeAll(() => {
+    app = buildTestApp();
+    tuToken = makeTUToken();
+    dosenToken = makeDosenToken();
+  });
+
+  it('TC-TU-JD-01: Get list jenis dokumen (gabungan defaults + custom) → 200', async () => {
+    const mockPrisma = require('../lib/prisma').prisma;
+    mockPrisma.jenisDokumen.findMany.mockResolvedValue([
+      { id: 'custom-1', nama: 'SURAT_KETERANGAN_AKTIF', created_at: new Date() }
+    ]);
+
+    const res = await request(app)
+      .get('/api/jenis-dokumen')
+      .set('Authorization', `Bearer ${tuToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('success');
+    expect(res.body.data).toContain('SURAT_KEPUTUSAN');
+    expect(res.body.data).toContain('SURAT_KETERANGAN_AKTIF');
+  });
+
+  it('TC-TU-JD-02: Staf TU menambah jenis dokumen baru → 201', async () => {
+    const mockPrisma = require('../lib/prisma').prisma;
+    mockPrisma.jenisDokumen.findUnique.mockResolvedValue(null);
+    mockPrisma.jenisDokumen.create.mockResolvedValue({
+      id: 'custom-2',
+      nama: 'IJAZAH_DOSEN',
+      created_at: new Date()
+    });
+
+    const res = await request(app)
+      .post('/api/tatausaha/jenis-dokumen')
+      .set('Authorization', `Bearer ${tuToken}`)
+      .send({ nama: 'ijazah_dosen' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe('success');
+    expect(res.body.data.nama).toBe('IJAZAH_DOSEN');
+  });
+
+  it('TC-TU-JD-03: Menambah jenis dokumen duplikat dari default → 400', async () => {
+    const res = await request(app)
+      .post('/api/tatausaha/jenis-dokumen')
+      .set('Authorization', `Bearer ${tuToken}`)
+      .send({ nama: 'surat_keputusan' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/tidak boleh diduplikasi/);
+  });
+
+  it('TC-TU-JD-04: Menambah jenis dokumen tanpa nama → 400', async () => {
+    const res = await request(app)
+      .post('/api/tatausaha/jenis-dokumen')
+      .set('Authorization', `Bearer ${tuToken}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+  });
+
+  it('TC-TU-JD-05: Dosen biasa tidak bisa menambah jenis dokumen → 403', async () => {
+    const res = await request(app)
+      .post('/api/tatausaha/jenis-dokumen')
+      .set('Authorization', `Bearer ${dosenToken}`)
+      .send({ nama: 'BUKU_PEDOMAN' });
+
+    expect(res.status).toBe(403);
   });
 });
