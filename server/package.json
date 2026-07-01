@@ -11,7 +11,9 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:tu": "jest staf_tu --verbose",
-    "test:kaprodi": "jest kaprodi --verbose"
+    "test:kaprodi": "jest kaprodi --verbose",
+    "test:dosen": "jest src/__tests__/dosen.test.ts --verbose",
+    "test:kajur": "jest src/__tests__/kajur.test.ts --verbose"
   },
   "jest": {
     "preset": "ts-jest",
