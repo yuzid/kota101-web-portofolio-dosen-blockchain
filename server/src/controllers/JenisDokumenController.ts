@@ -20,7 +20,7 @@ export class JenisDokumenController {
       ];
 
       const allNames = new Set(defaults);
-      records.forEach(r => allNames.add(r.nama));
+      records.forEach((r: any) => allNames.add(r.nama));
 
       res.status(200).json({ status: 'success', data: Array.from(allNames) });
     } catch (error: any) {

@@ -69,7 +69,6 @@ import {
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { toast } from "sonner";
-import { unlinkKegiatan } from "../lib/dokumenKegiatanMap";
 
 interface DosenDoc {
   id: string;
@@ -294,19 +293,6 @@ export function ActivityDetailPage() {
       const result = await response.json();
       if (result.status === "success") {
         const act = result.data;
-        // Filter deleted docs dari localStorage mock
-        if (id) {
-          const savedDeleted = JSON.parse(localStorage.getItem('kegiatan_mock_' + id + '_deleted') || '[]');
-          if (savedDeleted.length > 0) {
-            act.dosenTerlibat = act.dosenTerlibat.map((d: any) => ({
-              ...d,
-              dokumen: d.dokumen.filter((doc: any) => !savedDeleted.includes(doc.lampiranId))
-            }));
-            if (act.dokumenBersama) {
-              act.dokumenBersama = act.dokumenBersama.filter((doc: any) => !savedDeleted.includes(doc.lampiranId));
-            }
-          }
-        }
         setActivity(act);
       } else {
         toast.error(result.error || "Gagal mengambil detail kegiatan");
@@ -400,7 +386,6 @@ export function ActivityDetailPage() {
 
   const confirmDelete = async () => {
     setShowDeleteDialog(false);
-    if (id) unlinkKegiatan(id);
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`,

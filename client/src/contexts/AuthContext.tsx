@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
+import { fetchAndCacheJenisDokumen } from "../lib/utils";
 
 export type UserRole =
   | "admin"
@@ -108,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
         setUser(parsed);
+        void fetchAndCacheJenisDokumen();
       } catch {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
@@ -152,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authenticatedUser);
     localStorage.setItem("user", JSON.stringify(authenticatedUser));
     localStorage.setItem("token", result.data.token);
+    void fetchAndCacheJenisDokumen();
   };
 
   // 2. Login Menggunakan Google OAuth
@@ -172,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authenticatedUser);
     localStorage.setItem("user", JSON.stringify(authenticatedUser));
     localStorage.setItem("token", result.data.token);
+    void fetchAndCacheJenisDokumen();
   };
 
   const logout = () => {

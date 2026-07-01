@@ -1,5 +1,6 @@
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
+import { prisma } from '../lib/prisma';
 import { resolveBlockchainNode } from '../lib/blockchainNode';
 import { EmailService } from './EmailService';
 import { MultiChainService } from './MultiChainService';
@@ -353,6 +354,21 @@ export class ActivityService {
       partisipasiData.push({ dosen_id: dosenId, peran: PeranTridharma.KETUA, status: 'DITERIMA' });
     }
 
+    // Validate that documents are not bound to other activities
+    if (lampiran_ids && Array.isArray(lampiran_ids) && lampiran_ids.length > 0) {
+      const bound = await prisma.lampiranBukti.findFirst({
+        where: {
+          dokumen_id: { in: lampiran_ids }
+        },
+        include: {
+          dokumen: true
+        }
+      });
+      if (bound) {
+        throw new Error(`Dokumen "${bound.dokumen.nama}" sudah terikat dengan kegiatan lain.`);
+      }
+    }
+
     const lampiranData = (lampiran_ids && Array.isArray(lampiran_ids))
       ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId }))
       : [];
@@ -455,6 +471,21 @@ export class ActivityService {
       const toAdd = lampiran_ids.filter(
         (docId: string) => !existingDocIds.includes(docId)
       );
+
+      if (toAdd.length > 0) {
+        const bound = await prisma.lampiranBukti.findFirst({
+          where: {
+            dokumen_id: { in: toAdd }
+          },
+          include: {
+            dokumen: true
+          }
+        });
+        if (bound) {
+          throw new Error(`Dokumen "${bound.dokumen.nama}" sudah terikat dengan kegiatan lain.`);
+        }
+      }
+
       for (const docId of toAdd) {
         await this.activityRepository.createLampiran({
           kegiatan_id: id,

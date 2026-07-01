@@ -19,7 +19,7 @@ import express from 'express';
 // Mock prisma
 const mockPrismaJabatanKaprodi = { findFirst: jest.fn() };
 const mockPrismaJabatanKajur = { findFirst: jest.fn() };
-const mockPrismaLampiranBukti = { findUnique: jest.fn() };
+const mockPrismaLampiranBukti = { findUnique: jest.fn(), findFirst: jest.fn() };
 const mockPrismaRekapLaporan = {
   create: jest.fn(),
   findMany: jest.fn(),
@@ -55,7 +55,7 @@ jest.mock('../repositories/ActivityRepository', () => ({
 jest.mock('../services/RekapService', () => ({
   RekapService: jest.fn().mockImplementation(() => ({
     createRekap: jest.fn().mockResolvedValue({ id: 'rekap-new-001', nama: 'Rekap Test' }),
-    getAllRekap: jest.fn().mockResolvedValue([]),
+    getAllRekap: jest.fn().mockImplementation(() => mockPrismaRekapLaporan.findMany()),
     getRekapDetail: jest.fn().mockResolvedValue(null),
     updateRekap: jest.fn().mockResolvedValue({ id: 'rekap-001' }),
     deleteRekap: jest.fn().mockResolvedValue(undefined),
@@ -365,6 +365,7 @@ describe('Kaprodi — Rekap Laporan Prodi', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockPrismaJabatanKaprodi.findFirst.mockResolvedValue(JABATAN_KAPRODI_AKTIF);
+    mockPrismaRekapLaporan.findMany.mockResolvedValue([]);
     // Mock user lookup untuk updateRekap
     mockPrismaUser.findUnique.mockResolvedValue({
       id: KAPRODI_USER_ID,

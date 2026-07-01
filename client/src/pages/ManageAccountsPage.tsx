@@ -139,21 +139,6 @@ export function ManageAccountsPage() {
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
-
-    if (MOCK_MODE) {
-      const stored = localStorage.getItem('MOCK_ACCOUNTS');
-      if (stored) {
-        try {
-          setAccounts(JSON.parse(stored));
-          setIsLoading(false);
-          return;
-        } catch (_) {
-          // corrupted, re-fetch or seed
-        }
-      }
-    }
-
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -177,25 +162,10 @@ export function ManageAccountsPage() {
             lastLogin: 'Belum pernah',
           };
         });
-        if (MOCK_MODE) {
-          localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mapped));
-        }
         setAccounts(mapped);
       }
     } catch (error) {
-      if (MOCK_MODE) {
-        const seed: Account[] = [
-          { id: 'seed-1', name: 'Dr. Andi Pratama', username: 'andi@example.com', nip: '198001012005011001', nidn: '0010018001', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-2', name: 'Dewi Sartika', username: 'dewi@example.com', nip: '198502102010012002', nidn: '0010028502', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Sistem Informasi', programStudiId: 'prodi-2', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-3', name: 'Budi Santoso', username: 'budi@example.com', nip: '199003152015031003', roles: ['staf_tu'], mainRole: 'staf_tu', programStudi: 'JTK', programStudiId: '', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-4', name: 'Admin Sistem', username: 'admin@example.com', roles: ['admin'], mainRole: 'admin', programStudi: 'Sistem', programStudiId: '', jurusanId: '', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-5', name: 'Prof. Sri Wahyuni', username: 'sri@example.com', nip: '197512102003122003', nidn: '0010127505', roles: ['dosen', 'kaprodi'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-        ];
-        localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(seed));
-        setAccounts(seed);
-      } else {
-        toast.error('Gagal memuat data pengguna');
-      }
+      toast.error('Gagal memuat data pengguna');
     } finally {
       setIsLoading(false);
     }
@@ -358,28 +328,6 @@ export function ManageAccountsPage() {
     if (!selectedAccount) return;
     setShowSubmitConfirm(false);
     setIsSubmitting(true);
-
-    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
-
-    if (MOCK_MODE) {
-      const updatedAccount: Account = {
-        ...selectedAccount,
-        name: formData.name,
-        nip: formData.nip || selectedAccount.nip,
-        nidn: formData.nidn || selectedAccount.nidn,
-      };
-      const mockData = JSON.parse(localStorage.getItem('MOCK_ACCOUNTS') || '[]');
-      const idx = mockData.findIndex((a: any) => a.id === selectedAccount.id);
-      if (idx >= 0) mockData[idx] = updatedAccount;
-      else mockData.push(updatedAccount);
-      localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mockData));
-
-      setAccounts(prev => prev.map(a => a.id === selectedAccount.id ? updatedAccount : a));
-      toast.success(`Akun ${formData.name} berhasil diperbarui. (Mock Mode)`);
-      setShowEditDialog(false);
-      setIsSubmitting(false);
-      return;
-    }
 
     const token = localStorage.getItem('token');
     try {

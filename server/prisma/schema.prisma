@@ -6,15 +6,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum JenisDokumen {
-  SURAT_KEPUTUSAN
-  SURAT_TUGAS
-  LEMBAR_PENGESAHAN
-  KONTRAK_PENELITIAN
-  SERTIFIKAT
-  FOTO
-  LAPORAN
-  BUKTI_PENDUKUNG_LAIN
+model JenisDokumen {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("jenis_dokumen")
 }
 
 enum SumberDokumen {

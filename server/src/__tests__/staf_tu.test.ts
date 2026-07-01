@@ -47,6 +47,9 @@ jest.mock('@prisma/client', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    lampiranBukti: {
+      findFirst: jest.fn(),
+    },
   };
   return { PrismaClient: jest.fn(() => mockPrisma) };
 });
