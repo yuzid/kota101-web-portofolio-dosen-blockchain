@@ -64,6 +64,11 @@ export class AdminUserService {
       throw new Error('email, password, role, dan nama wajib diisi.');
     }
 
+    // Validasi panjang password (OWASP / NIST SP 800-63B — minimal 8 karakter)
+    if (password.length < 8) {
+      throw new Error('Password minimal 8 karakter.');
+    }
+
     const validRoles = ['ADMIN', 'TATA_USAHA', 'DOSEN'];
     if (!validRoles.includes(roleUpper)) {
       throw new Error(`Role tidak valid. Pilihan: ${validRoles.join(', ')}`);
@@ -138,6 +143,18 @@ export class AdminUserService {
       }
     }
 
+    // Validasi NIP wajib untuk DOSEN dan TATA_USAHA (role tidak bisa diubah, gunakan existing.role)
+    if (existing.role === 'TATA_USAHA' && (!nip || !String(nip).trim())) {
+      throw new Error('NIP wajib diisi untuk Tata Usaha.');
+    }
+    if (existing.role === 'DOSEN' && (!nip || !String(nip).trim())) {
+      throw new Error('NIP wajib diisi untuk Dosen.');
+    }
+    // Validasi NIDN wajib untuk DOSEN
+    if (existing.role === 'DOSEN' && (!nidn || !String(nidn).trim())) {
+      throw new Error('NIDN wajib diisi untuk Dosen.');
+    }
+
     if (email && email !== existing.email) {
       const emailTaken = await this.userRepository.findByEmail(email);
       if (emailTaken) throw new Error('Email sudah digunakan user lain.');
@@ -145,7 +162,13 @@ export class AdminUserService {
 
     const userData: any = {};
     if (email) userData.email = email;
-    if (password) userData.password_hash = await bcrypt.hash(password, 12);
+    if (password) {
+      // Validasi panjang password jika user mengisi password baru
+      if (password.length < 8) {
+        throw new Error('Password minimal 8 karakter.');
+      }
+      userData.password_hash = await bcrypt.hash(password, 12);
+    }
 
     const profileData: any = {};
     if (nama) profileData.nama = nama;

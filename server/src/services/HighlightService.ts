@@ -13,7 +13,10 @@ export class HighlightService {
 
   async getHighlightsByDocumentAndDosen(dokumenId: string, dosenId: string) {
     const kepemilikanId = await this.highlightRepository.findKepemilikanId(dosenId, dokumenId) || null;
-    const highlights = await this.highlightRepository.findByDokumenId(dokumenId);
+    // Fix: filter per kepemilikan dosen, bukan return semua highlight dokumen
+    const highlights = kepemilikanId
+      ? await this.highlightRepository.findByKepemilikanId(kepemilikanId)
+      : [];
     return { highlights, kepemilikanId };
   }
 

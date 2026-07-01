@@ -392,7 +392,7 @@ export class ActivityService {
     const {
       namaKegiatan, jenisTridharma, kategori,
       tanggalMulai, tanggalSelesai, tahunAkademik, semester,
-      anggota_ids, lampiran_ids,
+      anggota_ids, lampiran_ids, deleted_lampiran_ids,
       jenisBukti
     } = data;
 
@@ -424,6 +424,28 @@ export class ActivityService {
           peran: 'ANGGOTA',
           status: 'MENUNGGU_KONFIRMASI',
         });
+      }
+    }
+
+    // Hapus lampiran yang di-defer dari frontend (fix cancel button)
+    if (deleted_lampiran_ids && Array.isArray(deleted_lampiran_ids)) {
+      // Re-fetch agar activity.lampiran_bukti fresh setelah update metadata
+      const freshActivity = await this.activityRepository.findById(id);
+      if (freshActivity) {
+        for (const lampiranId of deleted_lampiran_ids) {
+          if (typeof lampiranId !== 'string') continue;
+
+          const lampiran = freshActivity.lampiran_bukti.find((lb: any) => lb.id === lampiranId);
+          if (!lampiran) continue; // sudah tidak ada, skip
+
+          // Validasi: hanya uploader yang boleh hapus
+          const isUploader = lampiran.dokumen.kepemilikan.some(
+            (k: any) => k.dosen_id === dosenId
+          );
+          if (!isUploader) continue; // bukan uploader, skip
+
+          await this.activityRepository.deleteLampiran(lampiranId);
+        }
       }
     }
 
