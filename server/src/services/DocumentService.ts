@@ -4,7 +4,6 @@ import { DocumentRepository } from "../repositories/DocumentRepository";
 import { FileStorageService } from "./FileStorageService";
 import { MultiChainService } from "./MultiChainService";
 import { resolveBlockchainNode } from "../lib/blockchainNode";
-import { mapJenisToEnum } from "../utils/enumMapping";
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
@@ -195,10 +194,6 @@ export class DocumentService {
     };
   }
 
-  mapJenisToEnum(jenis: string): string {
-    return String(jenis).trim();
-  }
-
   private async getExistingFilePathOrUpload(
     file: Express.Multer.File,
     hashFile: string,
@@ -230,18 +225,18 @@ export class DocumentService {
     }
 
     if (jenis && jenis !== "all") {
-      whereClause.jenis_dokumen = mapJenisToEnum(String(jenis));
+      whereClause.jenis_dokumen = String(jenis).toUpperCase().trim();
     }
 
     const documents = await this.documentRepository.findAll(whereClause);
-    return documents.map((doc) => ({
+    return documents.map((doc: any) => ({
       id: doc.id,
       name: doc.nama,
       jenis: doc.jenis_dokumen,
       tanggal: doc.tanggal_upload,
       asal: doc.sumber_dokumen === "TATA_USAHA" ? "tu" : "dosen",
       size: "Undetermined",
-      hasHighlight: doc.kepemilikan.some((k) => k.highlights.length > 0),
+      hasHighlight: doc.kepemilikan.some((k: any) => k.highlights.length > 0),
     }));
   }
 
@@ -287,7 +282,7 @@ export class DocumentService {
     return await this.documentRepository.create(
       {
         nama,
-        jenis_dokumen: mapJenisToEnum(jenis_dokumen),
+        jenis_dokumen: String(jenis_dokumen).toUpperCase().trim(),
         file_path: filePath,
         hash_file: hashFile,
         sumber_dokumen: "UPLOAD_PRIBADI",
@@ -325,7 +320,7 @@ export class DocumentService {
     return await this.documentRepository.create(
       {
         nama,
-        jenis_dokumen: mapJenisToEnum(jenis_dokumen),
+        jenis_dokumen: String(jenis_dokumen).toUpperCase().trim(),
         file_path: filePath,
         hash_file: hashFile,
         sumber_dokumen: "TATA_USAHA",
@@ -356,7 +351,7 @@ export class DocumentService {
     const { nama, jenis_dokumen, tanggal_upload } = data;
     return await this.documentRepository.update(id, {
       nama,
-      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
+      jenis_dokumen: String(jenis_dokumen).toUpperCase().trim(),
       tanggal_upload: new Date(tanggal_upload),
     });
   }
@@ -406,7 +401,7 @@ export class DocumentService {
           "Akses ditolak. Anda tidak diperbolehkan menghapus dokumen resmi dari Tata Usaha."
         );
       const isOwner = targetDoc.kepemilikan.some(
-        (k) => k.dosen_id === currentUser.id
+        (k: any) => k.dosen_id === currentUser.id
       );
       if (!isOwner)
         throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
