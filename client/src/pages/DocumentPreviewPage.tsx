@@ -317,12 +317,8 @@ export function DocumentPreviewPage() {
     setHighlightsError(null);
     try {
       const result = await getHighlightsByDokumenId(id);
-      // Filter: hanya highlight milik user yg login (kepemilikan_id sama)
       const myKepemilikanId = result.kepemilikanId;
-      const filtered = myKepemilikanId
-        ? result.highlights.filter(hl => hl.kepemilikan_id === myKepemilikanId)
-        : result.highlights;
-      setHighlights(filtered);
+      setHighlights(result.highlights);
       if (myKepemilikanId) {
         setKepemilikanId(myKepemilikanId);
       }

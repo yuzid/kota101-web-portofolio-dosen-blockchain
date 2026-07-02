@@ -1,24 +1,31 @@
 // src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import type { ReactNode } from "react";
-import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
+import {
+  destroyFetchInterceptor,
+  initFetchInterceptor,
+  isTokenExpired,
+} from "../lib/api";
 import { SessionWarningDialog } from "../components/ui/session-warning-dialog";
+import { fetchAndCacheJenisDokumen } from "../lib/utils";
 
-export type UserRole =
-  | "admin"
-  | "staf_tu"
-  | "dosen"
-  | "kaprodi"
-  | "kajur";
+export type UserRole = "admin" | "staf_tu" | "dosen" | "kaprodi" | "kajur";
 
 export interface User {
   id: string;
   uuid: string;
   email: string;
-  name: string; 
+  name: string;
   roles: UserRole[];
   token: string;
-  programStudi?: string; 
+  programStudi?: string;
   lastLogin?: string;
 }
 
@@ -32,10 +39,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
 function decodeJwtPayload(token: string): Record<string, any> | null {
   try {
-    const payload = token.split('.')[1];
+    const payload = token.split(".")[1];
     return JSON.parse(atob(payload));
   } catch {
     return null;
@@ -44,15 +50,15 @@ function decodeJwtPayload(token: string): Record<string, any> | null {
 
 const mapBackendUserToFrontend = (backendData: any): User => {
   const roles: UserRole[] = [];
-  
-  const dbRole = backendData.role?.toUpperCase();
-  
-  if (dbRole === 'ADMIN') roles.push('admin');
-  if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
-  if (dbRole === 'DOSEN') roles.push('dosen');
 
-  if (backendData.jabatan?.is_kajur) roles.push('kajur');
-  if (backendData.jabatan?.is_kaprodi) roles.push('kaprodi');
+  const dbRole = backendData.role?.toUpperCase();
+
+  if (dbRole === "ADMIN") roles.push("admin");
+  if (dbRole === "TATA_USAHA") roles.push("staf_tu");
+  if (dbRole === "DOSEN") roles.push("dosen");
+
+  if (backendData.jabatan?.is_kajur) roles.push("kajur");
+  if (backendData.jabatan?.is_kaprodi) roles.push("kaprodi");
 
   const decoded = decodeJwtPayload(backendData.token);
   const uuid = decoded?.id || backendData.email;
@@ -61,11 +67,11 @@ const mapBackendUserToFrontend = (backendData: any): User => {
     id: backendData.email,
     uuid: uuid,
     email: backendData.email,
-    name: backendData.name, 
+    name: backendData.name,
     programStudi: backendData.programStudi || undefined,
     roles: roles,
     token: backendData.token,
-    lastLogin: new Date().toISOString()
+    lastLogin: new Date().toISOString(),
   };
 };
 
@@ -112,17 +118,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const decoded = decodeJwtPayload(parsed.token);
           if (decoded) {
             const roles: UserRole[] = [];
-            const dbRole = (decoded.role || '').toUpperCase();
-            if (dbRole === 'ADMIN') roles.push('admin');
-            if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
-            if (dbRole === 'DOSEN') roles.push('dosen');
-            if (decoded.jabatan?.is_kajur) roles.push('kajur');
-            if (decoded.jabatan?.is_kaprodi) roles.push('kaprodi');
+            const dbRole = (decoded.role || "").toUpperCase();
+            if (dbRole === "ADMIN") roles.push("admin");
+            if (dbRole === "TATA_USAHA") roles.push("staf_tu");
+            if (dbRole === "DOSEN") roles.push("dosen");
+            if (decoded.jabatan?.is_kajur) roles.push("kajur");
+            if (decoded.jabatan?.is_kaprodi) roles.push("kaprodi");
             parsed.roles = roles;
             localStorage.setItem("user", JSON.stringify(parsed));
           }
         }
         setUser(parsed);
+        void fetchAndCacheJenisDokumen();
       } catch {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
@@ -145,7 +152,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const remaining = getTokenExpirySeconds();
-      if (remaining !== null && remaining <= 60 && remaining > 0 && !warningShownRef.current) {
+      if (
+        remaining !== null &&
+        remaining <= 60 &&
+        remaining > 0 &&
+        !warningShownRef.current
+      ) {
         warningShownRef.current = true;
         setSessionExpiresIn(remaining);
         setShowSessionWarning(true);
@@ -163,71 +175,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let response: Response;
     try {
       response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
     } catch {
-      throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+      throw new Error(
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda."
+      );
     }
 
     let result: any;
     try {
       result = await response.json();
     } catch {
-      throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+      throw new Error(
+        "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
+      );
     }
 
-    if (!response.ok || result.status === 'error') {
+    if (!response.ok || result.status === "error") {
       if (response.status === 401) {
-        throw new Error('Email atau password salah.');
+        throw new Error("Email atau password salah.");
       }
       if (response.status === 500) {
-        throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+        throw new Error(
+          "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
+        );
       }
-      throw new Error(result.error || 'Terjadi kesalahan. Silakan coba lagi.');
+      throw new Error(result.error || "Terjadi kesalahan. Silakan coba lagi.");
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);
     setUser(authenticatedUser);
     localStorage.setItem("user", JSON.stringify(authenticatedUser));
     localStorage.setItem("token", result.data.token);
+    void fetchAndCacheJenisDokumen();
   };
 
   // 2. Login Menggunakan Google OAuth
   const loginWithGoogle = async (idToken: string) => {
     let response: Response;
     try {
-      response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
+      response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/google-login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        }
+      );
     } catch {
-      throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+      throw new Error(
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda."
+      );
     }
 
     let result: any;
     try {
       result = await response.json();
     } catch {
-      throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+      throw new Error(
+        "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
+      );
     }
 
-    if (!response.ok || result.status === 'error') {
+    if (!response.ok || result.status === "error") {
       if (response.status === 401) {
-        throw new Error('Email atau password salah.');
+        throw new Error("Email atau password salah.");
       }
       if (response.status === 500) {
-        throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+        throw new Error(
+          "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
+        );
       }
-      throw new Error(result.error || 'Terjadi kesalahan. Silakan coba lagi.');
+      throw new Error(result.error || "Terjadi kesalahan. Silakan coba lagi.");
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);
     setUser(authenticatedUser);
     localStorage.setItem("user", JSON.stringify(authenticatedUser));
     localStorage.setItem("token", result.data.token);
+    void fetchAndCacheJenisDokumen();
   };
 
   const logout = () => {
@@ -248,7 +277,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isLoading }}>
+    <AuthContext.Provider
+      value={{ user, login, loginWithGoogle, logout, isLoading }}
+    >
       {children}
       <SessionWarningDialog
         open={showSessionWarning}

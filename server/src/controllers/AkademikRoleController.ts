@@ -251,6 +251,46 @@ export class AkademikRoleController {
     }
   };
 
+  getKajurAllRekaps = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
+        return;
+      }
+
+      const jabatan = await prisma.jabatanKajur.findFirst({
+        where: {
+          dosen_id: userId,
+          periode_mulai: { lte: new Date() },
+          periode_selesai: { gte: new Date() }
+        }
+      });
+
+      if (!jabatan) {
+        res.status(403).json({ status: 'error', error: 'Anda bukan Ketua Jurusan aktif.' });
+        return;
+      }
+
+      const prodiList = await prisma.programStudi.findMany({
+        where: { jurusan_id: jabatan.jurusan_id },
+        select: { id: true }
+      });
+      const prodiIds = prodiList.map(p => p.id);
+
+      const result = await this.rekapService.getAllRekap({
+        OR: [
+          { jurusan_id: jabatan.jurusan_id },
+          { prodi_id: { in: prodiIds } }
+        ]
+      });
+
+      res.status(200).json({ status: 'success', data: result });
+    } catch (error: any) {
+      res.status(500).json({ status: 'error', error: error.message });
+    }
+  };
+
   createProdiRekap = async (req: AuthRequest, res: Response) => {
     try {
       const userId = req.user?.id;

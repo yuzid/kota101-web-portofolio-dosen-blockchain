@@ -52,7 +52,6 @@ import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { getDokumenStatus, linkDokumen, unlinkDokumen, unlinkKegiatan } from "../lib/dokumenKegiatanMap";
 
 interface Dosen {
   id: string;
@@ -265,26 +264,8 @@ export function ActivityFormPage() {
           lampiranId: doc.lampiranId
         }));
         setLampiran([...docs, ...bersamDocs]);
-
-        // Task 6: filter deleted docs dari localStorage
-        if (id) {
-          const savedDeleted = JSON.parse(localStorage.getItem(LS_PREFIX + id + '_deleted') || '[]');
-          if (savedDeleted.length > 0) {
-            setLampiran(prev => prev.filter(l => !savedDeleted.includes(l.lampiranId)));
-            setDeletedLampiranIds(savedDeleted);
-          }
-        }
       }
     } catch {}
-    if (!apiSuccess && id) {
-      const mock = loadFromLocalStorage(id);
-      if (mock) {
-        setFormData(mock.data.formData || mock.data);
-        setAnggota(mock.anggota || []);
-        setLampiran(mock.lampiran || []);
-        setDeletedLampiranIds(mock.deletedLampiranIds || []);
-      }
-    }
     setIsLoading(false);
   };
 
@@ -359,13 +340,6 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
-        if (isEdit && id) {
-          saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
-          localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
-          lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
-            linkDokumen(doc.id, id, formData.namaKegiatan);
-          });
-        }
         setDeletedLampiranIds([]);
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
@@ -373,19 +347,6 @@ export function ActivityFormPage() {
         toast.error(result.error || 'Gagal menyimpan kegiatan');
       }
     } catch (error) {
-      // Mock fallback: save to localStorage if API unavailable
-      if (isEdit && id) {
-        saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
-        localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
-        lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
-          linkDokumen(doc.id, id, formData.namaKegiatan);
-        });
-        setDeletedLampiranIds([]);
-        toast.success(isEdit ? "Kegiatan berhasil diperbarui (mock)." : "Kegiatan berhasil dicatat.");
-        navigate(isEdit ? `/activities/${id}` : "/activities");
-        setIsLoading(false);
-        return;
-      }
       toast.error('Terjadi kesalahan saat menyimpan');
     } finally {
       setIsLoading(false);
@@ -394,7 +355,6 @@ export function ActivityFormPage() {
 
   const handleDelete = async () => {
     setIsLoading(true);
-    if (id) unlinkKegiatan(id);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
@@ -402,7 +362,6 @@ export function ActivityFormPage() {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        if (id) localStorage.removeItem(LS_PREFIX + id);
         toast.success(`Kegiatan berhasil dihapus.`);
         navigate("/activities");
       } else {
@@ -442,11 +401,6 @@ export function ActivityFormPage() {
   );
 
   const handleAddDoc = (doc: Document) => {
-    const status = getDokumenStatus(doc.id, id);
-    if (!status.available) {
-      toast.error(`Dokumen "${doc.name}" sudah terikat ke kegiatan "${status.kegiatanNama}"`);
-      return;
-    }
     if (!lampiran.find(l => l.id === doc.id)) {
       setLampiran([...lampiran, doc]);
     }
@@ -462,7 +416,6 @@ export function ActivityFormPage() {
     }
     setLampiran(lampiran.filter(l => l.id !== docId));
     setRemoveDocId(null);
-    unlinkDokumen(docId);
   };
 
   const handleUploadFile = () => {
@@ -1141,23 +1094,17 @@ export function ActivityFormPage() {
             ) : (
               <div className="space-y-2">
                 {availableDocs.map(doc => {
-                  const status = getDokumenStatus(doc.id, id);
                   return (
                     <div key={doc.id}
-                      className={`flex items-start gap-3 p-3 border rounded-lg ${status.available ? 'hover:bg-accent cursor-pointer' : 'bg-muted/30 opacity-70'}`}
-                      onClick={() => status.available && handleAddDoc(doc)}
+                      className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer"
+                      onClick={() => handleAddDoc(doc)}
                     >
                       <FileText className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{doc.name}</p>
                         <p className="text-xs text-muted-foreground">{doc.jenis}</p>
-                        {!status.available ? (
-                          <Badge variant="secondary" className="text-xs mt-1">Terpakai di "{status.kegiatanNama}"</Badge>
-                        ) : null}
                       </div>
-                      {status.available ? (
-                        <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
-                      ) : null}
+                      <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
                     </div>
                   );
                 })}

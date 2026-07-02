@@ -63,7 +63,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { getAllJenisDokumen, tambahJenisDokumen } from "@/lib/utils";
+import { getAllJenisDokumen } from "@/lib/utils";
 
 interface DistribusiItem {
   id: string;
@@ -644,14 +644,33 @@ export function DocumentDistributionPage() {
                     onChange={(e) => setNewJenisName(e.target.value)}
                     className="flex-1"
                   />
-                  <Button size="sm" onClick={() => {
+                  <Button size="sm" onClick={async () => {
                     if (newJenisName.trim()) {
                       const formatted = newJenisName.trim().toUpperCase().replace(/\s+/g, '_');
-                      tambahJenisDokumen(formatted);
-                      setUploadForm({ ...uploadForm, jenis: formatted });
-                      setShowNewJenisInput(false);
-                      setNewJenisName("");
-                      toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan`);
+                      try {
+                        const token = localStorage.getItem('token');
+                        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/jenis-dokumen`, {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ nama: formatted })
+                        });
+                        const result = await response.json();
+                        if (result.status === 'success') {
+                          const { fetchAndCacheJenisDokumen } = await import("@/lib/utils");
+                          await fetchAndCacheJenisDokumen();
+                          setUploadForm({ ...uploadForm, jenis: formatted });
+                          setShowNewJenisInput(false);
+                          setNewJenisName("");
+                          toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan.`);
+                        } else {
+                          toast.error(result.error || 'Gagal menambahkan jenis dokumen');
+                        }
+                      } catch {
+                        toast.error('Gagal menghubungi server');
+                      }
                     }
                   }}>Tambah</Button>
                 </div>

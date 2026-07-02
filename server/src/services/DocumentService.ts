@@ -1,9 +1,10 @@
-import crypto from 'crypto';
-import { DocumentRepository } from '../repositories/DocumentRepository';
-import { FileStorageService } from './FileStorageService';
-import { MultiChainService } from './MultiChainService';
-import { resolveBlockchainNode } from '../lib/blockchainNode';
-import { mapJenisToEnum } from '../utils/enumMapping';
+import crypto from "crypto";
+
+import { DocumentRepository } from "../repositories/DocumentRepository";
+import { FileStorageService } from "./FileStorageService";
+import { MultiChainService } from "./MultiChainService";
+import { resolveBlockchainNode } from "../lib/blockchainNode";
+import { mapJenisToEnum } from "../utils/enumMapping";
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
@@ -13,7 +14,7 @@ export class DocumentService {
   constructor(
     documentRepository: DocumentRepository,
     fileStorageService: FileStorageService,
-    multiChainService = new MultiChainService(),
+    multiChainService = new MultiChainService()
   ) {
     this.documentRepository = documentRepository;
     this.fileStorageService = fileStorageService;
@@ -22,61 +23,91 @@ export class DocumentService {
 
   private canAccessDocument(document: any, currentUser: any) {
     // Non-dosen users (Admin, TU) can access all documents
-    if (currentUser.role?.toUpperCase() !== 'DOSEN') return true;
+    if (currentUser.role?.toUpperCase() !== "DOSEN") return true;
 
     // Check ownership
-    const isOwner = document.kepemilikan.some((item: any) => item.dosen_id === currentUser.id);
-    
+    const isOwner = document.kepemilikan.some(
+      (item: any) => item.dosen_id === currentUser.id
+    );
+
     // Check if document is attached to activities where user is creator or participant
     const isInLinkedActivity = document.lampiran_bukti.some((item: any) => {
       const activity = item.kegiatan;
-      return activity.dosen_id === currentUser.id ||
-        activity.partisipasi.some((participant: any) => participant.dosen_id === currentUser.id);
+      return (
+        activity.dosen_id === currentUser.id ||
+        activity.partisipasi.some(
+          (participant: any) => participant.dosen_id === currentUser.id
+        )
+      );
     });
 
     // Check if user is Kajur and document is attached to activity in their jurusan
-    const isAccessibleByKajur = currentUser.jabatan?.is_kajur && document.lampiran_bukti.some((item: any) => {
-      const activity = item.kegiatan;
-      return activity?.dosen?.program_studi?.jurusan_id === currentUser.jabatan?.jurusan_id;
-    });
+    const isAccessibleByKajur =
+      currentUser.jabatan?.is_kajur &&
+      document.lampiran_bukti.some((item: any) => {
+        const activity = item.kegiatan;
+        return (
+          activity?.dosen?.program_studi?.jurusan_id ===
+          currentUser.jabatan?.jurusan_id
+        );
+      });
 
     // Check if user is Kaprodi and document is attached to activity in their prodi
-    const isAccessibleByKaprodi = currentUser.jabatan?.is_kaprodi && document.lampiran_bukti.some((item: any) => {
-      const activity = item.kegiatan;
-      return activity?.dosen?.program_studi_id === currentUser.jabatan?.program_studi_id;
-    });
+    const isAccessibleByKaprodi =
+      currentUser.jabatan?.is_kaprodi &&
+      document.lampiran_bukti.some((item: any) => {
+        const activity = item.kegiatan;
+        return (
+          activity?.dosen?.program_studi_id ===
+          currentUser.jabatan?.program_studi_id
+        );
+      });
 
-    return isOwner || isInLinkedActivity || isAccessibleByKajur || isAccessibleByKaprodi;
+    return (
+      isOwner ||
+      isInLinkedActivity ||
+      isAccessibleByKajur ||
+      isAccessibleByKaprodi
+    );
   }
 
   private getMimeType(contentType: string, filePath: string) {
-    if (contentType !== 'application/octet-stream') return contentType;
-    if (filePath.toLowerCase().endsWith('.pdf')) return 'application/pdf';
-    if (filePath.toLowerCase().endsWith('.docx')) {
-      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    if (contentType !== "application/octet-stream") return contentType;
+    if (filePath.toLowerCase().endsWith(".pdf")) return "application/pdf";
+    if (filePath.toLowerCase().endsWith(".docx")) {
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     }
     return contentType;
   }
 
-  private async findBlockchainDocumentRecord(document: any, activityId?: string) {
+  private async findBlockchainDocumentRecord(
+    document: any,
+    activityId?: string
+  ) {
     const linkedActivities = document.lampiran_bukti
       .map((item: any) => item.kegiatan)
       .filter((activity: any) => !activityId || activity.id === activityId);
 
     for (const activity of linkedActivities) {
       const node = resolveBlockchainNode(activity.dosen.program_studi);
-      const items = await this.multiChainService.getJsonStreamItems(node, activity.id);
+      const items = await this.multiChainService.getJsonStreamItems(
+        node,
+        activity.id
+      );
 
       for (const item of items) {
         const payload = item.data.json || {};
         const documents = Array.isArray(payload.dokumen_pendukung)
-          ? payload.dokumen_pendukung as Array<Record<string, unknown>>
+          ? (payload.dokumen_pendukung as Array<Record<string, unknown>>)
           : [];
         const blockchainDocument = documents.find(
-          (entry) => entry.dokumen_id === document.id,
+          (entry) => entry.dokumen_id === document.id
         );
 
-        if (blockchainDocument && typeof blockchainDocument.hash_file === 'string') {
+        if (
+          blockchainDocument &&
+          typeof blockchainDocument.hash_file === "string"
+        ) {
           return {
             activityId: activity.id,
             txId: item.txid,
@@ -93,9 +124,12 @@ export class DocumentService {
 
   async getDocumentContent(id: string, currentUser: any) {
     const document = await this.documentRepository.findPreviewById(id);
-    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    if (!document || document.deleted_at)
+      throw new Error("Dokumen tidak ditemukan.");
     if (!this.canAccessDocument(document, currentUser)) {
-      throw new Error('Akses ditolak. Anda tidak memiliki akses ke dokumen ini.');
+      throw new Error(
+        "Akses ditolak. Anda tidak memiliki akses ke dokumen ini."
+      );
     }
 
     const file = await this.fileStorageService.getFile(document.file_path);
@@ -103,20 +137,29 @@ export class DocumentService {
       ...file,
       contentType: this.getMimeType(file.contentType, document.file_path),
       fileName: document.nama,
-      contentHash: crypto.createHash('sha256').update(file.bytes).digest('hex'),
+      contentHash: crypto.createHash("sha256").update(file.bytes).digest("hex"),
     };
   }
 
   async getDocumentPreview(id: string, currentUser: any, activityId?: string) {
     const document = await this.documentRepository.findPreviewById(id);
-    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    if (!document || document.deleted_at)
+      throw new Error("Dokumen tidak ditemukan.");
     if (!this.canAccessDocument(document, currentUser)) {
-      throw new Error('Akses ditolak. Anda tidak memiliki akses ke dokumen ini.');
+      throw new Error(
+        "Akses ditolak. Anda tidak memiliki akses ke dokumen ini."
+      );
     }
 
     const file = await this.fileStorageService.getFile(document.file_path);
-    const servedHash = crypto.createHash('sha256').update(file.bytes).digest('hex');
-    const blockchainRecord = await this.findBlockchainDocumentRecord(document, activityId);
+    const servedHash = crypto
+      .createHash("sha256")
+      .update(file.bytes)
+      .digest("hex");
+    const blockchainRecord = await this.findBlockchainDocumentRecord(
+      document,
+      activityId
+    );
     const blockchainHash = blockchainRecord?.hash || null;
 
     return {
@@ -130,28 +173,40 @@ export class DocumentService {
       databaseHash: document.hash_file,
       contentHash: servedHash,
       contentMatchesDatabase: servedHash === document.hash_file,
-      blockchainIntegrity: blockchainRecord ? {
-        status: servedHash === blockchainHash ? 'valid' : 'invalid',
-        blockchainHash,
-        txId: blockchainRecord.txId,
-        activityId: blockchainRecord.activityId,
-        blockHeight: blockchainRecord.blockHeight,
-        confirmations: blockchainRecord.confirmations,
-        checkedAt: new Date().toISOString(),
-      } : {
-        status: 'not_recorded',
-        blockchainHash: null,
-        txId: null,
-        activityId: activityId || null,
-        blockHeight: null,
-        confirmations: 0,
-        checkedAt: new Date().toISOString(),
-      },
+      blockchainIntegrity: blockchainRecord
+        ? {
+            status: servedHash === blockchainHash ? "valid" : "invalid",
+            blockchainHash,
+            txId: blockchainRecord.txId,
+            activityId: blockchainRecord.activityId,
+            blockHeight: blockchainRecord.blockHeight,
+            confirmations: blockchainRecord.confirmations,
+            checkedAt: new Date().toISOString(),
+          }
+        : {
+            status: "not_recorded",
+            blockchainHash: null,
+            txId: null,
+            activityId: activityId || null,
+            blockHeight: null,
+            confirmations: 0,
+            checkedAt: new Date().toISOString(),
+          },
     };
   }
 
-  private async getExistingFilePathOrUpload(file: Express.Multer.File, hashFile: string, folder: string) {
-    const existingDocument = await this.documentRepository.findByHashFile(hashFile);
+  mapJenisToEnum(jenis: string): string {
+    return String(jenis).trim();
+  }
+
+  private async getExistingFilePathOrUpload(
+    file: Express.Multer.File,
+    hashFile: string,
+    folder: string
+  ) {
+    const existingDocument = await this.documentRepository.findByHashFile(
+      hashFile
+    );
     if (existingDocument) return existingDocument.file_path;
 
     return await this.fileStorageService.uploadFile(file, folder);
@@ -161,99 +216,140 @@ export class DocumentService {
     const { tab, search, jenis } = query;
     let whereClause: any = {
       deleted_at: null,
-      kepemilikan: { some: { dosen_id: dosenId, status: 'DISETUJUI' } }
+      kepemilikan: { some: { dosen_id: dosenId, status: "DISETUJUI" } },
     };
 
-    if (tab === 'tu') {
-      whereClause.sumber_dokumen = 'TATA_USAHA';
-    } else if (tab === 'dosen') {
-      whereClause.sumber_dokumen = 'UPLOAD_PRIBADI';
+    if (tab === "tu") {
+      whereClause.sumber_dokumen = "TATA_USAHA";
+    } else if (tab === "dosen") {
+      whereClause.sumber_dokumen = "UPLOAD_PRIBADI";
     }
 
     if (search) {
-      whereClause.nama = { contains: String(search), mode: 'insensitive' };
+      whereClause.nama = { contains: String(search), mode: "insensitive" };
     }
 
-    if (jenis && jenis !== 'all') {
+    if (jenis && jenis !== "all") {
       whereClause.jenis_dokumen = mapJenisToEnum(String(jenis));
     }
 
     const documents = await this.documentRepository.findAll(whereClause);
-    return documents.map(doc => ({
+    return documents.map((doc) => ({
       id: doc.id,
       name: doc.nama,
       jenis: doc.jenis_dokumen,
       tanggal: doc.tanggal_upload,
-      asal: doc.sumber_dokumen === 'TATA_USAHA' ? 'tu' : 'dosen',
-      size: 'Undetermined',
-      hasHighlight: doc.kepemilikan.some(k => k.highlights.length > 0)
+      asal: doc.sumber_dokumen === "TATA_USAHA" ? "tu" : "dosen",
+      size: "Undetermined",
+      hasHighlight: doc.kepemilikan.some((k) => k.highlights.length > 0),
     }));
   }
 
   async getTUDocuments(currentUser: any) {
     let whereClause: any = {
       deleted_at: null,
-      sumber_dokumen: 'TATA_USAHA'
+      sumber_dokumen: "TATA_USAHA",
     };
 
-    if (currentUser.role.toUpperCase() === 'TATA_USAHA') {
-      if (!currentUser.jurusan_id) throw new Error('Akses ditolak. Yurisdiksi jurusan tidak valid.');
+    if (currentUser.role.toUpperCase() === "TATA_USAHA") {
+      if (!currentUser.jurusan_id)
+        throw new Error("Akses ditolak. Yurisdiksi jurusan tidak valid.");
       whereClause.kepemilikan = {
-        some: { status: 'DISETUJUI', dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } } }
+        some: {
+          status: "DISETUJUI",
+          dosen: { program_studi: { jurusan_id: currentUser.jurusan_id } },
+        },
       };
     }
 
     return await this.documentRepository.findAll(whereClause);
   }
 
-  async uploadDosenDocument(dosenId: string, data: any, file: Express.Multer.File) {
+  async uploadDosenDocument(
+    dosenId: string,
+    data: any,
+    file: Express.Multer.File
+  ) {
     const { nama, jenis_dokumen, tanggal_dokumen } = data;
-    if (!file || !nama || !jenis_dokumen || !tanggal_dokumen) throw new Error('Semua komponen data formulir wajib diisi.');
+    if (!file || !nama || !jenis_dokumen || !tanggal_dokumen)
+      throw new Error("Semua komponen data formulir wajib diisi.");
 
-    const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, `dosen_uploads/${dosenId}`);
+    const hashFile = crypto
+      .createHash("sha256")
+      .update(file.buffer)
+      .digest("hex");
+    const filePath = await this.getExistingFilePathOrUpload(
+      file,
+      hashFile,
+      `dosen_uploads/${dosenId}`
+    );
 
-    return await this.documentRepository.create({
-      nama,
-      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
-      file_path: filePath,
-      hash_file: hashFile,
-      sumber_dokumen: 'UPLOAD_PRIBADI',
-      tanggal_upload: new Date(tanggal_dokumen),
-    }, [dosenId]);
+    return await this.documentRepository.create(
+      {
+        nama,
+        jenis_dokumen: mapJenisToEnum(jenis_dokumen),
+        file_path: filePath,
+        hash_file: hashFile,
+        sumber_dokumen: "UPLOAD_PRIBADI",
+        tanggal_upload: new Date(tanggal_dokumen),
+      },
+      [dosenId]
+    );
   }
 
   async uploadTUDocument(data: any, file: Express.Multer.File) {
     const { nama, jenis_dokumen, tanggal_upload, dosen_penerima_ids } = data;
-    if (!file || !nama || !jenis_dokumen || !tanggal_upload || !dosen_penerima_ids) throw new Error('Data formulir dan file wajib diisi.');
+    if (
+      !file ||
+      !nama ||
+      !jenis_dokumen ||
+      !tanggal_upload ||
+      !dosen_penerima_ids
+    )
+      throw new Error("Data formulir dan file wajib diisi.");
 
     const targetDosenIds: string[] = JSON.parse(dosen_penerima_ids);
-    if (targetDosenIds.length === 0) throw new Error('Minimal pilih satu dosen penerima.');
+    if (targetDosenIds.length === 0)
+      throw new Error("Minimal pilih satu dosen penerima.");
 
-    const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.getExistingFilePathOrUpload(file, hashFile, 'documents');
+    const hashFile = crypto
+      .createHash("sha256")
+      .update(file.buffer)
+      .digest("hex");
+    const filePath = await this.getExistingFilePathOrUpload(
+      file,
+      hashFile,
+      "documents"
+    );
 
-    return await this.documentRepository.create({
-      nama,
-      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
-      file_path: filePath,
-      hash_file: hashFile,
-      sumber_dokumen: 'TATA_USAHA',
-      tanggal_upload: new Date(tanggal_upload),
-    }, targetDosenIds);
+    return await this.documentRepository.create(
+      {
+        nama,
+        jenis_dokumen: mapJenisToEnum(jenis_dokumen),
+        file_path: filePath,
+        hash_file: hashFile,
+        sumber_dokumen: "TATA_USAHA",
+        tanggal_upload: new Date(tanggal_upload),
+      },
+      targetDosenIds
+    );
   }
 
   async updateMetadata(id: string, data: any, currentUser: any) {
     const existing = await this.documentRepository.findById(id);
-    if (!existing) throw new Error('Dokumen tidak ditemukan.');
+    if (!existing) throw new Error("Dokumen tidak ditemukan.");
 
-    if (currentUser.role.toUpperCase() === 'DOSEN') {
-      if (existing.sumber_dokumen === 'TATA_USAHA') {
-        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengubah dokumen resmi dari Tata Usaha.');
+    if (currentUser.role.toUpperCase() === "DOSEN") {
+      if (existing.sumber_dokumen === "TATA_USAHA") {
+        throw new Error(
+          "Akses ditolak. Anda tidak diperbolehkan mengubah dokumen resmi dari Tata Usaha."
+        );
       }
-      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      const isOwner = existing.kepemilikan.some(
+        (k: any) => k.dosen_id === currentUser.id
+      );
       if (!isOwner) {
-        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+        throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
       }
     }
 
@@ -261,26 +357,36 @@ export class DocumentService {
     return await this.documentRepository.update(id, {
       nama,
       jenis_dokumen: mapJenisToEnum(jenis_dokumen),
-      tanggal_upload: new Date(tanggal_upload)
+      tanggal_upload: new Date(tanggal_upload),
     });
   }
 
   async replaceFile(id: string, file: Express.Multer.File, currentUser: any) {
     const existing = await this.documentRepository.findById(id);
-    if (!existing) throw new Error('Dokumen tidak ditemukan.');
+    if (!existing) throw new Error("Dokumen tidak ditemukan.");
 
-    if (currentUser.role.toUpperCase() === 'DOSEN') {
-      if (existing.sumber_dokumen === 'TATA_USAHA') {
-        throw new Error('Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha.');
+    if (currentUser.role.toUpperCase() === "DOSEN") {
+      if (existing.sumber_dokumen === "TATA_USAHA") {
+        throw new Error(
+          "Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha."
+        );
       }
-      const isOwner = existing.kepemilikan.some((k: any) => k.dosen_id === currentUser.id);
+      const isOwner = existing.kepemilikan.some(
+        (k: any) => k.dosen_id === currentUser.id
+      );
       if (!isOwner) {
-        throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+        throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
       }
     }
 
-    const hashFile = crypto.createHash('sha256').update(file.buffer).digest('hex');
-    const filePath = await this.fileStorageService.uploadFile(file, 'documents');
+    const hashFile = crypto
+      .createHash("sha256")
+      .update(file.buffer)
+      .digest("hex");
+    const filePath = await this.fileStorageService.uploadFile(
+      file,
+      "documents"
+    );
 
     await this.documentRepository.update(id, {
       file_path: filePath,
@@ -292,12 +398,18 @@ export class DocumentService {
 
   async deleteDocument(id: string, currentUser: any) {
     const targetDoc = await this.documentRepository.findById(id);
-    if (!targetDoc) throw new Error('Dokumen tidak ditemukan.');
+    if (!targetDoc) throw new Error("Dokumen tidak ditemukan.");
 
-    if (currentUser.role.toUpperCase() === 'DOSEN') {
-      if (targetDoc.sumber_dokumen === 'TATA_USAHA') throw new Error('Akses ditolak. Anda tidak diperbolehkan menghapus dokumen resmi dari Tata Usaha.');
-      const isOwner = targetDoc.kepemilikan.some(k => k.dosen_id === currentUser.id);
-      if (!isOwner) throw new Error('Akses ilegal. Anda bukan pemilik dokumen ini.');
+    if (currentUser.role.toUpperCase() === "DOSEN") {
+      if (targetDoc.sumber_dokumen === "TATA_USAHA")
+        throw new Error(
+          "Akses ditolak. Anda tidak diperbolehkan menghapus dokumen resmi dari Tata Usaha."
+        );
+      const isOwner = targetDoc.kepemilikan.some(
+        (k) => k.dosen_id === currentUser.id
+      );
+      if (!isOwner)
+        throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
     }
 
     return await this.documentRepository.softDelete(id);
@@ -310,20 +422,22 @@ export class DocumentService {
 
   async getPublicDocumentById(id: string) {
     const document = await this.documentRepository.findByIdPublic(id);
-    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    if (!document || document.deleted_at)
+      throw new Error("Dokumen tidak ditemukan.");
     return document;
   }
 
   async getPublicDocumentContent(id: string) {
     const document = await this.documentRepository.findByIdPublic(id);
-    if (!document || document.deleted_at) throw new Error('Dokumen tidak ditemukan.');
+    if (!document || document.deleted_at)
+      throw new Error("Dokumen tidak ditemukan.");
 
     const file = await this.fileStorageService.getFile(document.file_path);
     return {
       ...file,
       contentType: this.getMimeType(file.contentType, document.file_path),
       fileName: document.nama,
-      contentHash: crypto.createHash('sha256').update(file.bytes).digest('hex'),
+      contentHash: crypto.createHash("sha256").update(file.bytes).digest("hex"),
     };
   }
 }

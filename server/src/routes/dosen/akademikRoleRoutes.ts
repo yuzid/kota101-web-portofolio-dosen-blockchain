@@ -13,6 +13,7 @@ router.get('/jurusan/rekap', asyncHandler(controller.getJurusanRekaps));
 router.get('/jurusan/rekap/:id', asyncHandler(controller.getRekapDetail));
 router.put('/jurusan/rekap/:id', asyncHandler(controller.updateRekap));
 router.delete('/jurusan/rekap/:id', asyncHandler(controller.deleteRekap));
+router.get('/kajur/rekap/semua', asyncHandler(controller.getKajurAllRekaps));
 router.get('/jurusan/kegiatan/:kegiatanId/lampiran/:lampiranId/preview', asyncHandler(controller.getJurusanLampiranPreview));
 router.get('/jurusan/kegiatan/:kegiatanId/lampiran/:lampiranId/content', asyncHandler(controller.getJurusanLampiranContent));
 

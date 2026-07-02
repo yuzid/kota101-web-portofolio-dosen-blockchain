@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from 'react-router';
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
@@ -56,17 +56,17 @@ import {
 } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/loading-skeleton";
-import { AnimatedTable, AnimatedTableRow } from "@/components/ui/animated-table";
+import {
+  AnimatedTable,
+  AnimatedTableRow,
+} from "@/components/ui/animated-table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Account {
@@ -160,18 +160,6 @@ export function ManageAccountsPage() {
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const MOCK_MODE =
-      localStorage.getItem("VITE_MOCK_API") === "true";
-    if (MOCK_MODE) {
-      const stored = localStorage.getItem("MOCK_ACCOUNTS");
-      if (stored) {
-        try {
-          setAccounts(JSON.parse(stored));
-          setIsLoading(false);
-          return;
-        } catch (_) {}
-      }
-    }
     try {
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/admin/users`,
@@ -184,10 +172,7 @@ export function ManageAccountsPage() {
           return {
             id: u.id,
             name:
-              u.dosen?.nama ||
-              u.tata_usaha?.nama ||
-              u.admin?.nama ||
-              u.email,
+              u.dosen?.nama || u.tata_usaha?.nama || u.admin?.nama || u.email,
             username: u.email,
             nip: u.dosen?.nip || u.tata_usaha?.nip,
             nidn: u.dosen?.nidn,
@@ -198,93 +183,15 @@ export function ManageAccountsPage() {
               (u.tata_usaha?.jurusan_id ? "JTK" : "Sistem"),
             programStudiId: u.dosen?.program_studi?.id,
             jurusanId:
-              u.dosen?.program_studi?.jurusan_id ||
-              u.tata_usaha?.jurusan_id,
+              u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
             status: "active" as const,
             lastLogin: "Belum pernah",
           };
         });
-        if (MOCK_MODE) {
-          localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(mapped));
-        }
         setAccounts(mapped);
       }
     } catch (error) {
-      if (MOCK_MODE) {
-        const seed: Account[] = [
-          {
-            id: "seed-1",
-            name: "Dr. Andi Pratama",
-            username: "andi@example.com",
-            nip: "198001012005011001",
-            nidn: "0010018001",
-            roles: ["dosen"],
-            mainRole: "dosen",
-            programStudi: "Informatika",
-            programStudiId: "prodi-1",
-            jurusanId: "jur-1",
-            status: "active",
-            lastLogin: "Belum pernah",
-          },
-          {
-            id: "seed-2",
-            name: "Dewi Sartika",
-            username: "dewi@example.com",
-            nip: "198502102010012002",
-            nidn: "0010028502",
-            roles: ["dosen"],
-            mainRole: "dosen",
-            programStudi: "Sistem Informasi",
-            programStudiId: "prodi-2",
-            jurusanId: "jur-1",
-            status: "active",
-            lastLogin: "Belum pernah",
-          },
-          {
-            id: "seed-3",
-            name: "Budi Santoso",
-            username: "budi@example.com",
-            nip: "199003152015031003",
-            roles: ["staf_tu"],
-            mainRole: "staf_tu",
-            programStudi: "JTK",
-            programStudiId: "",
-            jurusanId: "jur-1",
-            status: "active",
-            lastLogin: "Belum pernah",
-          },
-          {
-            id: "seed-4",
-            name: "Admin Sistem",
-            username: "admin@example.com",
-            roles: ["admin"],
-            mainRole: "admin",
-            programStudi: "Sistem",
-            programStudiId: "",
-            jurusanId: "",
-            status: "active",
-            lastLogin: "Belum pernah",
-          },
-          {
-            id: "seed-5",
-            name: "Prof. Sri Wahyuni",
-            username: "sri@example.com",
-            nip: "197512102003122003",
-            nidn: "0010127505",
-            roles: ["dosen", "kaprodi"],
-            mainRole: "dosen",
-            programStudi: "Informatika",
-            programStudiId: "prodi-1",
-            jurusanId: "jur-1",
-            status: "active",
-            lastLogin: "Belum pernah",
-          },
-        ];
-        localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(seed));
-        setAccounts(seed);
-      } else {
-        toast.error("Gagal memuat data pengguna");
-      }
+      toast.error("Gagal memuat data pengguna");
     } finally {
       setIsLoading(false);
     }
@@ -293,14 +200,12 @@ export function ManageAccountsPage() {
   const fetchMetadata = async () => {
     try {
       const [prodiRes, jurusanRes] = await Promise.all([
-        fetch(
-          `${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        ),
-        fetch(
-          `${import.meta.env.VITE_API_URL}/api/admin/akademik/jurusan`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        ),
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/jurusan`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
       ]);
       const pData = await prodiRes.json();
       const jData = await jurusanRes.json();
@@ -324,7 +229,11 @@ export function ManageAccountsPage() {
     const matchesProdi =
       filterProdi === "all" || account.programStudiId === filterProdi;
     return (
-      matchesSearch && matchesRole && matchesStatus && matchesJurusan && matchesProdi
+      matchesSearch &&
+      matchesRole &&
+      matchesStatus &&
+      matchesJurusan &&
+      matchesProdi
     );
   });
 
@@ -403,7 +312,12 @@ export function ManageAccountsPage() {
   };
 
   const handleSubmitAdd = () => {
-    if (!formData.name || !formData.username || !formData.password || !formData.role) {
+    if (
+      !formData.name ||
+      !formData.username ||
+      !formData.password ||
+      !formData.role
+    ) {
       toast.error("Semua field wajib diisi");
       return;
     }
@@ -450,13 +364,15 @@ export function ManageAccountsPage() {
         toast.success(`Akun ${formData.name} berhasil dibuat.`);
         setShowAddDialog(false);
         fetchUsers();
-        navigate('/manage-accounts');
+        navigate("/manage-accounts");
       } else {
         if (response.status === 409) {
           const msg = result.error || "";
           const lower = msg.toLowerCase();
           const hasFieldError =
-            lower.includes("email") || lower.includes("nip") || lower.includes("nidn");
+            lower.includes("email") ||
+            lower.includes("nip") ||
+            lower.includes("nidn");
           if (lower.includes("email")) setUsernameError(msg);
           if (lower.includes("nip")) setNipError(msg);
           if (lower.includes("nidn")) setNidnError(msg);
@@ -509,34 +425,6 @@ export function ManageAccountsPage() {
     setPasswordError("");
     setGeneralError("");
 
-    const MOCK_MODE = localStorage.getItem("VITE_MOCK_API") === "true";
-    if (MOCK_MODE) {
-      const updatedAccount: Account = {
-        ...selectedAccount,
-        name: formData.name,
-        nip: formData.nip || selectedAccount.nip,
-        nidn: formData.nidn || selectedAccount.nidn,
-      };
-      const mockData = JSON.parse(
-        localStorage.getItem("MOCK_ACCOUNTS") || "[]"
-      );
-      const idx = mockData.findIndex(
-        (a: any) => a.id === selectedAccount.id
-      );
-      if (idx >= 0) mockData[idx] = updatedAccount;
-      else mockData.push(updatedAccount);
-      localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(mockData));
-      setAccounts((prev) =>
-        prev.map((a) =>
-          a.id === selectedAccount.id ? updatedAccount : a
-        )
-      );
-      toast.success(`Akun ${formData.name} berhasil diperbarui. (Mock Mode)`);
-      setShowEditDialog(false);
-      setIsSubmitting(false);
-      return;
-    }
-
     const token = localStorage.getItem("token");
     try {
       const payload: any = {
@@ -571,8 +459,7 @@ export function ManageAccountsPage() {
         if (response.status === 409) {
           const msg = result.error || "";
           const lower = msg.toLowerCase();
-          const hasFieldError =
-            lower.includes("nip") || lower.includes("nidn");
+          const hasFieldError = lower.includes("nip") || lower.includes("nidn");
           if (lower.includes("nip")) setNipError(msg);
           if (lower.includes("nidn")) setNidnError(msg);
           if (!hasFieldError) {
@@ -595,71 +482,69 @@ export function ManageAccountsPage() {
     toast.info("Fitur kelola status akun akan segera hadir.");
   };
 
-const filterSelects = (
-        <>
-          <Select value={filterRole} onValueChange={setFilterRole}>
-            <SelectTrigger className="w-full sm:w-[160px]">
-              <SelectValue placeholder="Role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Role</SelectItem>
-              <SelectItem value="dosen">Dosen</SelectItem>
-              <SelectItem value="staf_tu">Staf Tata Usaha</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
+  const filterSelects = (
+    <>
+      <Select value={filterRole} onValueChange={setFilterRole}>
+        <SelectTrigger className="w-full sm:w-[160px]">
+          <SelectValue placeholder="Role" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua Role</SelectItem>
+          <SelectItem value="dosen">Dosen</SelectItem>
+          <SelectItem value="staf_tu">Staf Tata Usaha</SelectItem>
+          <SelectItem value="admin">Admin</SelectItem>
+        </SelectContent>
+      </Select>
 
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-full sm:w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="active">Aktif</SelectItem>
-              <SelectItem value="inactive">Nonaktif</SelectItem>
-            </SelectContent>
-          </Select>
+      <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <SelectTrigger className="w-full sm:w-[160px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua Status</SelectItem>
+          <SelectItem value="active">Aktif</SelectItem>
+          <SelectItem value="inactive">Nonaktif</SelectItem>
+        </SelectContent>
+      </Select>
 
-          <Select
-            value={filterJurusan}
-            onValueChange={(val) => {
-              setFilterJurusan(val);
-              setFilterProdi("all");
-            }}
-          >
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Jurusan" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Jurusan</SelectItem>
-              {jurusans.map((j: any) => (
-                <SelectItem key={j.id} value={j.id}>
-                  {j.nama_jurusan}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <Select
+        value={filterJurusan}
+        onValueChange={(val) => {
+          setFilterJurusan(val);
+          setFilterProdi("all");
+        }}
+      >
+        <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectValue placeholder="Jurusan" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua Jurusan</SelectItem>
+          {jurusans.map((j: any) => (
+            <SelectItem key={j.id} value={j.id}>
+              {j.nama_jurusan}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-          <Select value={filterProdi} onValueChange={setFilterProdi}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Program Studi" />
-            </SelectTrigger>
-            <SelectContent>
-              {prodis
-                .filter(
-                  (p: any) =>
-                    !formData.jurusanId ||
-                    p.jurusan_id === filterJurusan
-                )
-                .map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nama_prodi}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </>
-      );
+      <Select value={filterProdi} onValueChange={setFilterProdi}>
+        <SelectTrigger className="w-full sm:w-[200px]">
+          <SelectValue placeholder="Program Studi" />
+        </SelectTrigger>
+        <SelectContent>
+          {prodis
+            .filter(
+              (p: any) => !formData.jurusanId || p.jurusan_id === filterJurusan
+            )
+            .map((p: any) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.nama_prodi}
+              </SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
+    </>
+  );
 
   return (
     <MainLayout
@@ -720,21 +605,21 @@ const filterSelects = (
             )}
           </div>
 
-<AnimatePresence>
-       {showFilters && (
-         <motion.div
-           initial={{ opacity: 0, height: 0 }}
-           animate={{ opacity: 1, height: "auto" }}
-           exit={{ opacity: 0, height: 0 }}
-           transition={{ duration: 0.2 }}
-           className="overflow-hidden"
-         >
-           <div className="pt-1 pb-2 flex flex-col sm:flex-row sm:justify-end sm:space-x-2 flex-wrap gap-3">
-             {filterSelects}
-           </div>
-         </motion.div>
-       )}
-     </AnimatePresence>
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-1 pb-2 flex flex-col sm:flex-row sm:justify-end sm:space-x-2 flex-wrap gap-3">
+                  {filterSelects}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Table */}
@@ -783,12 +668,21 @@ const filterSelects = (
                             </p>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1 -mt-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0 -mr-1 -mt-1"
+                                >
                                   <MoreVertical className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="min-w-[130px]">
-                                <DropdownMenuItem onClick={() => openEditDialog(account)}>
+                              <DropdownMenuContent
+                                align="end"
+                                className="min-w-[130px]"
+                              >
+                                <DropdownMenuItem
+                                  onClick={() => openEditDialog(account)}
+                                >
                                   <Edit className="w-3.5 h-3.5 mr-2" /> Edit
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -798,7 +692,9 @@ const filterSelects = (
                                   }}
                                 >
                                   <Power className="w-3.5 h-3.5 mr-2" />{" "}
-                                  {account.status === "active" ? "Nonaktifkan" : "Aktifkan"}
+                                  {account.status === "active"
+                                    ? "Nonaktifkan"
+                                    : "Aktifkan"}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -852,8 +748,12 @@ const filterSelects = (
                       <TableHead className="w-[14%]">Role</TableHead>
                       <TableHead className="w-[16%]">Program Studi</TableHead>
                       <TableHead className="w-[110px]">Status</TableHead>
-                      <TableHead className="w-[130px]">Terakhir Login</TableHead>
-                      <TableHead className="w-[70px] text-right">Aksi</TableHead>
+                      <TableHead className="w-[130px]">
+                        Terakhir Login
+                      </TableHead>
+                      <TableHead className="w-[70px] text-right">
+                        Aksi
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1438,7 +1338,9 @@ const filterSelects = (
         confirmLabel={
           selectedAccount?.status === "active" ? "Nonaktifkan" : "Aktifkan"
         }
-        variant={selectedAccount?.status === "active" ? "destructive" : "default"}
+        variant={
+          selectedAccount?.status === "active" ? "destructive" : "default"
+        }
         onConfirm={handleToggleStatus}
       />
     </MainLayout>
