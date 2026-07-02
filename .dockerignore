@@ -8,7 +8,8 @@
 **/.github
 
 # Build artifacts
-**/dist
+client/dist
+server/dist
 client/.next
 
 # Logs

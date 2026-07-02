@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
+import { StatCard } from "../components/ui/stat-card";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Card, CardContent } from "../components/ui/card";
 import {
   Table,
@@ -27,16 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
@@ -99,14 +94,14 @@ interface Dosen {
 }
 
 const jenisColorMap: Record<string, string> = {
-  SURAT_KEPUTUSAN: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  SURAT_TUGAS: "bg-blue-100 text-blue-800 border-blue-200",
-  KONTRAK_PENELITIAN: "bg-teal-100 text-teal-800 border-teal-200",
-  LAPORAN: "bg-amber-100 text-amber-800 border-amber-200",
-  LEMBAR_PENGESAHAN: "bg-purple-100 text-purple-800 border-purple-200",
-  SERTIFIKAT: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  FOTO: "bg-pink-100 text-pink-800 border-pink-200",
-  BUKTI_PENDUKUNG_LAIN: "bg-gray-100 text-gray-800 border-gray-200",
+  SURAT_KEPUTUSAN: "bg-primary/10 text-primary border-primary/20",
+  SURAT_TUGAS: "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
+  KONTRAK_PENELITIAN: "bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-200 border-teal-200 dark:border-teal-800",
+  LAPORAN: "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800",
+  LEMBAR_PENGESAHAN: "bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800",
+  SERTIFIKAT: "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800",
+  FOTO: "bg-pink-100 dark:bg-pink-950 text-pink-800 dark:text-pink-200 border-pink-200 dark:border-pink-800",
+  BUKTI_PENDUKUNG_LAIN: "bg-muted/50 text-muted-foreground border-border",
 };
 
 export function DocumentDistributionPage() {
@@ -293,10 +288,10 @@ export function DocumentDistributionPage() {
   // ── Status Summary helpers ──
   const recipientBadge = (distribusi: DistribusiItem[]) => {
     if (!distribusi || distribusi.length === 0) {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">0</Badge>;
-    }
-    return (
-      <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-200 text-xs rounded-full font-normal">
+      return <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border text-xs rounded-full font-normal">0</Badge>;
+     }
+     return (
+       <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border text-xs rounded-full font-normal">
         {distribusi.length}
       </Badge>
     );
@@ -304,30 +299,30 @@ export function DocumentDistributionPage() {
 
   const statusBadges = (distribusi: DistribusiItem[]) => {
     if (!distribusi || distribusi.length === 0) {
-      return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">Belum didistribusi</Badge>;
+      return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950 text-xs">Belum didistribusi</Badge>;
     }
     const disetujui = distribusi.filter(d => d.status === "DISETUJUI").length;
     const ditolak = distribusi.filter(d => d.status === "DITOLAK").length;
     const menunggu = distribusi.filter(d => d.status === "MENUNGGU_KONFIRMASI").length;
     if (disetujui === distribusi.length) {
-      return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-medium">Semua disetujui</Badge>;
+      return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-xs font-medium">Semua disetujui</Badge>;
     }
     return (
       <div className="flex items-center gap-1 flex-wrap">
         {disetujui > 0 && (
-          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs font-medium whitespace-nowrap">
-            <Check className="w-3 h-3 mr-0.5 inline" /> {disetujui} Disetujui
-          </Badge>
-        )}
-        {ditolak > 0 && (
-          <Badge className="bg-red-100 text-red-700 border-red-200 text-xs font-medium whitespace-nowrap">
-            <X className="w-3 h-3 mr-0.5 inline" /> {ditolak} Ditolak
-          </Badge>
-        )}
-        {menunggu > 0 && (
-          <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs font-medium whitespace-nowrap">
-            <Clock className="w-3 h-3 mr-0.5 inline" /> {menunggu} Menunggu
-          </Badge>
+          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 text-xs font-medium whitespace-nowrap">
+             <Check className="w-3 h-3 mr-0.5 inline" /> {disetujui} Disetujui
+           </Badge>
+         )}
+         {ditolak > 0 && (
+           <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800 text-xs font-medium whitespace-nowrap">
+             <X className="w-3 h-3 mr-0.5 inline" /> {ditolak} Ditolak
+           </Badge>
+         )}
+         {menunggu > 0 && (
+           <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800 text-xs font-medium whitespace-nowrap">
+             <Clock className="w-3 h-3 mr-0.5 inline" /> {menunggu} Menunggu
+           </Badge>
         )}
       </div>
     );
@@ -338,24 +333,29 @@ export function DocumentDistributionPage() {
       title="Distribusi Dokumen"
       breadcrumbs={[{ label: "Beranda", path: "/dashboard" }, { label: "Distribusi Dokumen" }]}
     >
-      <div className="space-y-4 max-w-7xl mx-auto">
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Distribusi Dokumen</h1>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4 max-w-7xl mx-auto">
+         {/* ── Header ── */}
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+           <div>
+             <h1 className="text-2xl font-bold tracking-tight">Distribusi Dokumen</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Kelola dan distribusikan dokumen ke dosen</p>
           </div>
-          <Button onClick={() => { setCurrentPage(1); setShowUploadDialog(true); }} className="shrink-0 bg-indigo-600 hover:bg-indigo-700">
+           <RippleButton onClick={() => { setCurrentPage(1); setShowUploadDialog(true); }} className="shrink-0">
             <Upload className="w-4 h-4 mr-2" /> Upload Dokumen Baru
-          </Button>
+          </RippleButton>
         </div>
 
         {/* ── Stats Cards ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard icon={<FileText className="w-5 h-5 text-indigo-600" />} value={stats.total} label="Total Dokumen" bg="bg-indigo-50 border-indigo-200" />
-          <StatCard icon={<Check className="w-5 h-5 text-emerald-600" />} value={stats.terdistribusi} label="Sudah Terdistribusi" bg="bg-emerald-50 border-emerald-200" />
-          <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />} value={stats.belumDistribusi} label="Belum Terdistribusi" bg="bg-amber-50 border-amber-200" />
-          <StatCard icon={<Tag className="w-5 h-5 text-purple-600" />} value={stats.jenisUnik} label="Jenis Dokumen" bg="bg-purple-50 border-purple-200" />
+          <StatCard icon={<FileText className="w-5 h-5" />} value={stats.total} label="Total Dokumen" color="primary" />
+           <StatCard icon={<Check className="w-5 h-5" />} value={stats.terdistribusi} label="Sudah Terdistribusi" color="emerald" />
+           <StatCard icon={<Clock className="w-5 h-5" />} value={stats.belumDistribusi} label="Belum Terdistribusi" color="amber" />
+           <StatCard icon={<Tag className="w-5 h-5" />} value={stats.jenisUnik} label="Jenis Dokumen" color="purple" />
         </div>
 
         {/* ── Filter Bar ── */}
@@ -411,7 +411,7 @@ export function DocumentDistributionPage() {
           <CardContent className="p-0">
             {paginatedDocs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 px-4">
-                <div className="p-4 rounded-full bg-gray-100 border border-gray-200 mb-4">
+                 <div className="p-4 rounded-full bg-muted/50 border border-border mb-4">
                   <FileWarning className="w-10 h-10 text-muted-foreground" />
                 </div>
                 <h3 className="text-base font-medium mb-1">
@@ -423,9 +423,9 @@ export function DocumentDistributionPage() {
                     : "Upload dokumen pertama untuk memulai distribusi ke dosen."}
                 </p>
                 {!hasActiveFilter && (
-                  <Button onClick={() => setShowUploadDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                   <RippleButton onClick={() => setShowUploadDialog(true)}>
                     <Upload className="w-4 h-4 mr-2" /> Upload Dokumen Pertama
-                  </Button>
+                  </RippleButton>
                 )}
                 {hasActiveFilter && (
                   <Button variant="outline" onClick={resetFilters}>
@@ -436,24 +436,32 @@ export function DocumentDistributionPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <Table>
+                  <Table className="table-fixed">
+                    <colgroup>
+                      <col className="w-2/5" />
+                      <col className="w-1/6" />
+                      <col className="w-28" />
+                      <col className="w-24" />
+                      <col className="w-32" />
+                      <col className="w-20" />
+                    </colgroup>
                     <TableHeader>
-                      <TableRow className="bg-gray-50 border-b">
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4">Nama Dokumen</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4">Jenis</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4">Tanggal Upload</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4 w-[100px]">Penerima</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4 w-[140px]">Status</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 py-3 px-4 text-right">Aksi</TableHead>
+                      <TableRow className="bg-muted/30 border-b">
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Nama Dokumen</TableHead>
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Jenis</TableHead>
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Tanggal Upload</TableHead>
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[100px]">Penerima</TableHead>
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[140px]">Status</TableHead>
+                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 text-right">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedDocs.map((doc) => (
-                        <TableRow key={doc.id} className="hover:bg-gray-50/50 transition-colors">
-                          <TableCell className="py-3 px-4">
+                        <TableRow key={doc.id} className="hover:bg-muted/50 transition-colors">
+                          <TableCell className="py-2.5 px-3">
                             <div className="flex items-center gap-3">
-                              <div className="p-1.5 rounded-md bg-indigo-50 border border-indigo-100 shrink-0">
-                                <FileText className="w-4 h-4 text-indigo-600" />
+                              <div className="p-1.5 rounded-md bg-primary/5 border border-primary/20 shrink-0">
+                                 <FileText className="w-4 h-4 text-primary" />
                               </div>
                               <div className="min-w-0">
                                 <p className="font-medium text-sm truncate max-w-[260px]">{doc.nama}</p>
@@ -461,15 +469,15 @@ export function DocumentDistributionPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="py-3 px-4">
-                            <Badge variant="outline" className={`text-xs font-medium ${jenisColorMap[doc.jenis_dokumen] || "bg-gray-100 text-gray-700 border-gray-200"}`}>
+                          <TableCell className="py-2.5 px-3">
+                            <Badge variant="outline" className={`text-xs font-medium ${jenisColorMap[doc.jenis_dokumen] || "bg-muted/50 text-foreground border-border"}`}>
                               {doc.jenis_dokumen.replace(/_/g, " ")}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-3 px-4 text-sm whitespace-nowrap">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
-                          <TableCell className="py-3 px-4">{recipientBadge(doc.distribusi)}</TableCell>
-                          <TableCell className="py-3 px-4">{statusBadges(doc.distribusi)}</TableCell>
-                          <TableCell className="py-3 px-4 text-right">
+                          <TableCell className="py-2.5 px-3 text-sm whitespace-nowrap">{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</TableCell>
+                          <TableCell className="py-2.5 px-3">{recipientBadge(doc.distribusi)}</TableCell>
+                          <TableCell className="py-2.5 px-3">{statusBadges(doc.distribusi)}</TableCell>
+                          <TableCell className="py-2.5 px-3 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -493,6 +501,58 @@ export function DocumentDistributionPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+
+                {/* ── Mobile Cards ── */}
+                <div className="md:hidden space-y-2 p-4">
+                  {paginatedDocs.map((doc) => (
+                    <Card key={doc.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="w-10 h-10 shrink-0">
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                              {doc.nama?.charAt(0) || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{doc.nama}</p>
+                                <Badge variant="outline" className={`text-xs mt-0.5 ${jenisColorMap[doc.jenis_dokumen] || "bg-muted/50 text-foreground border-border"}`}>
+                                  {doc.jenis_dokumen.replace(/_/g, " ")}
+                                </Badge>
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1 -mt-1">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-[130px]">
+                                  <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}`)}>
+                                    <Eye className="w-3.5 h-3.5 mr-2" /> Lihat
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}/edit`)}>
+                                    <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <span>{format(new Date(doc.tanggal_upload), "dd MMM yyyy")}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              {recipientBadge(doc.distribusi)}
+                              {statusBadges(doc.distribusi)}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
 
                 {/* ── Pagination ── */}
@@ -520,9 +580,10 @@ export function DocumentDistributionPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+       </div>
+       </motion.div>
 
-      {/* ── Upload Dialog ── */}
+       {/* ── Upload Dialog ── */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           <div className="p-6 pb-0">
@@ -545,7 +606,7 @@ export function DocumentDistributionPage() {
                   onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
                   placeholder="Contoh: SK Mengajar Semester Genap"
                   maxLength={100}
-                  className="border-gray-300 focus-visible:ring-indigo-500 pr-14"
+                    className="border-border focus-visible:ring-primary/50 pr-14"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">{uploadForm.name.length}/100</span>
               </div>
@@ -565,7 +626,7 @@ export function DocumentDistributionPage() {
                 setShowNewJenisInput(false);
                 setUploadForm({ ...uploadForm, jenis: val });
               }}>
-                <SelectTrigger className="border-gray-300 focus-visible:ring-indigo-500">
+                <SelectTrigger className="border-border focus-visible:ring-primary/50">
                   <SelectValue placeholder="Pilih jenis dokumen" />
                 </SelectTrigger>
                 <SelectContent>
@@ -606,9 +667,9 @@ export function DocumentDistributionPage() {
               <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.docx" onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files?.[0] || null })} />
 
               {uploadForm.file ? (
-                <div className="flex items-center gap-3 p-3 border rounded-lg bg-red-50/50 border-red-200">
-                  <div className="p-2 rounded-md bg-red-100 border border-red-200 shrink-0">
-                    <FileText className="w-5 h-5 text-red-500" />
+                <div className="flex items-center gap-3 p-3 border rounded-lg bg-red-50/50 dark:bg-red-950/50 border-red-200 dark:border-red-800">
+                   <div className="p-2 rounded-md bg-red-100 dark:bg-red-900 border border-red-200 dark:border-red-800 shrink-0">
+                     <FileText className="w-5 h-5 text-red-500 dark:text-red-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{uploadForm.file.name}</p>
@@ -621,13 +682,13 @@ export function DocumentDistributionPage() {
               ) : (
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50/50 transition-colors group"
-                >
-                  <div className="p-3 rounded-full bg-gray-100 border border-gray-200 mx-auto mb-3 w-fit group-hover:bg-indigo-50 group-hover:border-indigo-200 transition-colors">
-                    <Upload className="w-6 h-6 text-muted-foreground group-hover:text-indigo-500 transition-colors" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-700">
-                    Drag & drop file di sini, atau <span className="text-indigo-600 underline underline-offset-2">klik untuk memilih</span>
+                    className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors group"
+                 >
+                    <div className="p-3 rounded-full bg-muted border border-border mx-auto mb-3 w-fit group-hover:bg-primary/5 group-hover:border-primary/30 transition-colors">
+                     <Upload className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                   </div>
+                   <p className="text-sm font-medium text-foreground">
+                     Drag & drop file di sini, atau <span className="text-primary underline underline-offset-2">klik untuk memilih</span>
                   </p>
                   <p className="text-xs text-muted-foreground mt-1.5">Format: PDF · Maks. 20MB</p>
                 </div>
@@ -672,10 +733,10 @@ export function DocumentDistributionPage() {
 
               {/* ── Selected Chips ── */}
               {uploadForm.recipients.length > 0 && (
-                <div className="px-4 py-2 border-b bg-blue-50/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-blue-700">{uploadForm.recipients.length} dosen dipilih</span>
-                    <button onClick={() => setUploadForm({ ...uploadForm, recipients: [] })} className="text-[11px] text-blue-600 hover:underline">Hapus semua</button>
+                <div className="px-4 py-2 border-b bg-blue-50/30 dark:bg-blue-950/30">
+                   <div className="flex items-center justify-between">
+                     <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">{uploadForm.recipients.length} dosen dipilih</span>
+                     <button onClick={() => setUploadForm({ ...uploadForm, recipients: [] })} className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline">Hapus semua</button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {uploadForm.recipients.map((id) => {
@@ -722,7 +783,7 @@ export function DocumentDistributionPage() {
                   return (
                     <div
                       key={dosen.id}
-                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${isSelected ? "bg-indigo-50/50 border-l-2 border-l-indigo-500" : "hover:bg-gray-50/50"}`}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-border last:border-b-0 transition-colors ${isSelected ? "bg-primary/5 border-l-2 border-l-primary" : "hover:bg-muted/50"}`}
                       onClick={() => toggleRecipient(dosen.id)}
                     >
                       <Checkbox checked={isSelected} />
@@ -742,57 +803,34 @@ export function DocumentDistributionPage() {
 
           <div className="sticky bottom-0 bg-background border-t p-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowUploadDialog(false)} disabled={isSubmitting}>Batal</Button>
-            <Button onClick={handleDistribute} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700">
+            <RippleButton onClick={handleDistribute} disabled={isSubmitting}>
               <Upload className="w-4 h-4 mr-2" />{isSubmitting ? "Mengupload..." : "Upload"}
-            </Button>
+            </RippleButton>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* ── Delete Confirmation ── */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>Apakah Anda yakin ingin menghapus dokumen <strong>{deleteTarget?.nama}</strong>? Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Hapus</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Dokumen?"
+        description={`Apakah Anda yakin ingin menghapus dokumen ${deleteTarget?.nama}? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={confirmDelete}
+      />
 
-      {/* ── Submit Confirmation ── */}
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Distribusi</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin mendistribusikan dokumen "{uploadForm.name}" ke {uploadForm.recipients.length} dosen?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSubmit}>Ya, Distribusikan</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        title="Konfirmasi Distribusi"
+        description={`Apakah Anda yakin ingin mendistribusikan dokumen "${uploadForm.name}" ke ${uploadForm.recipients.length} dosen?`}
+        confirmLabel="Ya, Distribusikan"
+        onConfirm={confirmSubmit}
+      />
     </MainLayout>
   );
 }
 
-/* ── Stat Card ── */
-function StatCard({ icon, value, label, bg }: { icon: React.ReactNode; value: number; label: string; bg: string }) {
-  return (
-    <div className={`rounded-xl border p-4 ${bg}`}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+

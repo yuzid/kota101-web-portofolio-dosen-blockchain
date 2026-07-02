@@ -1,0 +1,63 @@
+<mjml>
+  <mj-head>
+    <mj-title>Undangan Kegiatan Tridharma</mj-title>
+    <mj-attributes>
+      <mj-all font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" />
+    </mj-attributes>
+    <mj-style inline="inline">
+      .brand { color: #2563eb; font-weight: 700; font-size: 16px; }
+      .greeting { font-size: 16px; line-height: 1.6; }
+      .message { font-size: 15px; line-height: 1.7; color: #374151; }
+      .act-name { font-weight: 600; color: #111827; }
+      .footer-text { font-size: 12px; color: #9ca3af; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f3f4f6">
+    <mj-section padding="32px 24px 0">
+      <mj-column>
+        <mj-text align="center" font-size="22px" font-weight="700" color="#2563eb">
+          📋 Portofolio Dosen
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="16px 24px">
+      <mj-column background-color="#ffffff" border-radius="12px" padding="32px">
+        <mj-text css-class="greeting">
+          Halo <strong>{{namaPenerima}}</strong>,
+        </mj-text>
+
+        <mj-text css-class="message" padding-top="12px">
+          <strong>{{namaPengundang}}</strong> mengundang Anda untuk berpartisipasi sebagai anggota dalam kegiatan tridharma berikut:
+        </mj-text>
+
+        <mj-section background-color="#f0fdf4" border-radius="8px" padding="16px" border="1px solid #bbf7d0">
+          <mj-column>
+            <mj-text font-size="14px" color="#6b7280">Nama Kegiatan</mj-text>
+            <mj-text css-class="act-name" font-size="16px">{{namaKegiatan}}</mj-text>
+            <mj-text font-size="14px" color="#6b7280" padding-top="8px">Jenis</mj-text>
+            <mj-text font-size="15px" color="#374151">{{jenisKegiatan}}</mj-text>
+            <mj-text font-size="14px" color="#6b7280" padding-top="8px">Tanggal</mj-text>
+            <mj-text font-size="15px" color="#374151">{{tanggalKegiatan}}</mj-text>
+          </mj-column>
+        </mj-section>
+
+        <mj-text css-class="message" padding-top="20px">
+          Silakan masuk ke sistem untuk menerima atau menolak undangan ini.
+        </mj-text>
+
+        <mj-button href="{{linkAplikasi}}" background-color="#2563eb" border-radius="8px" font-size="15px" padding="24px 0 8px">
+          Lihat Undangan
+        </mj-button>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="0 24px 32px">
+      <mj-column>
+        <mj-text css-class="footer-text" align="center">
+          Sistem Portofolio Dosen — Politeknik Negeri Bandung
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

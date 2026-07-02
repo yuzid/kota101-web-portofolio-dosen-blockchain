@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
-    "build": "tsc",
+    "build": "tsc && cp -r src/email-templates dist/email-templates",
     "start": "node dist/server.js"
   },
   "keywords": [],
@@ -23,6 +23,7 @@
     "express": "^5.2.1",
     "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
+    "mjml": "^5.4.0",
     "multer": "^2.1.1",
     "nodemailer": "^9.0.1",
     "pg": "^8.21.0",
@@ -33,6 +34,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/mjml": "^5.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",

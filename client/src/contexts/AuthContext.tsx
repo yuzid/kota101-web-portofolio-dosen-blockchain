@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { destroyFetchInterceptor, initFetchInterceptor, isTokenExpired } from "../lib/api";
+import { SessionWarningDialog } from "../components/ui/session-warning-dialog";
 
 export type UserRole =
   | "admin"
@@ -71,7 +72,21 @@ const mapBackendUserToFrontend = (backendData: any): User => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
+  const [sessionExpiresIn, setSessionExpiresIn] = useState(60);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const warningShownRef = useRef(false);
+
+  function getTokenExpirySeconds(): number | null {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return Math.max(0, Math.floor((payload.exp * 1000 - Date.now()) / 1000));
+    } catch {
+      return null;
+    }
+  }
 
   const clearAuth = useCallback(() => {
     setUser(null);
@@ -124,9 +139,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     intervalRef.current = setInterval(() => {
       if (isTokenExpired()) {
+        warningShownRef.current = false;
         clearAuth();
+        return;
       }
-    }, 30000);
+
+      const remaining = getTokenExpirySeconds();
+      if (remaining !== null && remaining <= 60 && remaining > 0 && !warningShownRef.current) {
+        warningShownRef.current = true;
+        setSessionExpiresIn(remaining);
+        setShowSessionWarning(true);
+      }
+    }, 10000);
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -136,16 +160,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 1. Login Manual (Form)
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch {
+      throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    }
 
-    const result = await response.json();
+    let result: any;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+    }
 
     if (!response.ok || result.status === 'error') {
-      throw new Error(result.error || 'Gagal login. Silakan coba lagi.');
+      if (response.status === 401) {
+        throw new Error('Email atau password salah.');
+      }
+      if (response.status === 500) {
+        throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+      }
+      throw new Error(result.error || 'Terjadi kesalahan. Silakan coba lagi.');
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);
@@ -156,16 +196,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 2. Login Menggunakan Google OAuth
   const loginWithGoogle = async (idToken: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+    } catch {
+      throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    }
 
-    const result = await response.json();
+    let result: any;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+    }
 
     if (!response.ok || result.status === 'error') {
-      throw new Error(result.error || 'Otentikasi Google gagal.');
+      if (response.status === 401) {
+        throw new Error('Email atau password salah.');
+      }
+      if (response.status === 500) {
+        throw new Error('Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.');
+      }
+      throw new Error(result.error || 'Terjadi kesalahan. Silakan coba lagi.');
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);
@@ -175,12 +231,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    warningShownRef.current = false;
+    setShowSessionWarning(false);
+    clearAuth();
+  };
+
+  const handleExtendSession = () => {
+    warningShownRef.current = false;
+    setShowSessionWarning(false);
+  };
+
+  const handleSessionLogout = () => {
+    warningShownRef.current = false;
+    setShowSessionWarning(false);
     clearAuth();
   };
 
   return (
     <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isLoading }}>
       {children}
+      <SessionWarningDialog
+        open={showSessionWarning}
+        expiresInSeconds={sessionExpiresIn}
+        onExtend={handleExtendSession}
+        onLogout={handleSessionLogout}
+      />
     </AuthContext.Provider>
   );
 }

@@ -1,7 +1,8 @@
 import { lazy, Suspense } from "react";
+import { motion } from "motion/react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { NotificationProvider } from "./contexts/NotificationContext";
+
 import { Toaster } from "./components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { isTokenExpired } from "./lib/api";
@@ -123,12 +124,25 @@ const PublicDocumentPage = lazy(() =>
   }))
 );
 
+
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
 
 function LoadingSpinner() {
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-col items-center gap-3"
+      >
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="rounded-full h-10 w-10 border-2 border-primary border-t-transparent"
+        />
+        <p className="text-sm text-muted-foreground">Memuat...</p>
+      </motion.div>
     </div>
   );
 }
@@ -441,13 +455,11 @@ function AppRoutes() {
 // ─── App Shell ────────────────────────────────────────────────────────────────
 
 function AppWithProviders() {
-  const { user } = useAuth();
-
   return (
-    <NotificationProvider userRoles={user?.roles}>
+    <>
       <AppRoutes />
       <Toaster position="top-right" />
-    </NotificationProvider>
+    </>
   );
 }
 

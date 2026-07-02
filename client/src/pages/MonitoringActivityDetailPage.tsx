@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { StatCard } from "../components/ui/stat-card";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
@@ -107,34 +109,32 @@ const statusBadge: Record<
 > = {
   MENUNGGU_KONFIRMASI: {
     label: "Menunggu Konfirmasi",
-    className: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    className: "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-800",
     icon: <Clock className="w-3 h-3" />,
   },
   DITERIMA: {
     label: "Diterima",
-    className: "bg-green-100 text-green-800 border-green-300",
+    className: "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200 border-green-300 dark:border-green-800",
     icon: <CheckCircle className="w-3 h-3" />,
   },
   DITOLAK: {
     label: "Ditolak",
-    className: "bg-red-100 text-red-800 border-red-300",
+    className: "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200 border-red-300 dark:border-red-800",
     icon: <XCircle className="w-3 h-3" />,
   },
 };
 
 const jenisColor: Record<string, string> = {
-  pendidikan: "border-l-blue-500",
-  penelitian: "border-l-green-500",
-  pengabdian: "border-l-purple-500",
-  tugas_tambahan: "border-l-orange-500",
+  pendidikan: "border-l-blue-500 dark:border-l-blue-400",
+  penelitian: "border-l-green-500 dark:border-l-green-400",
+  pengabdian: "border-l-purple-500 dark:border-l-purple-400",
+  tugas_tambahan: "border-l-orange-500 dark:border-l-orange-400",
 };
 const jenisBadge: Record<string, string> = {
-  pendidikan: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100",
-  penelitian: "bg-green-100 text-green-800 border-green-200 hover:bg-green-100",
-  pengabdian:
-    "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100",
-  tugas_tambahan:
-    "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100",
+  pendidikan: "border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
+  penelitian: "border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300",
+  pengabdian: "border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300",
+  tugas_tambahan: "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300",
 };
 const jenisIcon: Record<string, React.ReactNode> = {
   pendidikan: <GraduationCap className="w-4 h-4" />,
@@ -277,10 +277,15 @@ export function MonitoringActivityDetailPage() {
         { label: "Detail Kegiatan" },
       ]}
     >
-      <div className="space-y-6 max-w-5xl mx-auto">
-        {/* ── Top Bar ── */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={handleBack}>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-5xl mx-auto">
+         {/* ── Top Bar ── */}
+         <div className="flex items-center justify-between">
+           <Button variant="ghost" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
           </Button>
           <div className="flex gap-2">
@@ -531,15 +536,15 @@ export function MonitoringActivityDetailPage() {
                               {dosen.name}
                             </span>
                             {dosen.isPencatat && (
-                              <Badge className="bg-blue-500 text-xs h-5">
-                                Pembuat
-                              </Badge>
-                            )}
-                            {dosen.isKetua && !dosen.isPencatat && (
-                              <Badge className="bg-purple-500 text-xs h-5">
-                                Ketua
-                              </Badge>
-                            )}
+                               <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs h-5">
+                                 Pembuat
+                               </Badge>
+                             )}
+                             {dosen.isKetua && !dosen.isPencatat && (
+                               <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">
+                                 Ketua
+                               </Badge>
+                             )}
                           </div>
                           {dosen.nidn && (
                             <p className="text-xs text-muted-foreground font-mono mt-0.5">
@@ -551,14 +556,14 @@ export function MonitoringActivityDetailPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {getStatusBadge(dosen.status || "MENUNGGU_KONFIRMASI")}
                         {activity.jenisBukti !== "BERSAMA" &&
-                          (dosen.dokumen.length > 0 ? (
-                            <Badge className="bg-green-500 text-xs whitespace-nowrap">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              {dosen.dokumen.length} dokumen
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
+                           (dosen.dokumen.length > 0 ? (
+                             <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs whitespace-nowrap">
+                               <CheckCircle className="w-3 h-3 mr-1" />
+                               {dosen.dokumen.length} dokumen
+                             </Badge>
+                           ) : (
+                             <Badge
+                               variant="outline"
                               className="text-xs text-muted-foreground whitespace-nowrap"
                             >
                               Belum upload
@@ -643,55 +648,55 @@ export function MonitoringActivityDetailPage() {
 
             {/* ── Summary Stats ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SummaryCard
-                icon={<Users className="w-5 h-5 text-blue-600" />}
-                label="Total Dosen Terlibat"
-                value={activity.dosenTerlibat.length.toString()}
-                bg="bg-blue-50 border-blue-200"
-              />
-              <SummaryCard
-                icon={<FileText className="w-5 h-5 text-green-600" />}
-                label={
-                  activity.jenisBukti === "BERSAMA"
-                    ? "Total Dokumen Bersama"
-                    : "Total Dokumen Bukti"
-                }
-                value={
-                  activity.jenisBukti === "BERSAMA"
-                    ? (activity.dokumenBersama?.length || 0).toString()
-                    : activity.dosenTerlibat
-                        .reduce((s, d) => s + d.dokumen.length, 0)
-                        .toString()
-                }
-                bg="bg-green-50 border-green-200"
-              />
-              <SummaryCard
-                icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
-                label={
-                  activity.jenisBukti === "BERSAMA"
-                    ? "Status Dokumen"
-                    : "Dosen Belum Upload"
-                }
-                value={
-                  activity.jenisBukti === "BERSAMA"
-                    ? activity.dokumenBersama &&
-                      activity.dokumenBersama.length > 0
-                      ? "Ada"
-                      : "Kosong"
-                    : activity.dosenTerlibat
-                        .filter(
-                          (d) =>
-                            d.dokumen.length === 0 && d.status === "DITERIMA"
-                        )
-                        .length.toString()
-                }
-                bg="bg-amber-50 border-amber-200"
-              />
+              <StatCard
+                icon={<Users className="w-5 h-5" />}
+                 label="Total Dosen Terlibat"
+                 value={activity.dosenTerlibat.length}
+                 color="blue"
+               />
+               <StatCard
+                 icon={<FileText className="w-5 h-5" />}
+                 label={
+                   activity.jenisBukti === "BERSAMA"
+                     ? "Total Dokumen Bersama"
+                     : "Total Dokumen Bukti"
+                 }
+                 value={
+                   activity.jenisBukti === "BERSAMA"
+                     ? (activity.dokumenBersama?.length || 0)
+                     : activity.dosenTerlibat
+                         .reduce((s, d) => s + d.dokumen.length, 0)
+                 }
+                 color="emerald"
+               />
+               <StatCard
+                 icon={<AlertCircle className="w-5 h-5" />}
+                 label={
+                   activity.jenisBukti === "BERSAMA"
+                     ? "Status Dokumen"
+                     : "Dosen Belum Upload"
+                 }
+                 value={
+                   activity.jenisBukti === "BERSAMA"
+                     ? activity.dokumenBersama &&
+                       activity.dokumenBersama.length > 0
+                       ? "Ada"
+                       : "Kosong"
+                     : activity.dosenTerlibat
+                         .filter(
+                           (d) =>
+                             d.dokumen.length === 0 && d.status === "DITERIMA"
+                         )
+                         .length
+                 }
+                 color="amber"
+               />
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    </MainLayout>
+       </div>
+       </motion.div>
+     </MainLayout>
   );
 }
 
@@ -719,29 +724,7 @@ function InfoItem({
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-  bg,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  bg: string;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 ${bg}`}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 function FileRow({
   doc,
@@ -754,8 +737,8 @@ function FileRow({
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="p-2 rounded-lg bg-blue-50 border border-blue-100 shrink-0">
-          <FileText className="w-4 h-4 text-blue-600" />
+        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-800 shrink-0">
+           <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
         </div>
         <div className="min-w-0">
           <p className="font-medium text-sm truncate">{doc.name}</p>
@@ -806,14 +789,14 @@ function FileRow({
 function getKelengkapanBadge(status: string) {
   if (status === "lengkap") {
     return (
-      <Badge className="bg-green-500 text-white text-xs">
+      <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs">
         <CheckCircle className="w-3 h-3 mr-1" />
         Dokumen Lengkap
       </Badge>
     );
   }
   return (
-    <Badge className="bg-red-500 text-white text-xs">
+    <Badge variant="outline" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-xs">
       <AlertCircle className="w-3 h-3 mr-1" />
       Dokumen Tidak Lengkap
     </Badge>

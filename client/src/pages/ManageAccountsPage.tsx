@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
-import { MainLayout } from '../components/layout/MainLayout';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
+import { useState, useEffect } from "react";
+import { useNavigate } from 'react-router';
+import { motion, AnimatePresence } from "motion/react";
+import { MainLayout } from "../components/layout/MainLayout";
+import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
+import { Input } from "../components/ui/input";
 import {
   Table,
   TableBody,
@@ -9,15 +12,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../components/ui/table';
+} from "../components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
+} from "../components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -25,81 +27,100 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '../components/ui/dialog';
+} from "../components/ui/dialog";
+import { Label } from "../components/ui/label";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
-import { Label } from '../components/ui/label';
-import { Plus, Search, Edit, Power, Eye, EyeOff, X, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+  Plus,
+  Edit,
+  Power,
+  Eye,
+  EyeOff,
+  Search,
+  SlidersHorizontal,
+  X,
+  Loader2,
+  Users,
+  Filter,
+  MoreVertical,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/page-header";
+import { RoleBadge } from "@/components/ui/role-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/loading-skeleton";
+import { AnimatedTable, AnimatedTableRow } from "@/components/ui/animated-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Account {
   id: string;
   name: string;
-  username: string; // Will map from email
+  username: string;
   nidn?: string;
   nip?: string;
-  roles: string[]; // List of roles for display
-  mainRole: string; // Primary role for filtering/editing
+  roles: string[];
+  mainRole: string;
   programStudi: string;
   programStudiId?: string;
   jurusanId?: string;
-  status: 'active' | 'inactive';
+  status: "active" | "inactive";
   lastLogin?: string;
 }
 
 const roleLabels: Record<string, string> = {
-  dosen: 'Dosen',
-  staf_tu: 'Staf Tata Usaha',
-  kaprodi: 'Kaprodi',
-  kajur: 'Kajur',
-  admin: 'Admin'
+  dosen: "Dosen",
+  staf_tu: "Staf Tata Usaha",
+  kaprodi: "Kaprodi",
+  kajur: "Kajur",
+  admin: "Admin",
 };
 
-const roleBadgeColors: Record<string, string> = {
-  dosen: 'bg-green-500',
-  staf_tu: 'bg-blue-500',
-  kaprodi: 'bg-purple-500',
-  kajur: 'bg-orange-500',
-  admin: 'bg-red-500'
-};
-
-// Internal mapping helper
 const mapRolesFromBackend = (u: any): string[] => {
   const roles: string[] = [];
   const dbRole = u.role?.toUpperCase();
-  
-  if (dbRole === 'ADMIN') roles.push('admin');
-  if (dbRole === 'TATA_USAHA') roles.push('staf_tu');
-  if (dbRole === 'DOSEN') roles.push('dosen');
-
-  if (u.dosen?.jabatan_kajur && u.dosen.jabatan_kajur.length > 0) roles.push('kajur');
-  if (u.dosen?.jabatan_kaprodi && u.dosen.jabatan_kaprodi.length > 0) roles.push('kaprodi');
-
+  if (dbRole === "ADMIN") roles.push("admin");
+  if (dbRole === "TATA_USAHA") roles.push("staf_tu");
+  if (dbRole === "DOSEN") roles.push("dosen");
+  if (u.dosen?.jabatan_kajur && u.dosen.jabatan_kajur.length > 0)
+    roles.push("kajur");
+  if (u.dosen?.jabatan_kaprodi && u.dosen.jabatan_kaprodi.length > 0)
+    roles.push("kaprodi");
   return roles;
 };
 
 const mapRoleToBackend = (frontendRole: string): string => {
-  if (frontendRole === 'staf_tu') return 'TATA_USAHA';
-  if (frontendRole === 'admin') return 'ADMIN';
+  if (frontendRole === "staf_tu") return "TATA_USAHA";
+  if (frontendRole === "admin") return "ADMIN";
   return frontendRole.toUpperCase();
 };
 
 export function ManageAccountsPage() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterJurusan, setFilterJurusan] = useState('all');
-  const [filterProdi, setFilterProdi] = useState('all');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterJurusan, setFilterJurusan] = useState("all");
+  const [filterProdi, setFilterProdi] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   const [prodis, setProdis] = useState<any[]>([]);
   const [jurusans, setJurusans] = useState<any[]>([]);
@@ -109,28 +130,28 @@ export function ManageAccountsPage() {
   const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
-  const [submitMode, setSubmitMode] = useState<'add' | 'edit' | null>(null);
+  const [submitMode, setSubmitMode] = useState<"add" | "edit" | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
-    name: '',
-    username: '',
-    nidn: '',
-    nip: '',
-    password: '',
-    role: '',
-    programStudi: '',
-    programStudiId: '',
-    jurusanId: '',
+    name: "",
+    username: "",
+    nidn: "",
+    nip: "",
+    password: "",
+    role: "",
+    programStudi: "",
+    programStudiId: "",
+    jurusanId: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [usernameError, setUsernameError] = useState('');
-  const [nipError, setNipError] = useState('');
-  const [nidnError, setNidnError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [usernameError, setUsernameError] = useState("");
+  const [nipError, setNipError] = useState("");
+  const [nidnError, setNidnError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     fetchUsers();
@@ -139,62 +160,130 @@ export function ManageAccountsPage() {
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
-
+    const MOCK_MODE =
+      localStorage.getItem("VITE_MOCK_API") === "true";
     if (MOCK_MODE) {
-      const stored = localStorage.getItem('MOCK_ACCOUNTS');
+      const stored = localStorage.getItem("MOCK_ACCOUNTS");
       if (stored) {
         try {
           setAccounts(JSON.parse(stored));
           setIsLoading(false);
           return;
-        } catch (_) {
-          // corrupted, re-fetch or seed
-        }
+        } catch (_) {}
       }
     }
-
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/admin/users`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === "success") {
         const mapped = result.data.map((u: any) => {
           const userRoles = mapRolesFromBackend(u);
           return {
             id: u.id,
-            name: u.dosen?.nama || u.tata_usaha?.nama || u.admin?.nama || u.email,
+            name:
+              u.dosen?.nama ||
+              u.tata_usaha?.nama ||
+              u.admin?.nama ||
+              u.email,
             username: u.email,
             nip: u.dosen?.nip || u.tata_usaha?.nip,
             nidn: u.dosen?.nidn,
             roles: userRoles,
-            mainRole: u.role.toLowerCase(), // Store original role for filtering/editing
-            programStudi: u.dosen?.program_studi?.nama_prodi || (u.tata_usaha?.jurusan_id ? 'JTK' : 'Sistem'),
+            mainRole: u.role.toLowerCase(),
+            programStudi:
+              u.dosen?.program_studi?.nama_prodi ||
+              (u.tata_usaha?.jurusan_id ? "JTK" : "Sistem"),
             programStudiId: u.dosen?.program_studi?.id,
-            jurusanId: u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
-            status: 'active' as const,
-            lastLogin: 'Belum pernah',
+            jurusanId:
+              u.dosen?.program_studi?.jurusan_id ||
+              u.tata_usaha?.jurusan_id,
+            status: "active" as const,
+            lastLogin: "Belum pernah",
           };
         });
         if (MOCK_MODE) {
-          localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mapped));
+          localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(mapped));
         }
         setAccounts(mapped);
       }
     } catch (error) {
       if (MOCK_MODE) {
         const seed: Account[] = [
-          { id: 'seed-1', name: 'Dr. Andi Pratama', username: 'andi@example.com', nip: '198001012005011001', nidn: '0010018001', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-2', name: 'Dewi Sartika', username: 'dewi@example.com', nip: '198502102010012002', nidn: '0010028502', roles: ['dosen'], mainRole: 'dosen', programStudi: 'Sistem Informasi', programStudiId: 'prodi-2', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-3', name: 'Budi Santoso', username: 'budi@example.com', nip: '199003152015031003', roles: ['staf_tu'], mainRole: 'staf_tu', programStudi: 'JTK', programStudiId: '', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-4', name: 'Admin Sistem', username: 'admin@example.com', roles: ['admin'], mainRole: 'admin', programStudi: 'Sistem', programStudiId: '', jurusanId: '', status: 'active', lastLogin: 'Belum pernah' },
-          { id: 'seed-5', name: 'Prof. Sri Wahyuni', username: 'sri@example.com', nip: '197512102003122003', nidn: '0010127505', roles: ['dosen', 'kaprodi'], mainRole: 'dosen', programStudi: 'Informatika', programStudiId: 'prodi-1', jurusanId: 'jur-1', status: 'active', lastLogin: 'Belum pernah' },
+          {
+            id: "seed-1",
+            name: "Dr. Andi Pratama",
+            username: "andi@example.com",
+            nip: "198001012005011001",
+            nidn: "0010018001",
+            roles: ["dosen"],
+            mainRole: "dosen",
+            programStudi: "Informatika",
+            programStudiId: "prodi-1",
+            jurusanId: "jur-1",
+            status: "active",
+            lastLogin: "Belum pernah",
+          },
+          {
+            id: "seed-2",
+            name: "Dewi Sartika",
+            username: "dewi@example.com",
+            nip: "198502102010012002",
+            nidn: "0010028502",
+            roles: ["dosen"],
+            mainRole: "dosen",
+            programStudi: "Sistem Informasi",
+            programStudiId: "prodi-2",
+            jurusanId: "jur-1",
+            status: "active",
+            lastLogin: "Belum pernah",
+          },
+          {
+            id: "seed-3",
+            name: "Budi Santoso",
+            username: "budi@example.com",
+            nip: "199003152015031003",
+            roles: ["staf_tu"],
+            mainRole: "staf_tu",
+            programStudi: "JTK",
+            programStudiId: "",
+            jurusanId: "jur-1",
+            status: "active",
+            lastLogin: "Belum pernah",
+          },
+          {
+            id: "seed-4",
+            name: "Admin Sistem",
+            username: "admin@example.com",
+            roles: ["admin"],
+            mainRole: "admin",
+            programStudi: "Sistem",
+            programStudiId: "",
+            jurusanId: "",
+            status: "active",
+            lastLogin: "Belum pernah",
+          },
+          {
+            id: "seed-5",
+            name: "Prof. Sri Wahyuni",
+            username: "sri@example.com",
+            nip: "197512102003122003",
+            nidn: "0010127505",
+            roles: ["dosen", "kaprodi"],
+            mainRole: "dosen",
+            programStudi: "Informatika",
+            programStudiId: "prodi-1",
+            jurusanId: "jur-1",
+            status: "active",
+            lastLogin: "Belum pernah",
+          },
         ];
-        localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(seed));
+        localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(seed));
         setAccounts(seed);
       } else {
-        toast.error('Gagal memuat data pengguna');
+        toast.error("Gagal memuat data pengguna");
       }
     } finally {
       setIsLoading(false);
@@ -204,45 +293,72 @@ export function ManageAccountsPage() {
   const fetchMetadata = async () => {
     try {
       const [prodiRes, jurusanRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/jurusan`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(
+          `${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_URL}/api/admin/akademik/jurusan`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        ),
       ]);
       const pData = await prodiRes.json();
       const jData = await jurusanRes.json();
-      if (pData.status === 'success') setProdis(pData.data);
-      if (jData.status === 'success') setJurusans(jData.data);
+      if (pData.status === "success") setProdis(pData.data);
+      if (jData.status === "success") setJurusans(jData.data);
     } catch (error) {
-      console.error('Gagal memuat metadata');
+      console.error("Gagal memuat metadata");
     }
   };
 
-  // Filter logic
-  const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          account.username.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Filter can match any of the roles
-    const matchesRole = filterRole === 'all' || account.roles.includes(filterRole);
-    const matchesStatus = filterStatus === 'all' || account.status === filterStatus;
-    const matchesJurusan = filterJurusan === 'all' || account.jurusanId === filterJurusan;
-    const matchesProdi = filterProdi === 'all' || account.programStudiId === filterProdi;
-
-    return matchesSearch && matchesRole && matchesStatus && matchesJurusan && matchesProdi;
+  const filteredAccounts = accounts.filter((account) => {
+    const matchesSearch =
+      account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      account.username.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole =
+      filterRole === "all" || account.roles.includes(filterRole);
+    const matchesStatus =
+      filterStatus === "all" || account.status === filterStatus;
+    const matchesJurusan =
+      filterJurusan === "all" || account.jurusanId === filterJurusan;
+    const matchesProdi =
+      filterProdi === "all" || account.programStudiId === filterProdi;
+    return (
+      matchesSearch && matchesRole && matchesStatus && matchesJurusan && matchesProdi
+    );
   });
 
-  const hasActiveFilters = filterRole !== 'all' || filterStatus !== 'all' || filterJurusan !== 'all' || filterProdi !== 'all' || searchTerm !== '';
+  const hasActiveFilters =
+    filterRole !== "all" ||
+    filterStatus !== "all" ||
+    filterJurusan !== "all" ||
+    filterProdi !== "all" ||
+    searchTerm !== "";
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setFilterRole('all');
-    setFilterStatus('all');
-    setFilterJurusan('all');
-    setFilterProdi('all');
+    setSearchTerm("");
+    setFilterRole("all");
+    setFilterStatus("all");
+    setFilterJurusan("all");
+    setFilterProdi("all");
   };
 
   const openAddDialog = () => {
-    setFormData({ name: '', username: '', nidn: '', nip: '', password: '', role: '', programStudi: '', programStudiId: '', jurusanId: '' });
-    setUsernameError('');
+    setFormData({
+      name: "",
+      username: "",
+      nidn: "",
+      nip: "",
+      password: "",
+      role: "",
+      programStudi: "",
+      programStudiId: "",
+      jurusanId: "",
+    });
+    setUsernameError("");
+    setNipError("");
+    setNidnError("");
+    setGeneralError("");
     setShowPassword(false);
     setShowAddDialog(true);
   };
@@ -252,46 +368,61 @@ export function ManageAccountsPage() {
     setFormData({
       name: account.name,
       username: account.username,
-      nidn: account.nidn || '',
-      nip: account.nip || '',
-      password: '',
-      role: account.mainRole === 'tata_usaha' ? 'staf_tu' : account.mainRole === 'admin' ? 'admin' : account.mainRole,
+      nidn: account.nidn || "",
+      nip: account.nip || "",
+      password: "",
+      role:
+        account.mainRole === "tata_usaha"
+          ? "staf_tu"
+          : account.mainRole === "admin"
+          ? "admin"
+          : account.mainRole,
       programStudi: account.programStudi,
-      programStudiId: account.programStudiId || '',
-      jurusanId: account.jurusanId || '',
+      programStudiId: account.programStudiId || "",
+      jurusanId: account.jurusanId || "",
     });
-    setUsernameError('');
+    setUsernameError("");
+    setNipError("");
+    setNidnError("");
+    setPasswordError("");
+    setGeneralError("");
     setShowPassword(false);
     setShowEditDialog(true);
   };
 
   const checkUsernameAvailability = (username: string, excludeId?: string) => {
-    const exists = accounts.some(acc => acc.username === username && acc.id !== excludeId);
+    const exists = accounts.some(
+      (acc) => acc.username === username && acc.id !== excludeId
+    );
     if (exists) {
-      setUsernameError('Email ini sudah digunakan');
+      setUsernameError("Email ini sudah digunakan");
       return false;
     }
-    setUsernameError('');
+    setUsernameError("");
     return true;
   };
 
   const handleSubmitAdd = () => {
     if (!formData.name || !formData.username || !formData.password || !formData.role) {
-      toast.error('Semua field wajib diisi');
+      toast.error("Semua field wajib diisi");
       return;
     }
     if (formData.password.length < 8) {
-      setPasswordError('Password minimal 8 karakter');
+      setPasswordError("Password minimal 8 karakter");
       return;
     }
-    setSubmitMode('add');
+    setSubmitMode("add");
     setShowSubmitConfirm(true);
   };
 
   const confirmSubmitAdd = async () => {
     setShowSubmitConfirm(false);
     setIsSubmitting(true);
-    const token = localStorage.getItem('token');
+    setUsernameError("");
+    setNipError("");
+    setNidnError("");
+    setGeneralError("");
+    const token = localStorage.getItem("token");
     try {
       const payload = {
         email: formData.username,
@@ -303,21 +434,42 @@ export function ManageAccountsPage() {
         program_studi_id: formData.programStudiId || undefined,
         jurusan_id: formData.jurusanId || undefined,
       };
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/admin/users`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === "success") {
         toast.success(`Akun ${formData.name} berhasil dibuat.`);
         setShowAddDialog(false);
         fetchUsers();
+        navigate('/manage-accounts');
       } else {
-        toast.error(result.error || 'Gagal membuat akun');
+        if (response.status === 409) {
+          const msg = result.error || "";
+          const lower = msg.toLowerCase();
+          const hasFieldError =
+            lower.includes("email") || lower.includes("nip") || lower.includes("nidn");
+          if (lower.includes("email")) setUsernameError(msg);
+          if (lower.includes("nip")) setNipError(msg);
+          if (lower.includes("nidn")) setNidnError(msg);
+          if (!hasFieldError) {
+            setGeneralError(msg);
+            toast.error(msg);
+          }
+        } else {
+          toast.error(result.error || "Gagal membuat akun");
+        }
       }
     } catch (error) {
-      toast.error('Terjadi kesalahan koneksi');
+      toast.error("Terjadi kesalahan koneksi");
     } finally {
       setIsSubmitting(false);
     }
@@ -325,32 +477,26 @@ export function ManageAccountsPage() {
 
   const handleSubmitEdit = () => {
     let hasError = false;
-
     if (!selectedAccount || !formData.name || !formData.role) {
-      toast.error('Field yang wajib tidak boleh kosong');
+      toast.error("Field yang wajib tidak boleh kosong");
       return;
     }
-
-    if (formData.role === 'dosen' || formData.role === 'staf_tu') {
+    if (formData.role === "dosen" || formData.role === "staf_tu") {
       if (!formData.nip.trim()) {
-        setNipError('NIP wajib diisi');
+        setNipError("NIP wajib diisi");
         hasError = true;
       }
     }
-
-    if (formData.role === 'dosen' && !formData.nidn.trim()) {
-      setNidnError('NIDN wajib diisi');
+    if (formData.role === "dosen" && !formData.nidn.trim()) {
+      setNidnError("NIDN wajib diisi");
       hasError = true;
     }
-
     if (formData.password && formData.password.length < 8) {
-      setPasswordError('Password minimal 8 karakter');
+      setPasswordError("Password minimal 8 karakter");
       hasError = true;
     }
-
     if (hasError) return;
-
-    setSubmitMode('edit');
+    setSubmitMode("edit");
     setShowSubmitConfirm(true);
   };
 
@@ -358,9 +504,12 @@ export function ManageAccountsPage() {
     if (!selectedAccount) return;
     setShowSubmitConfirm(false);
     setIsSubmitting(true);
+    setNipError("");
+    setNidnError("");
+    setPasswordError("");
+    setGeneralError("");
 
-    const MOCK_MODE = localStorage.getItem('VITE_MOCK_API') === 'true';
-
+    const MOCK_MODE = localStorage.getItem("VITE_MOCK_API") === "true";
     if (MOCK_MODE) {
       const updatedAccount: Account = {
         ...selectedAccount,
@@ -368,20 +517,27 @@ export function ManageAccountsPage() {
         nip: formData.nip || selectedAccount.nip,
         nidn: formData.nidn || selectedAccount.nidn,
       };
-      const mockData = JSON.parse(localStorage.getItem('MOCK_ACCOUNTS') || '[]');
-      const idx = mockData.findIndex((a: any) => a.id === selectedAccount.id);
+      const mockData = JSON.parse(
+        localStorage.getItem("MOCK_ACCOUNTS") || "[]"
+      );
+      const idx = mockData.findIndex(
+        (a: any) => a.id === selectedAccount.id
+      );
       if (idx >= 0) mockData[idx] = updatedAccount;
       else mockData.push(updatedAccount);
-      localStorage.setItem('MOCK_ACCOUNTS', JSON.stringify(mockData));
-
-      setAccounts(prev => prev.map(a => a.id === selectedAccount.id ? updatedAccount : a));
+      localStorage.setItem("MOCK_ACCOUNTS", JSON.stringify(mockData));
+      setAccounts((prev) =>
+        prev.map((a) =>
+          a.id === selectedAccount.id ? updatedAccount : a
+        )
+      );
       toast.success(`Akun ${formData.name} berhasil diperbarui. (Mock Mode)`);
       setShowEditDialog(false);
       setIsSubmitting(false);
       return;
     }
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     try {
       const payload: any = {
         nama: formData.name,
@@ -391,21 +547,44 @@ export function ManageAccountsPage() {
         jurusan_id: formData.jurusanId || undefined,
       };
       if (formData.password) payload.password = formData.password;
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${selectedAccount.id}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/admin/users/${selectedAccount.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
       const result = await response.json();
-      if (result.status === 'success') {
+      if (result.status === "success") {
         toast.success(`Akun ${formData.name} berhasil diperbarui.`);
+        setNipError("");
+        setNidnError("");
+        setPasswordError("");
+        setGeneralError("");
         setShowEditDialog(false);
         fetchUsers();
       } else {
-        toast.error(result.error || 'Gagal memperbarui akun');
+        if (response.status === 409) {
+          const msg = result.error || "";
+          const lower = msg.toLowerCase();
+          const hasFieldError =
+            lower.includes("nip") || lower.includes("nidn");
+          if (lower.includes("nip")) setNipError(msg);
+          if (lower.includes("nidn")) setNidnError(msg);
+          if (!hasFieldError) {
+            setGeneralError(msg);
+            toast.error(msg);
+          }
+        } else {
+          toast.error(result.error || "Gagal memperbarui akun");
+        }
       }
     } catch (error) {
-      toast.error('Terjadi kesalahan koneksi');
+      toast.error("Terjadi kesalahan koneksi");
     } finally {
       setIsSubmitting(false);
     }
@@ -413,45 +592,13 @@ export function ManageAccountsPage() {
 
   const handleToggleStatus = () => {
     setShowDeactivateDialog(false);
-    toast.info('Fitur kelola status akun akan segera hadir.');
+    toast.info("Fitur kelola status akun akan segera hadir.");
   };
 
-  return (
-    <MainLayout
-      title="Manajemen Akun Pengguna"
-      breadcrumbs={[{ label: 'Beranda', path: '/dashboard' }, { label: 'Manajemen Akun' }]}
-    >
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Manajemen Akun Pengguna</h2>
-            <p className="text-sm text-muted-foreground">
-              Kelola akun pengguna sistem portofolio
-            </p>
-          </div>
-          <Button onClick={openAddDialog}>
-            <Plus className="w-4 h-4 mr-2" />
-            Tambah Akun Baru
-          </Button>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[250px]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama atau email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-          </div>
-
+const filterSelects = (
+        <>
           <Select value={filterRole} onValueChange={setFilterRole}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
@@ -463,7 +610,7 @@ export function ManageAccountsPage() {
           </Select>
 
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -473,147 +620,359 @@ export function ManageAccountsPage() {
             </SelectContent>
           </Select>
 
-          <Select value={filterJurusan} onValueChange={(val) => { setFilterJurusan(val); setFilterProdi('all'); }}>
-            <SelectTrigger className="w-[200px]">
+          <Select
+            value={filterJurusan}
+            onValueChange={(val) => {
+              setFilterJurusan(val);
+              setFilterProdi("all");
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Jurusan" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Jurusan</SelectItem>
-              {jurusans.map(j => (
-                <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+              {jurusans.map((j: any) => (
+                <SelectItem key={j.id} value={j.id}>
+                  {j.nama_jurusan}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
           <Select value={filterProdi} onValueChange={setFilterProdi}>
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Program Studi" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Program Studi</SelectItem>
               {prodis
-                .filter(p => filterJurusan === 'all' || p.jurusan_id === filterJurusan)
-                .map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                .filter(
+                  (p: any) =>
+                    !formData.jurusanId ||
+                    p.jurusan_id === filterJurusan
+                )
+                .map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nama_prodi}
+                  </SelectItem>
                 ))}
             </SelectContent>
           </Select>
+        </>
+      );
 
-          {hasActiveFilters && (
-            <Button variant="outline" onClick={resetFilters}>
-              <X className="w-4 h-4 mr-2" />
-              Reset Filter
+  return (
+    <MainLayout
+      title="Manajemen Akun Pengguna"
+      breadcrumbs={[
+        { label: "Beranda", path: "/dashboard" },
+        { label: "Manajemen Akun" },
+      ]}
+    >
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        <PageHeader
+          title="Manajemen Akun Pengguna"
+          description="Kelola akun pengguna sistem portofolio"
+        >
+          <RippleButton onClick={openAddDialog}>
+            <Plus className="w-4 h-4 mr-2" />
+            Tambah Akun
+          </RippleButton>
+        </PageHeader>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full sm:flex-1 sm:min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama atau email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-9 sm:w-auto w-full"
+            >
+              <Filter className="w-4 h-4 mr-1.5" />
+              Filter
             </Button>
-          )}
+
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="h-9 sm:w-auto w-full"
+              >
+                <X className="w-4 h-4 mr-1.5" />
+                Reset
+              </Button>
+            )}
+          </div>
+
+<AnimatePresence>
+       {showFilters && (
+         <motion.div
+           initial={{ opacity: 0, height: 0 }}
+           animate={{ opacity: 1, height: "auto" }}
+           exit={{ opacity: 0, height: 0 }}
+           transition={{ duration: 0.2 }}
+           className="overflow-hidden"
+         >
+           <div className="pt-1 pb-2 flex flex-col sm:flex-row sm:justify-end sm:space-x-2 flex-wrap gap-3">
+             {filterSelects}
+           </div>
+         </motion.div>
+       )}
+     </AnimatePresence>
         </div>
 
         {/* Table */}
-        <div className="border rounded-lg bg-background">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">No</TableHead>
-                <TableHead>Nama Lengkap</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Program Studi / Unit</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Terakhir Login</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-                    <p className="mt-2 text-muted-foreground">Memuat data pengguna...</p>
-                  </TableCell>
-                </TableRow>
-              ) : filteredAccounts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Tidak ada data yang sesuai dengan filter
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAccounts.map((account, index) => (
-                  <TableRow key={account.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="font-medium">{account.name}</TableCell>
-                    <TableCell>
-                      <code className="text-xs bg-muted px-2 py-1 rounded">{account.username}</code>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {account.roles.map(r => (
-                          <Badge key={r} className={roleBadgeColors[r]}>
-                            {roleLabels[r] || r}
-                          </Badge>
-                        ))}
+        <motion.div
+          layout
+          className="border rounded-xl bg-card overflow-x-auto"
+        >
+          {isLoading ? (
+            <div className="p-6">
+              <TableSkeleton rows={5} cols={7} />
+            </div>
+          ) : filteredAccounts.length === 0 ? (
+            <EmptyState
+              icon={<Users className="w-10 h-10" />}
+              title="Tidak ada data"
+              description={
+                hasActiveFilters
+                  ? "Tidak ada akun yang sesuai dengan filter"
+                  : "Belum ada akun pengguna"
+              }
+              action={
+                hasActiveFilters ? (
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    Reset Filter
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-2 p-4">
+                {filteredAccounts.map((account) => (
+                  <Card key={account.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="w-10 h-10 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                            {account.name?.charAt(0) || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm truncate">
+                              {account.name}
+                            </p>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1 -mt-1">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="min-w-[130px]">
+                                <DropdownMenuItem onClick={() => openEditDialog(account)}>
+                                  <Edit className="w-3.5 h-3.5 mr-2" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedAccount(account);
+                                    setShowDeactivateDialog(true);
+                                  }}
+                                >
+                                  <Power className="w-3.5 h-3.5 mr-2" />{" "}
+                                  {account.status === "active" ? "Nonaktifkan" : "Aktifkan"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {account.roles.map((r) => (
+                              <RoleBadge key={r} role={r} />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                              {account.username}
+                            </code>
+                            <StatusBadge status={account.status} animated />
+                          </div>
+                          {account.programStudi && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {account.programStudi}
+                            </p>
+                          )}
+                          {account.lastLogin && (
+                            <p className="text-xs text-muted-foreground">
+                              Login: {account.lastLogin}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>{account.programStudi}</TableCell>
-                    <TableCell>
-                      <Badge variant={account.status === 'active' ? 'default' : 'secondary'}>
-                        {account.status === 'active' ? 'Aktif' : 'Nonaktif'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {account.lastLogin}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEditDialog(account)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedAccount(account);
-                            setShowDeactivateDialog(true);
-                          }}
-                        >
-                          <Power className={account.status === 'active' ? 'w-4 h-4 text-destructive' : 'w-4 h-4 text-green-500'} />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-        {!isLoading && (
-          <div className="text-sm text-muted-foreground">
+              {/* Desktop Table */}
+              <div className="hidden md:block">
+                <AnimatedTable className="table-fixed">
+                  <colgroup>
+                    <col className="w-12" />
+                    <col className="w-1/5" />
+                    <col className="w-1/5" />
+                    <col className="w-24" />
+                    <col className="w-1/6" />
+                    <col className="w-24" />
+                    <col className="w-1/6" />
+                    <col className="w-20" />
+                  </colgroup>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">No</TableHead>
+                      <TableHead className="w-[26%]">Nama Lengkap</TableHead>
+                      <TableHead className="w-[16%]">Email</TableHead>
+                      <TableHead className="w-[14%]">Role</TableHead>
+                      <TableHead className="w-[16%]">Program Studi</TableHead>
+                      <TableHead className="w-[110px]">Status</TableHead>
+                      <TableHead className="w-[130px]">Terakhir Login</TableHead>
+                      <TableHead className="w-[70px] text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAccounts.map((account, index) => (
+                      <AnimatedTableRow key={account.id}>
+                        <TableCell className="text-muted-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="font-medium max-w-[200px]">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="truncate cursor-default">
+                                {account.name}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>{account.name}</TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs bg-muted px-2 py-1 rounded">
+                            {account.username}
+                          </code>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {account.roles.map((r) => (
+                              <RoleBadge key={r} role={r} />
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {account.programStudi}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={account.status} animated />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {account.lastLogin}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditDialog(account)}
+                              className="h-8 w-8"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedAccount(account);
+                                setShowDeactivateDialog(true);
+                              }}
+                              className="h-8 w-8"
+                            >
+                              <Power
+                                className={cn(
+                                  "w-4 h-4",
+                                  account.status === "active"
+                                    ? "text-destructive"
+                                    : "text-success"
+                                )}
+                              />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </AnimatedTableRow>
+                    ))}
+                  </TableBody>
+                </AnimatedTable>
+              </div>
+            </>
+          )}
+        </motion.div>
+
+        {!isLoading && filteredAccounts.length > 0 && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-sm text-muted-foreground"
+          >
             Menampilkan {filteredAccounts.length} dari {accounts.length} akun
-          </div>
+          </motion.p>
         )}
-      </div>
+      </motion.div>
 
       {/* Add Account Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Tambah Akun Pengguna Baru</DialogTitle>
-            <DialogDescription>
-              Isi form di bawah untuk membuat akun baru
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4 sm:mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          >
+            <DialogHeader>
+              <DialogTitle>Tambah Akun Pengguna</DialogTitle>
+              <DialogDescription>
+                Isi form di bawah untuk membuat akun baru
+              </DialogDescription>
+            </DialogHeader>
+          </motion.div>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+            {generalError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive text-sm text-destructive">
+                {generalError}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="add-name">Nama Lengkap *</Label>
               <Input
                 id="add-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="Masukkan nama lengkap"
               />
             </div>
@@ -625,10 +984,14 @@ export function ManageAccountsPage() {
                 value={formData.username}
                 onChange={(e) => {
                   setFormData({ ...formData, username: e.target.value });
-                  setUsernameError('');
+                  setUsernameError("");
                 }}
-                onBlur={() => formData.username && checkUsernameAvailability(formData.username)}
+                onBlur={() =>
+                  formData.username &&
+                  checkUsernameAvailability(formData.username)
+                }
                 placeholder="Masukkan email"
+                className={cn(usernameError && "border-destructive")}
               />
               {usernameError && (
                 <p className="text-sm text-destructive">{usernameError}</p>
@@ -637,7 +1000,17 @@ export function ManageAccountsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="add-role">Role *</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value, programStudiId: '', jurusanId: '' })}>
+              <Select
+                value={formData.role}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    role: value,
+                    programStudiId: "",
+                    jurusanId: "",
+                  })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih role" />
                 </SelectTrigger>
@@ -649,65 +1022,114 @@ export function ManageAccountsPage() {
               </Select>
             </div>
 
-            {(formData.role === 'dosen' || formData.role === 'staf_tu') && (
-              <div className="space-y-2">
+            {(formData.role === "dosen" || formData.role === "staf_tu") && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
                 <Label htmlFor="add-nip">NIP *</Label>
                 <Input
                   id="add-nip"
                   value={formData.nip}
-                  onChange={(e) => setFormData({ ...formData, nip: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, nip: e.target.value });
+                    setNipError("");
+                  }}
                   placeholder="Masukkan NIP"
+                  className={cn(nipError && "border-destructive")}
                 />
-              </div>
+                {nipError && (
+                  <p className="text-sm text-destructive">{nipError}</p>
+                )}
+              </motion.div>
             )}
 
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
+            {formData.role === "dosen" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
                 <Label htmlFor="add-nidn">NIDN *</Label>
                 <Input
                   id="add-nidn"
                   value={formData.nidn}
-                  onChange={(e) => setFormData({ ...formData, nidn: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, nidn: e.target.value });
+                    setNidnError("");
+                  }}
                   placeholder="Masukkan NIDN"
+                  className={cn(nidnError && "border-destructive")}
                 />
-              </div>
+                {nidnError && (
+                  <p className="text-sm text-destructive">{nidnError}</p>
+                )}
+              </motion.div>
             )}
 
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
+            {formData.role === "dosen" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
                 <Label htmlFor="add-jurusan">Jurusan *</Label>
                 <Select
                   value={formData.jurusanId}
-                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      jurusanId: value,
+                      programStudiId: "",
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih jurusan" />
                   </SelectTrigger>
                   <SelectContent>
                     {jurusans.map((j: any) => (
-                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                      <SelectItem key={j.id} value={j.id}>
+                        {j.nama_jurusan}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </motion.div>
             )}
 
-            {formData.role === 'dosen' && (
-              <div className="space-y-2">
+            {formData.role === "dosen" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
                 <Label htmlFor="add-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                <Select
+                  value={formData.programStudiId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, programStudiId: value })
+                  }
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih program studi" />
+                    <SelectValue placeholder="Pilih prodi" />
                   </SelectTrigger>
                   <SelectContent>
                     {prodis
-                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .filter(
+                        (p: any) =>
+                          !formData.jurusanId ||
+                          p.jurusan_id === formData.jurusanId
+                      )
                       .map((p: any) => (
-                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nama_prodi}
+                        </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </motion.div>
             )}
 
             <div className="space-y-2">
@@ -715,68 +1137,103 @@ export function ManageAccountsPage() {
               <div className="relative">
                 <Input
                   id="add-password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value });
-                    setPasswordError('');
+                    setPasswordError("");
                   }}
                   placeholder="Minimal 8 karakter"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
             </div>
 
-            {formData.role === 'staf_tu' && (
-              <div className="space-y-2">
-                <Label htmlFor="add-jurusan">Jurusan *</Label>
-                <Select value={formData.jurusanId} onValueChange={(value) => setFormData({ ...formData, jurusanId: value })}>
+            {formData.role === "staf_tu" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="space-y-2"
+              >
+                <Label htmlFor="add-jurusan-tu">Jurusan *</Label>
+                <Select
+                  value={formData.jurusanId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, jurusanId: value })
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih jurusan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {jurusans.map(j => (
-                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                    {jurusans.map((j: any) => (
+                      <SelectItem key={j.id} value={j.id}>
+                        {j.nama_jurusan}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </motion.div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isSubmitting}>
+            <Button
+              variant="outline"
+              onClick={() => setShowAddDialog(false)}
+              disabled={isSubmitting}
+            >
               Batal
             </Button>
-            <Button onClick={handleSubmitAdd} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            <RippleButton onClick={handleSubmitAdd} disabled={isSubmitting}>
+              {isSubmitting && (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              )}
               Simpan
-            </Button>
+            </RippleButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Account Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Akun — {selectedAccount?.name}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4 sm:mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          >
+            <DialogHeader>
+              <DialogTitle>Edit Akun — {selectedAccount?.name}</DialogTitle>
+            </DialogHeader>
+          </motion.div>
 
           <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
+            {generalError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive text-sm text-destructive">
+                {generalError}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="edit-name">Nama Lengkap *</Label>
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             </div>
 
@@ -788,10 +1245,12 @@ export function ManageAccountsPage() {
                 disabled
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Email tidak dapat diubah</p>
+              <p className="text-xs text-muted-foreground">
+                Email tidak dapat diubah
+              </p>
             </div>
 
-            {(formData.role === 'dosen' || formData.role === 'staf_tu') && (
+            {(formData.role === "dosen" || formData.role === "staf_tu") && (
               <div className="space-y-2">
                 <Label htmlFor="edit-nip">NIP *</Label>
                 <Input
@@ -799,10 +1258,13 @@ export function ManageAccountsPage() {
                   value={formData.nip}
                   onChange={(e) => {
                     setFormData({ ...formData, nip: e.target.value });
-                    setNipError('');
+                    setNipError("");
                   }}
+                  className={cn(nipError && "border-destructive")}
                 />
-                {nipError && <p className="text-sm text-destructive">{nipError}</p>}
+                {nipError && (
+                  <p className="text-sm text-destructive">{nipError}</p>
+                )}
               </div>
             )}
 
@@ -814,10 +1276,12 @@ export function ManageAccountsPage() {
                 disabled
                 className="bg-muted"
               />
-              <p className="text-xs text-muted-foreground">Role tidak dapat diubah</p>
+              <p className="text-xs text-muted-foreground">
+                Role tidak dapat diubah
+              </p>
             </div>
 
-            {formData.role === 'dosen' && (
+            {formData.role === "dosen" && (
               <div className="space-y-2">
                 <Label htmlFor="edit-nidn">NIDN *</Label>
                 <Input
@@ -825,45 +1289,67 @@ export function ManageAccountsPage() {
                   value={formData.nidn}
                   onChange={(e) => {
                     setFormData({ ...formData, nidn: e.target.value });
-                    setNidnError('');
+                    setNidnError("");
                   }}
                   placeholder="Masukkan NIDN"
+                  className={cn(nidnError && "border-destructive")}
                 />
-                {nidnError && <p className="text-sm text-destructive">{nidnError}</p>}
+                {nidnError && (
+                  <p className="text-sm text-destructive">{nidnError}</p>
+                )}
               </div>
             )}
 
-            {formData.role === 'dosen' && (
+            {formData.role === "dosen" && (
               <div className="space-y-2">
                 <Label htmlFor="edit-jurusan">Jurusan *</Label>
                 <Select
                   value={formData.jurusanId}
-                  onValueChange={(value) => setFormData({ ...formData, jurusanId: value, programStudiId: '' })}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      jurusanId: value,
+                      programStudiId: "",
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih jurusan" />
                   </SelectTrigger>
                   <SelectContent>
                     {jurusans.map((j: any) => (
-                      <SelectItem key={j.id} value={j.id}>{j.nama_jurusan}</SelectItem>
+                      <SelectItem key={j.id} value={j.id}>
+                        {j.nama_jurusan}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {formData.role === 'dosen' && (
+            {formData.role === "dosen" && (
               <div className="space-y-2">
                 <Label htmlFor="edit-prodi">Program Studi *</Label>
-                <Select value={formData.programStudiId} onValueChange={(value) => setFormData({ ...formData, programStudiId: value })}>
+                <Select
+                  value={formData.programStudiId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, programStudiId: value })
+                  }
+                >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Pilih prodi" />
                   </SelectTrigger>
                   <SelectContent>
                     {prodis
-                      .filter((p: any) => !formData.jurusanId || p.jurusan_id === formData.jurusanId)
+                      .filter(
+                        (p: any) =>
+                          !formData.jurusanId ||
+                          p.jurusan_id === formData.jurusanId
+                      )
                       .map((p: any) => (
-                        <SelectItem key={p.id} value={p.id}>{p.nama_prodi}</SelectItem>
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.nama_prodi}
+                        </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
@@ -875,92 +1361,86 @@ export function ManageAccountsPage() {
               <div className="relative">
                 <Input
                   id="edit-password"
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => {
                     setFormData({ ...formData, password: e.target.value });
-                    setPasswordError('');
+                    setPasswordError("");
                   }}
                   placeholder="Kosongkan jika tidak ingin mengubah"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={isSubmitting}>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={isSubmitting}
+            >
               Batal
             </Button>
-            <Button onClick={handleSubmitEdit} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+            <RippleButton onClick={handleSubmitEdit} disabled={isSubmitting}>
+              {isSubmitting && (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              )}
               Simpan
-            </Button>
+            </RippleButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Submit Confirmation */}
-      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
-            <AlertDialogDescription>
-              {submitMode === 'add'
-                ? `Apakah Anda yakin ingin membuat akun ${formData.name} (${formData.username})?`
-                : `Apakah Anda yakin ingin menyimpan perubahan untuk akun ${formData.name}?`
-              }
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={submitMode === 'add' ? confirmSubmitAdd : confirmSubmitEdit}>
-              {submitMode === 'add' ? 'Buat Akun' : 'Simpan Perubahan'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Confirm Submit */}
+      <ConfirmDialog
+        open={showSubmitConfirm}
+        onOpenChange={setShowSubmitConfirm}
+        title="Konfirmasi Simpan"
+        description={
+          submitMode === "add"
+            ? `Apakah Anda yakin ingin membuat akun ${formData.name} (${formData.username})?`
+            : `Apakah Anda yakin ingin menyimpan perubahan untuk akun ${formData.name}?`
+        }
+        confirmLabel={submitMode === "add" ? "Buat Akun" : "Simpan Perubahan"}
+        variant="default"
+        onConfirm={submitMode === "add" ? confirmSubmitAdd : confirmSubmitEdit}
+        loading={isSubmitting}
+      />
 
-      {/* Deactivate/Activate Confirmation */}
-      <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {selectedAccount?.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'} Akun?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedAccount?.status === 'active' ? (
-                <>
-                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan dinonaktifkan.
-                  Pengguna ini tidak akan bisa login dan seluruh sesi aktifnya akan langsung diakhiri.
-                  Akun dapat diaktifkan kembali kapan saja.
-                </>
-              ) : (
-                <>
-                  Akun <strong>{selectedAccount?.name}</strong> (email: <code>{selectedAccount?.username}</code>) akan diaktifkan kembali
-                  dan pengguna dapat login ke sistem.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleToggleStatus}
-              className={selectedAccount?.status === 'active' ? 'bg-destructive hover:bg-destructive/90' : ''}
-            >
-              {selectedAccount?.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Deactivate Confirmation */}
+      <ConfirmDialog
+        open={showDeactivateDialog}
+        onOpenChange={setShowDeactivateDialog}
+        title={
+          selectedAccount?.status === "active"
+            ? "Nonaktifkan Akun?"
+            : "Aktifkan Akun?"
+        }
+        description={
+          selectedAccount?.status === "active"
+            ? `Akun ${selectedAccount?.name} akan dinonaktifkan. Pengguna ini tidak akan bisa login.`
+            : `Akun ${selectedAccount?.name} akan diaktifkan kembali.`
+        }
+        confirmLabel={
+          selectedAccount?.status === "active" ? "Nonaktifkan" : "Aktifkan"
+        }
+        variant={selectedAccount?.status === "active" ? "destructive" : "default"}
+        onConfirm={handleToggleStatus}
+      />
     </MainLayout>
   );
 }

@@ -3,6 +3,7 @@ import { DistributionRepository } from '../repositories/DistributionRepository';
 import { DocumentRepository } from '../repositories/DocumentRepository';
 import { EmailService } from './EmailService';
 import { FileStorageService } from './FileStorageService';
+import { mapJenisToEnum } from '../utils/enumMapping';
 
 export class DocumentDistributionService {
   private distributionRepository: DistributionRepository;
@@ -33,7 +34,7 @@ export class DocumentDistributionService {
 
     return await this.documentRepository.create({
       nama,
-      jenis_dokumen,
+      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
       file_path: filePath,
       hash_file: hashFile,
       sumber_dokumen: 'TATA_USAHA',
@@ -65,7 +66,7 @@ export class DocumentDistributionService {
 
       const doc = await this.documentRepository.create({
         nama,
-        jenis_dokumen,
+        jenis_dokumen: mapJenisToEnum(jenis_dokumen),
         file_path: filePath,
         hash_file: hashFile,
         sumber_dokumen: 'TATA_USAHA',
@@ -164,10 +165,19 @@ export class DocumentDistributionService {
     if (!distribusi) throw new Error('Distribusi dokumen tidak ditemukan.');
     if (distribusi.status !== 'MENUNGGU_KONFIRMASI') throw new Error('Dokumen sudah diproses.');
 
-    const doc = await this.documentRepository.findById(dokumenId);
-    if (!doc) throw new Error('Dokumen tidak ditemukan.');
-
     await this.distributionRepository.updateStatus(distribusi.id, 'DISETUJUI');
+
+    const sender = distribusi.didistribusikan_oleh;
+    const dosenNama = (distribusi.dosen as any)?.nama || 'Dosen';
+    const docNama = (distribusi.dokumen as any)?.nama || 'Dokumen';
+    if (sender?.email) {
+      await this.emailService.notifyDocumentDecision(
+        { nama: sender.tata_usaha?.nama, email: sender.email },
+        docNama,
+        dosenNama,
+        'DITERIMA',
+      );
+    }
 
     return { message: 'Dokumen berhasil diterima.' };
   }
@@ -178,6 +188,18 @@ export class DocumentDistributionService {
     if (distribusi.status !== 'MENUNGGU_KONFIRMASI') throw new Error('Dokumen sudah diproses.');
 
     await this.distributionRepository.updateStatus(distribusi.id, 'DITOLAK');
+
+    const sender = distribusi.didistribusikan_oleh;
+    const dosenNama = (distribusi.dosen as any)?.nama || 'Dosen';
+    const docNama = (distribusi.dokumen as any)?.nama || 'Dokumen';
+    if (sender?.email) {
+      await this.emailService.notifyDocumentDecision(
+        { nama: sender.tata_usaha?.nama, email: sender.email },
+        docNama,
+        dosenNama,
+        'DITOLAK',
+      );
+    }
 
     return { message: 'Dokumen berhasil ditolak.' };
   }

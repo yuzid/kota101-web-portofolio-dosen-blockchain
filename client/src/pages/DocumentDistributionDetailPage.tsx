@@ -1,22 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { EmptyState } from "../components/ui/empty-state";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
 import { Separator } from "../components/ui/separator";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import {
   ArrowLeft,
   Edit,
@@ -80,16 +73,16 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusBadgeClass: Record<string, string> = {
-  MENUNGGU_KONFIRMASI: "bg-amber-100 text-amber-800 border-amber-200",
-  DISETUJUI: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  DITOLAK: "bg-red-100 text-red-800 border-red-200",
-};
+   MENUNGGU_KONFIRMASI: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+   DISETUJUI: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+   DITOLAK: "bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",
+ };
 
 const avatarStatusBg: Record<string, string> = {
-  MENUNGGU_KONFIRMASI: "bg-amber-100 text-amber-700",
-  DISETUJUI: "bg-emerald-100 text-emerald-700",
-  DITOLAK: "bg-red-100 text-red-700",
-};
+   MENUNGGU_KONFIRMASI: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+   DISETUJUI: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+   DITOLAK: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+ };
 
 export function DocumentDistributionDetailPage() {
   const { id } = useParams();
@@ -218,12 +211,17 @@ export function DocumentDistributionDetailPage() {
         { label: doc.nama },
       ]}
     >
-      <div className="space-y-4 max-w-6xl mx-auto">
-        {/* ── Topbar ── */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/document-distribution")}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
-          </Button>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4 max-w-6xl mx-auto">
+         {/* ── Topbar ── */}
+         <div className="flex items-center justify-between">
+           <Button variant="ghost" onClick={() => navigate("/document-distribution")}>
+             <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+           </Button>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => navigate(`/document-distribution/${id}/edit`)}>
               <Edit className="w-4 h-4 mr-1.5" /> Edit Dokumen
@@ -245,13 +243,13 @@ export function DocumentDistributionDetailPage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
-                    <FileText className="w-7 h-7 text-blue-600" />
-                  </div>
+                  <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-800 shrink-0">
+                     <FileText className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                   </div>
                   <div className="min-w-0 flex-1">
                     <h1 className="text-xl font-bold tracking-tight truncate">{doc.nama}</h1>
                     <div className="flex flex-wrap items-center gap-3 mt-2">
-                      <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-xs font-medium">{doc.jenis_dokumen.replace(/_/g, " ")}</Badge>
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-xs font-medium">{doc.jenis_dokumen.replace(/_/g, " ")}</Badge>
                       <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         {format(new Date(doc.tanggal_upload), "dd MMMM yyyy", { locale: localeId })}
@@ -327,7 +325,7 @@ export function DocumentDistributionDetailPage() {
                   </div>
                 ) : fileUrl && !isPdf ? (
                   <div className="flex flex-col items-center justify-center py-16 px-4">
-                    <div className="p-4 rounded-full bg-orange-50 border border-orange-200 mb-4">
+                    <div className="p-4 rounded-full bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 mb-4">
                       <FileWarning className="w-8 h-8 text-orange-500" />
                     </div>
                     <h3 className="text-sm font-medium mb-1">File tidak dapat dipratinjau</h3>
@@ -335,13 +333,11 @@ export function DocumentDistributionDetailPage() {
                     <Button variant="outline" onClick={handleDownload}><Download className="w-4 h-4 mr-2" /> Unduh File</Button>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-16 px-4">
-                    <div className="p-4 rounded-full bg-muted border border-border mb-4">
-                      <FileText className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-sm font-medium mb-1">Preview tidak tersedia</h3>
-                    <p className="text-sm text-muted-foreground">File dokumen belum tersedia.</p>
-                  </div>
+                  <EmptyState
+                    icon={<FileText className="w-8 h-8" />}
+                    title="Preview tidak tersedia"
+                    description="File dokumen belum tersedia."
+                  />
                 )}
               </CardContent>
             </Card>
@@ -356,7 +352,7 @@ export function DocumentDistributionDetailPage() {
                 <span className="text-sm font-medium">Ringkasan distribusi</span>
               </div>
               <CardContent className="space-y-4 p-4">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <SideStat value={totalPenerima} label="Total Penerima" />
                   <SideStat value={disetujui} label="Disetujui" className="text-emerald-600" />
                   <SideStat value={ditolak} label="Ditolak" className="text-red-600" />
@@ -431,45 +427,36 @@ export function DocumentDistributionDetailPage() {
           </div>
         </div>
       </div>
+       </motion.div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>Apakah Anda yakin ingin menghapus dokumen <strong>{doc.nama}</strong>? Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Hapus</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+       <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Dokumen?"
+        description={`Apakah Anda yakin ingin menghapus dokumen ${doc.nama}? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
 
-      <AlertDialog open={!!showResendDialog} onOpenChange={(o) => { if (!o) setShowResendDialog(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Kirim Ulang Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>Dokumen akan dikirim ulang ke dosen ini. Status akan direset menjadi "Menunggu Konfirmasi".</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={() => showResendDialog && handleResend(showResendDialog)}>Kirim Ulang</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!showResendDialog}
+        onOpenChange={(o) => { if (!o) setShowResendDialog(null); }}
+        title="Kirim Ulang Dokumen?"
+        description='Dokumen akan dikirim ulang ke dosen ini. Status akan direset menjadi "Menunggu Konfirmasi".'
+        confirmLabel="Kirim Ulang"
+        onConfirm={() => showResendDialog && handleResend(showResendDialog)}
+      />
 
-      <AlertDialog open={!!showRemoveDialog} onOpenChange={(o) => { if (!o) setShowRemoveDialog(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Penerima?</AlertDialogTitle>
-            <AlertDialogDescription>Dosen ini akan dihapus dari daftar penerima dokumen. Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={() => showRemoveDialog && handleRemoveRecipient(showRemoveDialog)} className="bg-destructive hover:bg-destructive/90">Hapus</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!showRemoveDialog}
+        onOpenChange={(o) => { if (!o) setShowRemoveDialog(null); }}
+        title="Hapus Penerima?"
+        description="Dosen ini akan dihapus dari daftar penerima dokumen. Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={() => showRemoveDialog && handleRemoveRecipient(showRemoveDialog)}
+      />
     </MainLayout>
   );
 }

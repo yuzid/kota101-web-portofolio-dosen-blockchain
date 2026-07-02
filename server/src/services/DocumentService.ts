@@ -1,9 +1,9 @@
 import crypto from 'crypto';
-import { JenisDokumen } from '@prisma/client';
 import { DocumentRepository } from '../repositories/DocumentRepository';
 import { FileStorageService } from './FileStorageService';
 import { MultiChainService } from './MultiChainService';
 import { resolveBlockchainNode } from '../lib/blockchainNode';
+import { mapJenisToEnum } from '../utils/enumMapping';
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
@@ -150,21 +150,6 @@ export class DocumentService {
     };
   }
 
-  mapJenisToEnum(jenis: string): JenisDokumen {
-    const upperInput = jenis.toUpperCase().trim();
-    if (Object.values(JenisDokumen).includes(upperInput as JenisDokumen)) {
-      return upperInput as JenisDokumen;
-    }
-    switch (jenis) {
-      case 'SK': return JenisDokumen.SURAT_KEPUTUSAN;
-      case 'Surat Tugas': return JenisDokumen.SURAT_TUGAS;
-      case 'Laporan Kegiatan': return JenisDokumen.LAPORAN;
-      case 'Sertifikat': return JenisDokumen.SERTIFIKAT;
-      case 'KONTRAK_PENELITIAN': return JenisDokumen.KONTRAK_PENELITIAN;
-      default: return JenisDokumen.BUKTI_PENDUKUNG_LAIN;
-    }
-  }
-
   private async getExistingFilePathOrUpload(file: Express.Multer.File, hashFile: string, folder: string) {
     const existingDocument = await this.documentRepository.findByHashFile(hashFile);
     if (existingDocument) return existingDocument.file_path;
@@ -190,7 +175,7 @@ export class DocumentService {
     }
 
     if (jenis && jenis !== 'all') {
-      whereClause.jenis_dokumen = this.mapJenisToEnum(String(jenis));
+      whereClause.jenis_dokumen = mapJenisToEnum(String(jenis));
     }
 
     const documents = await this.documentRepository.findAll(whereClause);
@@ -230,7 +215,7 @@ export class DocumentService {
 
     return await this.documentRepository.create({
       nama,
-      jenis_dokumen: this.mapJenisToEnum(jenis_dokumen),
+      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
       file_path: filePath,
       hash_file: hashFile,
       sumber_dokumen: 'UPLOAD_PRIBADI',
@@ -250,7 +235,7 @@ export class DocumentService {
 
     return await this.documentRepository.create({
       nama,
-      jenis_dokumen,
+      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
       file_path: filePath,
       hash_file: hashFile,
       sumber_dokumen: 'TATA_USAHA',
@@ -275,7 +260,7 @@ export class DocumentService {
     const { nama, jenis_dokumen, tanggal_upload } = data;
     return await this.documentRepository.update(id, {
       nama,
-      jenis_dokumen: this.mapJenisToEnum(jenis_dokumen),
+      jenis_dokumen: mapJenisToEnum(jenis_dokumen),
       tanggal_upload: new Date(tanggal_upload)
     });
   }

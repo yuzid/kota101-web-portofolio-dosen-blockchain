@@ -13,6 +13,7 @@ import dosenActivityRoutes from './routes/dosen/activityRoutes';
 import highlightRoutes from './routes/dosen/highlightRoutes';
 import publicRoutes from './routes/publicRoutes';
 import akademikRoleRoutes from './routes/dosen/akademikRoleRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 
 
 const app = express();
@@ -41,6 +42,8 @@ app.use('/api/dosen/dokumen', verifyToken, requireRole(['dosen']), dosenDocument
 app.use('/api/dosen/kegiatan', verifyToken, requireRole(['dosen']), dosenActivityRoutes);
 app.use('/api/dosen/highlights', verifyToken, requireRole(['dosen']), highlightRoutes);
 app.use('/api/dosen/akademik-role', verifyToken, requireRole(['dosen']), akademikRoleRoutes);
+
+app.use('/api/dashboard', verifyToken, dashboardRoutes);
 
 // ── Status ──
 app.get('/api/status', (req: Request, res: Response) => {

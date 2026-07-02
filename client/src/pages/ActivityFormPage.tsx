@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
@@ -21,16 +23,7 @@ import {
 } from "../components/ui/card";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -549,12 +542,17 @@ export function ActivityFormPage() {
         { label: isEdit ? "Edit" : "Tambah Kegiatan Baru" },
       ]}
     >
-      <div className="space-y-6 max-w-4xl relative">
-        {isLoading && (
-          <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
-            <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          </div>
-        )}
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-4xl mx-auto relative">
+         {isLoading && (
+           <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
+             <Loader2 className="w-10 h-10 animate-spin text-primary" />
+           </div>
+         )}
 
         <Card>
           <CardHeader>
@@ -804,8 +802,8 @@ export function ActivityFormPage() {
               </div>
               <div className="flex gap-2">
                 {isCurrentUserPencatat && (
-                  <Badge className="bg-blue-500">Pembuat</Badge>
-                )}
+                   <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                 )}
               </div>
             </div>
 
@@ -912,10 +910,10 @@ export function ActivityFormPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {d.isPencatat ? (
-                        <Badge className="bg-blue-500">Pembuat</Badge>
-                      ) : (
-                        <Badge variant="secondary">Anggota</Badge>
-                      )}
+                         <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                       ) : (
+                         <Badge variant="secondary">Anggota</Badge>
+                       )}
                       {!d.isPencatat && (
                         <Button
                           variant="ghost"
@@ -997,7 +995,7 @@ export function ActivityFormPage() {
                 : "Setiap dosen dapat mengupload dokumen bukti masing-masing"}
             </CardDescription>
             <div className="flex gap-2 pt-2">
-              <Button
+              <RippleButton
                 variant="outline"
                 size="sm"
                 className="flex-1"
@@ -1005,8 +1003,8 @@ export function ActivityFormPage() {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Pilih dari Dokumen Saya
-              </Button>
-              <Button
+              </RippleButton>
+              <RippleButton
                 variant="outline"
                 size="sm"
                 className="flex-1"
@@ -1014,7 +1012,7 @@ export function ActivityFormPage() {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Unggah Dokumen Baru
-              </Button>
+              </RippleButton>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1124,14 +1122,15 @@ export function ActivityFormPage() {
             <Button variant="outline" onClick={() => navigate(isEdit ? `/activities/${id}` : "/activities")}>
               Batal
             </Button>
-            <Button onClick={handleSubmit} disabled={isLoading}>
+            <RippleButton onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? 'Menyimpan...' : 'Simpan Kegiatan'}
-            </Button>
+            </RippleButton>
           </div>
         </div>
-      </div>
+       </div>
+       </motion.div>
 
-      <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
+       <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Pilih Dokumen Bukti</DialogTitle>
@@ -1168,86 +1167,47 @@ export function ActivityFormPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!removeAnggotaId} onOpenChange={(open) => { if (!open) setRemoveAnggotaId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Keluarkan Anggota?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin mengeluarkan <strong>{anggotaToRemove?.name}</strong> dari kegiatan ini?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (removeAnggotaId) handleRemoveAnggota(removeAnggotaId);
-                setRemoveAnggotaId(null);
-              }}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Keluarkan
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!removeAnggotaId}
+        onOpenChange={(open) => { if (!open) setRemoveAnggotaId(null); }}
+        title="Keluarkan Anggota?"
+        description={`Apakah Anda yakin ingin mengeluarkan ${anggotaToRemove?.name} dari kegiatan ini?`}
+        confirmLabel="Keluarkan"
+        variant="destructive"
+        onConfirm={() => {
+          if (removeAnggotaId) handleRemoveAnggota(removeAnggotaId);
+          setRemoveAnggotaId(null);
+        }}
+      />
 
-      <AlertDialog open={!!removeDocId} onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus dokumen <strong>{docToRemove?.name}</strong> dari kegiatan ini?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRemoveDoc}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!removeDocId}
+        onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}
+        title="Hapus Dokumen?"
+        description={`Apakah Anda yakin ingin menghapus dokumen ${docToRemove?.name} dari kegiatan ini?`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={confirmRemoveDoc}
+      />
 
-      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin {isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan <strong>{formData.namaKegiatan}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSubmit}>
-              {isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showSubmitConfirm}
+        onOpenChange={setShowSubmitConfirm}
+        title="Konfirmasi Simpan"
+        description={`Apakah Anda yakin ingin ${isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan ${formData.namaKegiatan}?`}
+        confirmLabel={isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
+        onConfirm={confirmSubmit}
+      />
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
-              asosiasinya akan dihapus.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Kegiatan?"
+        description={`Kegiatan ${formData.namaKegiatan} beserta seluruh asosiasinya akan dihapus.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </MainLayout>
   );
 }

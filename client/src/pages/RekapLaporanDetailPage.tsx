@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { Badge } from "../components/ui/badge";
 import {
   Tabs,
@@ -34,7 +36,9 @@ import {
   ChevronDown,
   Clock,
   History,
+  FileX,
 } from "lucide-react";
+import { EmptyState } from "../components/ui/empty-state";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getRekap, exportRekapXlsx, exportRekapCsv, type RekapLaporan } from "../lib/rekapStorage";
@@ -121,10 +125,10 @@ export function RekapLaporanDetailPage() {
 
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
-      case "PENDIDIKAN": return <Badge className="bg-blue-500">Pendidikan</Badge>;
-      case "PENELITIAN": return <Badge className="bg-green-500">Penelitian</Badge>;
-      case "PENGABDIAN": return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case "TUGAS_TAMBAHAN": return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
+      case "PENDIDIKAN": return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
+       case "PENELITIAN": return <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">Penelitian</Badge>;
+       case "PENGABDIAN": return <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Pengabdian</Badge>;
+       case "TUGAS_TAMBAHAN": return <Badge className="border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300">Tugas Tambahan</Badge>;
       default: return <Badge variant="secondary">{jenis}</Badge>;
     }
   };
@@ -151,12 +155,17 @@ export function RekapLaporanDetailPage() {
         { label: rekap.nama },
       ]}
     >
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" onClick={() => navigate(backPath)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Kembali
-          </Button>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6">
+         <div className="flex items-center justify-between">
+           <Button variant="outline" size="sm" onClick={() => navigate(backPath)}>
+             <ArrowLeft className="w-4 h-4 mr-2" />
+             Kembali
+           </Button>
           <div className="flex gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -175,10 +184,10 @@ export function RekapLaporanDetailPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={() => navigate(`${backPath}/${rekap.id}/edit`)}>
+            <RippleButton onClick={() => navigate(`${backPath}/${rekap.id}/edit`)}>
               <Edit className="w-4 h-4 mr-2" />
               Edit Rekap
-            </Button>
+            </RippleButton>
           </div>
         </div>
 
@@ -277,7 +286,16 @@ export function RekapLaporanDetailPage() {
             <div>
               <h3 className="font-semibold mb-3">Daftar Kegiatan ({rekap.kegiatanData.length})</h3>
               <div className="border rounded-lg overflow-x-auto">
-                <Table>
+                <Table className="table-fixed">
+                  <colgroup>
+                    <col className="w-12" />
+                    <col className="w-1/4" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-1/6" />
+                    <col className="w-28" />
+                    <col className="w-1/6" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">No</TableHead>
@@ -293,7 +311,7 @@ export function RekapLaporanDetailPage() {
                     {rekap.kegiatanData.map((kegiatan: any, i: number) => (
                       <TableRow key={kegiatan.id}>
                         <TableCell>{i + 1}</TableCell>
-                        <TableCell className="font-medium">{kegiatan.nama_kegiatan}</TableCell>
+                        <TableCell className="font-medium truncate max-w-[220px]">{kegiatan.nama_kegiatan}</TableCell>
                         <TableCell>{kegiatan.dosen?.nama || "-"}</TableCell>
                         <TableCell>{getJenisBadge(kegiatan.kategori_tridharma)}</TableCell>
                         <TableCell className="text-sm">{kegiatan.jenis_kegiatan?.replace(/_/g, " ")}</TableCell>
@@ -319,8 +337,8 @@ export function RekapLaporanDetailPage() {
                     ))}
                     {rekap.kegiatanData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
-                          Tidak ada data kegiatan
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <EmptyState title="Belum Ada Kegiatan" description="Belum ada data kegiatan yang tercatat dalam rekap ini." icon={FileX} />
                         </TableCell>
                       </TableRow>
                     )}
@@ -358,7 +376,8 @@ export function RekapLaporanDetailPage() {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    </MainLayout>
-  );
-}
+       </div>
+       </motion.div>
+     </MainLayout>
+   );
+ }

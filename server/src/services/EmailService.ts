@@ -1,4 +1,7 @@
 import nodemailer from 'nodemailer';
+import { renderTemplate } from './EmailTemplateRenderer';
+
+const APP_URL = process.env.APP_URL || 'https://portofolio.polban.ac.id';
 
 type MailRecipient = {
   email?: string | null;
@@ -65,31 +68,43 @@ export class EmailService {
     await Promise.all(messages.map(message => this.send(message)));
   }
 
-  async notifyDocumentDistribution(recipients: MailRecipient[], documentName: string, senderName: string) {
-    await this.sendMany(
-      recipients.map(recipient => ({
-        to: recipient,
-        subject: `Dokumen baru didistribusikan: ${documentName}`,
-        text: [
-          `Halo ${recipient.nama || 'Bapak/Ibu'},`,
-          '',
-          `${senderName} mendistribusikan dokumen "${documentName}" kepada Anda.`,
-          'Silakan masuk ke sistem untuk meninjau dan memberikan konfirmasi.',
-        ].join('\n'),
-      })),
+  async notifyDocumentDistribution(recipients: MailRecipient[], documentName: string, senderName: string, jenisDokumen?: string) {
+    const messages = await Promise.all(
+      recipients.map(async recipient => {
+        const { html, text } = await renderTemplate('distribusi-dokumen', {
+          namaPenerima: recipient.nama || 'Bapak/Ibu',
+          namaPengirim: senderName,
+          namaDokumen: documentName,
+          jenisDokumen: jenisDokumen || 'Dokumen',
+          linkAplikasi: `${APP_URL}/documents`,
+        });
+
+        return {
+          to: recipient,
+          subject: `Dokumen baru didistribusikan: ${documentName}`,
+          text,
+          html,
+        };
+      }),
     );
+    await this.sendMany(messages);
   }
 
-  async notifyActivityInvitation(recipient: MailRecipient, activityName: string, inviterName: string) {
+  async notifyActivityInvitation(recipient: MailRecipient, activityName: string, inviterName: string, jenisKegiatan?: string, tanggalKegiatan?: string) {
+    const { html, text } = await renderTemplate('undangan-kegiatan', {
+      namaPenerima: recipient.nama || 'Bapak/Ibu',
+      namaPengundang: inviterName,
+      namaKegiatan: activityName,
+      jenisKegiatan: jenisKegiatan || 'Kegiatan Tridharma',
+      tanggalKegiatan: tanggalKegiatan || '-',
+      linkAplikasi: `${APP_URL}/activities`,
+    });
+
     await this.send({
       to: recipient,
       subject: `Undangan anggota kegiatan tridharma: ${activityName}`,
-      text: [
-        `Halo ${recipient.nama || 'Bapak/Ibu'},`,
-        '',
-        `${inviterName} menambahkan Anda sebagai anggota kegiatan tridharma "${activityName}".`,
-        'Silakan masuk ke sistem untuk menerima atau menolak partisipasi.',
-      ].join('\n'),
+      text,
+      html,
     });
   }
 
@@ -99,6 +114,14 @@ export class EmailService {
     memberName: string,
     status: 'DITERIMA' | 'DITOLAK',
   ) {
+    const templateName = status === 'DITERIMA' ? 'konfirmasi-terima' : 'konfirmasi-tolak';
+    const { html, text } = await renderTemplate(templateName, {
+      namaPenerima: recipient.nama || 'Bapak/Ibu',
+      namaAnggota: memberName,
+      namaKegiatan: activityName,
+      linkAplikasi: `${APP_URL}/activities`,
+    });
+
     const decisionText = status === 'DITERIMA' ? 'menerima' : 'menolak';
     await this.send({
       to: recipient,
@@ -108,6 +131,40 @@ export class EmailService {
         '',
         `${memberName} ${decisionText} undangan anggota untuk kegiatan tridharma "${activityName}".`,
       ].join('\n'),
+      html,
+    });
+  }
+
+  async notifyDocumentDecision(
+    recipient: MailRecipient,
+    documentName: string,
+    dosenName: string,
+    status: 'DITERIMA' | 'DITOLAK',
+  ) {
+    const isAccepted = status === 'DITERIMA';
+    const { html, text } = await renderTemplate('konfirmasi-dokumen', {
+      namaPenerima: recipient.nama || 'Bapak/Ibu',
+      namaDosen: dosenName,
+      namaDokumen: documentName,
+      statusTeks: isAccepted ? 'menerima' : 'menolak',
+      bgWarna: isAccepted ? '#f0fdf4' : '#fef2f2',
+      borderWarna: isAccepted ? '#bbf7d0' : '#fecaca',
+      badgeBg: isAccepted ? '#dcfce7' : '#fee2e2',
+      badgeWarna: isAccepted ? '#16a34a' : '#dc2626',
+      badgeTeks: isAccepted ? '✅ DITERIMA' : '❌ DITOLAK',
+      linkAplikasi: `${APP_URL}/document-distribution`,
+    });
+
+    const decisionText = isAccepted ? 'menerima' : 'menolak';
+    await this.send({
+      to: recipient,
+      subject: `Konfirmasi dokumen: ${documentName}`,
+      text: [
+        `Halo ${recipient.nama || 'Bapak/Ibu'},`,
+        '',
+        `${dosenName} ${decisionText} dokumen "${documentName}" yang Anda distribusikan.`,
+      ].join('\n'),
+      html,
     });
   }
 }
