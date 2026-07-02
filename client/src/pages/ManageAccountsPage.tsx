@@ -184,7 +184,7 @@ export function ManageAccountsPage() {
             programStudiId: u.dosen?.program_studi?.id,
             jurusanId:
               u.dosen?.program_studi?.jurusan_id || u.tata_usaha?.jurusan_id,
-            status: "active" as const,
+            status: (u.status || "active") as "active" | "inactive",
             lastLogin: "Belum pernah",
           };
         });
@@ -477,9 +477,40 @@ export function ManageAccountsPage() {
     }
   };
 
-  const handleToggleStatus = () => {
+  const handleToggleStatus = async () => {
+    if (!selectedAccount) return;
     setShowDeactivateDialog(false);
-    toast.info("Fitur kelola status akun akan segera hadir.");
+
+    const newStatus = selectedAccount.status === "active" ? "inactive" : "active";
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/admin/users/${selectedAccount.id}/status`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      const result = await response.json();
+      if (result.status === "success") {
+        toast.success(
+          `Akun ${selectedAccount.name} berhasil ${
+            newStatus === "active" ? "diaktifkan" : "dinonaktifkan"
+          }.`
+        );
+        fetchUsers();
+      } else {
+        toast.error(result.error || "Gagal mengubah status akun");
+      }
+    } catch (error) {
+      toast.error("Terjadi kesalahan koneksi");
+    }
   };
 
   const filterSelects = (

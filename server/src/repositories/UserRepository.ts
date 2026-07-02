@@ -4,6 +4,7 @@ export const userSelect = {
   id: true,
   email: true,
   role: true,
+  status: true,
   admin: { select: { nama: true } },
   tata_usaha: { select: { nip: true, nama: true, jurusan_id: true } },
   dosen: {
