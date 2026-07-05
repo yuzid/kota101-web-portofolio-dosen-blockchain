@@ -13,6 +13,9 @@ import dosenActivityRoutes from './routes/dosen/activityRoutes';
 import highlightRoutes from './routes/dosen/highlightRoutes';
 import publicRoutes from './routes/publicRoutes';
 import akademikRoleRoutes from './routes/dosen/akademikRoleRoutes';
+import jenisDokumenRoutes from './routes/jenisDokumenRoutes';
+import { JenisDokumenController } from './controllers/JenisDokumenController';
+import { asyncHandler } from './middleware/authMiddleware';
 
 
 const app = express();
@@ -41,6 +44,10 @@ app.use('/api/dosen/dokumen', verifyToken, requireRole(['dosen']), dosenDocument
 app.use('/api/dosen/kegiatan', verifyToken, requireRole(['dosen']), dosenActivityRoutes);
 app.use('/api/dosen/highlights', verifyToken, requireRole(['dosen']), highlightRoutes);
 app.use('/api/dosen/akademik-role', verifyToken, requireRole(['dosen']), akademikRoleRoutes);
+
+const jenisDokumenController = new JenisDokumenController();
+app.use('/api/jenis-dokumen', verifyToken, requireRole(['admin', 'tata_usaha', 'dosen']), jenisDokumenRoutes);
+app.post('/api/tatausaha/jenis-dokumen', verifyToken, requireRole(['tata_usaha', 'admin']), asyncHandler(jenisDokumenController.create));
 
 // ── Status ──
 app.get('/api/status', (req: Request, res: Response) => {
