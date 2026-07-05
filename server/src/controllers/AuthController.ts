@@ -17,13 +17,18 @@ export class AuthController {
       return;
     }
 
-    const authData = await this.authService.login(email, password);
-    if (!authData) {
-      res.status(401).json({ status: 'error', error: 'Email atau password salah.' });
-      return;
-    }
+    try {
+      const authData = await this.authService.login(email, password);
+      if (!authData) {
+        res.status(401).json({ status: 'error', error: 'Email atau password salah.' });
+        return;
+      }
 
-    res.status(200).json({ status: 'success', data: authData });
+      res.status(200).json({ status: 'success', data: authData });
+    } catch (error: any) {
+      const status = error.message.includes('dinonaktifkan') ? 403 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
   };
 
   googleLogin = async (req: AuthRequest, res: Response) => {
@@ -38,7 +43,7 @@ export class AuthController {
       const authData = await this.authService.googleLogin(idToken);
       res.status(200).json({ status: 'success', data: authData });
     } catch (error: any) {
-      const status = error.message.includes('belum terdaftar') ? 403 : 401;
+      const status = (error.message.includes('belum terdaftar') || error.message.includes('dinonaktifkan')) ? 403 : 401;
       res.status(status).json({ status: 'error', error: error.message });
     }
   };

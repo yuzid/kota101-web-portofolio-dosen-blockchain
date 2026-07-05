@@ -95,4 +95,29 @@ export class AdminUserController {
       res.status(status).json({ status: 'error', error: error.message });
     }
   };
+
+  updateUserStatus = async (req: AuthRequest, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      const { status } = req.body;
+      const currentUser = req.user;
+
+      if (!currentUser) {
+        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
+        return;
+      }
+
+      if (!status) {
+        res.status(400).json({ status: 'error', error: 'Status wajib diisi.' });
+        return;
+      }
+
+      const user = await this.adminUserService.updateUserStatus(id, status, currentUser);
+      res.json({ status: 'success', data: user });
+    } catch (error: any) {
+      const status = error.message === 'User tidak ditemukan.' ? 404 : 
+                     error.message.includes('Akses ditolak') ? 403 : 400;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
 }

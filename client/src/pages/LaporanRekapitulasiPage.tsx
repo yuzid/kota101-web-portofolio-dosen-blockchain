@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -22,16 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+  Card,
+  CardContent,
+} from "../components/ui/card";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import {
   Search,
   Eye,
@@ -220,8 +217,13 @@ export function LaporanRekapitulasiPage() {
         { label: "Laporan Rekapitulasi" },
       ]}
     >
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4">
+         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Laporan Rekapitulasi</h2>
             <p className="text-sm text-muted-foreground">
@@ -242,8 +244,18 @@ export function LaporanRekapitulasiPage() {
           </div>
         </div>
 
-        <div className="border rounded-lg bg-background">
-          <Table>
+        <div className="border rounded-lg bg-background overflow-x-auto">
+          <Table className="table-fixed">
+              <colgroup>
+                <col className="w-1/4" />
+                <col className="w-28" />
+                <col className="w-1/6" />
+                <col className="w-1/6" />
+                <col className="w-24" />
+                <col className="w-1/6" />
+                <col className="w-1/6" />
+                <col className="w-20" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("nama")}>
@@ -292,7 +304,7 @@ export function LaporanRekapitulasiPage() {
                   const basePath = isKajur ? "/monitoring/jurusan/rekap" : "/monitoring/prodi/rekap";
                   return (
                     <TableRow key={rekap.id}>
-                      <TableCell className="font-medium">{rekap.nama}</TableCell>
+                      <TableCell className="font-medium truncate max-w-[220px]">{rekap.nama}</TableCell>
                       <TableCell>{formatDate(rekap.tanggalPerekapan)}</TableCell>
                       <TableCell>
                         <div>
@@ -377,29 +389,141 @@ export function LaporanRekapitulasiPage() {
             </TableBody>
           </Table>
         </div>
-      </div>
 
-      <AlertDialog open={!!deleteRekapId} onOpenChange={(open) => !open && setDeleteRekapId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Rekap?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Laporan rekapitulasi ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </MainLayout>
-  );
+        {/* Mobile Cards */}
+        <div className="md:hidden space-y-2">
+          {isLoading ? (
+            [...Array(3)].map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                      <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : filteredRekaps.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+              <FileText className="w-8 h-8" />
+              <p className="text-sm">Belum ada laporan rekapitulasi</p>
+            </div>
+          ) : (
+            filteredRekaps.map((rekap) => {
+              const basePath = isKajur ? "/monitoring/jurusan/rekap" : "/monitoring/prodi/rekap";
+              return (
+                <Card key={rekap.id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-10 h-10 shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                          {rekap.dibuatOleh.nama?.charAt(0) || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{rekap.nama}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(rekap.tanggalPerekapan)}</p>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 -mr-1 -mt-1">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => navigate(`${basePath}/${rekap.id}`)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Lihat Detail
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => navigate(`${basePath}/${rekap.id}/edit`)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  <DropdownMenuItem onClick={() => handleExportXlsx(rekap.id)}>
+                                    Format Excel (XLSX)
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleExportCsv(rekap.id)}>
+                                    Format CSV
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => setDeleteRekapId(rekap.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Hapus
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-medium text-foreground">{rekap.dibuatOleh.nama}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {rekap.dibuatOleh.role === "kajur" ? "Kajur" : "Kaprodi"}
+                          </Badge>
+                        </div>
+                        {isKajur && (
+                          <p className="text-xs text-muted-foreground">
+                            {rekap.prodiNama || "-"}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs">
+                          <Badge variant="secondary" className="text-xs">
+                            {rekap.kegiatanData.length} Kegiatan
+                          </Badge>
+                          {rekap.filter.kategori && rekap.filter.kategori.length > 0 ? (
+                            rekap.filter.kategori.slice(0, 2).map((k) => (
+                              <Badge key={k} variant="outline" className="text-xs">
+                                {k.replace(/_/g, " ")}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Semua filter</span>
+                          )}
+                          {rekap.filter.kategori && rekap.filter.kategori.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{rekap.filter.kategori.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Dibuat: {formatDateTime(rekap.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
+      </div>
+       </motion.div>
+
+       <ConfirmDialog
+         open={!!deleteRekapId}
+         onOpenChange={(open) => !open && setDeleteRekapId(null)}
+         title="Hapus Rekap?"
+         description="Laporan rekapitulasi ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan."
+         confirmLabel="Hapus"
+         variant="destructive"
+         onConfirm={handleDelete}
+         disabled={isDeleting}
+         loading={isDeleting}
+       />
+      </MainLayout>
+   );
 }

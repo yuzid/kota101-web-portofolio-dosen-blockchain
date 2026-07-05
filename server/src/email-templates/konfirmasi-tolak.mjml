@@ -1,0 +1,59 @@
+<mjml>
+  <mj-head>
+    <mj-title>Konfirmasi Partisipasi Kegiatan</mj-title>
+    <mj-attributes>
+      <mj-all font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" />
+    </mj-attributes>
+    <mj-style inline="inline">
+      .brand { color: #2563eb; font-weight: 700; font-size: 16px; }
+      .greeting { font-size: 16px; line-height: 1.6; }
+      .message { font-size: 15px; line-height: 1.7; color: #374151; }
+      .footer-text { font-size: 12px; color: #9ca3af; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f3f4f6">
+    <mj-section padding="32px 24px 0">
+      <mj-column>
+        <mj-text align="center" font-size="22px" font-weight="700" color="#2563eb">
+          📋 Portofolio Dosen
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="16px 24px">
+      <mj-column background-color="#ffffff" border-radius="12px" padding="32px">
+        <mj-text css-class="greeting">
+          Halo <strong>{{namaPenerima}}</strong>,
+        </mj-text>
+
+        <mj-text css-class="message" padding-top="12px">
+          <strong>{{namaAnggota}}</strong> telah <span style="color: #dc2626; font-weight: 600;">menolak</span> undangan untuk bergabung dalam kegiatan:
+        </mj-text>
+
+        <mj-section background-color="#fef2f2" border-radius="8px" padding="16px" border="1px solid #fecaca">
+          <mj-column>
+            <mj-text font-weight="600" font-size="16px" color="#111827">{{namaKegiatan}}</mj-text>
+          </mj-column>
+        </mj-section>
+
+        <mj-text align="center" padding-top="20px">
+          <span style="background-color: #fee2e2; color: #dc2626; padding: 8px 20px; border-radius: 9999px; font-size: 14px; font-weight: 600;">
+            ❌ DITOLAK
+          </span>
+        </mj-text>
+
+        <mj-button href="{{linkAplikasi}}" background-color="#2563eb" border-radius="8px" font-size="15px" padding="24px 0 8px">
+          Lihat Detail Kegiatan
+        </mj-button>
+      </mj-column>
+    </mj-section>
+
+    <mj-section padding="0 24px 32px">
+      <mj-column>
+        <mj-text css-class="footer-text" align="center">
+          Sistem Portofolio Dosen — Politeknik Negeri Bandung
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

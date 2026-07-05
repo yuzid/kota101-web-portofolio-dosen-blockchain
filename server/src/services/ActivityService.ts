@@ -1,5 +1,6 @@
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
+import { prisma } from '../lib/prisma';
 import { resolveBlockchainNode } from '../lib/blockchainNode';
 import { EmailService } from './EmailService';
 import { MultiChainService } from './MultiChainService';
@@ -353,6 +354,21 @@ export class ActivityService {
       partisipasiData.push({ dosen_id: dosenId, peran: PeranTridharma.KETUA, status: 'DITERIMA' });
     }
 
+    // Validate that documents are not bound to other activities
+    if (lampiran_ids && Array.isArray(lampiran_ids) && lampiran_ids.length > 0) {
+      const bound = await prisma.lampiranBukti.findFirst({
+        where: {
+          dokumen_id: { in: lampiran_ids }
+        },
+        include: {
+          dokumen: true
+        }
+      });
+      if (bound) {
+        throw new Error(`Dokumen "${bound.dokumen.nama}" sudah terikat dengan kegiatan lain.`);
+      }
+    }
+
     const lampiranData = (lampiran_ids && Array.isArray(lampiran_ids))
       ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId }))
       : [];
@@ -392,7 +408,7 @@ export class ActivityService {
     const {
       namaKegiatan, jenisTridharma, kategori,
       tanggalMulai, tanggalSelesai, tahunAkademik, semester,
-      anggota_ids, lampiran_ids,
+      anggota_ids, lampiran_ids, deleted_lampiran_ids,
       jenisBukti
     } = data;
 
@@ -427,12 +443,49 @@ export class ActivityService {
       }
     }
 
+    // Hapus lampiran yang di-defer dari frontend (fix cancel button)
+    if (deleted_lampiran_ids && Array.isArray(deleted_lampiran_ids)) {
+      // Re-fetch agar activity.lampiran_bukti fresh setelah update metadata
+      const freshActivity = await this.activityRepository.findById(id);
+      if (freshActivity) {
+        for (const lampiranId of deleted_lampiran_ids) {
+          if (typeof lampiranId !== 'string') continue;
+
+          const lampiran = freshActivity.lampiran_bukti.find((lb: any) => lb.id === lampiranId);
+          if (!lampiran) continue; // sudah tidak ada, skip
+
+          // Validasi: hanya uploader yang boleh hapus
+          const isUploader = lampiran.dokumen.kepemilikan.some(
+            (k: any) => k.dosen_id === dosenId
+          );
+          if (!isUploader) continue; // bukan uploader, skip
+
+          await this.activityRepository.deleteLampiran(lampiranId);
+        }
+      }
+    }
+
     if (lampiran_ids && Array.isArray(lampiran_ids)) {
       const existingDocIds = activity.lampiran_bukti.map((l: any) => l.dokumen_id);
 
       const toAdd = lampiran_ids.filter(
         (docId: string) => !existingDocIds.includes(docId)
       );
+
+      if (toAdd.length > 0) {
+        const bound = await prisma.lampiranBukti.findFirst({
+          where: {
+            dokumen_id: { in: toAdd }
+          },
+          include: {
+            dokumen: true
+          }
+        });
+        if (bound) {
+          throw new Error(`Dokumen "${bound.dokumen.nama}" sudah terikat dengan kegiatan lain.`);
+        }
+      }
+
       for (const docId of toAdd) {
         await this.activityRepository.createLampiran({
           kegiatan_id: id,

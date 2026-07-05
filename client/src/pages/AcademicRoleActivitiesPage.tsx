@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
@@ -25,6 +27,11 @@ import {
   TableRow,
 } from "../components/ui/table";
 import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "../components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -46,6 +53,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
+import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import {
   Search,
   Eye,
@@ -256,13 +264,13 @@ export function AcademicRoleActivitiesPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "PENDIDIKAN":
-        return <Badge className="bg-blue-500">Pendidikan</Badge>;
-      case "PENELITIAN":
-        return <Badge className="bg-green-500">Penelitian</Badge>;
-      case "PENGABDIAN":
-        return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case "TUGAS_TAMBAHAN":
-        return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
+         return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
+       case "PENELITIAN":
+         return <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">Penelitian</Badge>;
+       case "PENGABDIAN":
+         return <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Pengabdian</Badge>;
+       case "TUGAS_TAMBAHAN":
+         return <Badge className="border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300">Tugas Tambahan</Badge>;
       default:
         return <Badge variant="secondary">{jenis}</Badge>;
     }
@@ -273,14 +281,14 @@ export function AcademicRoleActivitiesPage() {
     const isLengkap = activity.lampiran_bukti.length > 0;
     if (isLengkap) {
       return (
-        <Badge className="bg-green-500">
+        <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
           <CheckCircle className="w-3 h-3 mr-1" />
           Lengkap
         </Badge>
       );
     }
     return (
-      <Badge className="bg-red-500">
+      <Badge variant="outline" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300">
         <AlertCircle className="w-3 h-3 mr-1" />
         Tidak Lengkap
       </Badge>
@@ -457,31 +465,36 @@ export function AcademicRoleActivitiesPage() {
         { label: `Monitoring ${roleTitle}` },
       ]}
     >
-      <div className="space-y-4">
-        {/* Header from AMIRecapPage */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold">Monitoring Kegiatan</h2>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4">
+         {/* Header from AMIRecapPage */}
+         <div className="flex justify-between items-center">
+           <div>
+             <h2 className="text-2xl font-bold">Monitoring Kegiatan</h2>
             <p className="text-sm text-muted-foreground">
               {isKajur ? "Seluruh Jurusan" : `Program Studi: ${user?.programStudi || "Memuat..."}`}
             </p>
           </div>
-          <Button onClick={openRekapModal}>
+          <RippleButton onClick={openRekapModal}>
             <Plus className="w-4 h-4 mr-2" />
             Buat Rekap
-          </Button>
+          </RippleButton>
         </div>
 
         {/* Info Banner from AMIRecapPage */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-          <p className="font-medium text-blue-900 mb-1">
-            ℹ️ Tentang Status Kelengkapan:
-          </p>
-          <p className="text-blue-800">
-            Status <strong>"Lengkap"</strong> berarti kegiatan sudah memiliki minimal satu dokumen bukti yang terlampir. 
-            Status <strong>"Tidak Lengkap"</strong> berarti kegiatan belum memiliki dokumen bukti sama sekali.
-          </p>
-        </div>
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm">
+           <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+             ℹ️ Tentang Status Kelengkapan:
+           </p>
+           <p className="text-blue-800 dark:text-blue-400">
+             Status <strong>"Lengkap"</strong> berarti kegiatan sudah memiliki minimal satu dokumen bukti yang terlampir. 
+             Status <strong>"Tidak Lengkap"</strong> berarti kegiatan belum memiliki dokumen bukti sama sekali.
+           </p>
+         </div>
 
         {/* Stats Cards from AMIRecapPage (Placeholder counts based on current list or simple logic) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -695,19 +708,19 @@ export function AcademicRoleActivitiesPage() {
             </div>
 
             {/* Table from AMIRecapPage */}
-            <div className="border rounded-lg bg-background">
-              <Table>
+            <div className="border rounded-lg bg-background overflow-x-auto">
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nama Kegiatan</TableHead>
-                    <TableHead>Pencatat</TableHead>
-                    {isKajur && <TableHead>Program Studi</TableHead>}
-                    <TableHead>Kategori</TableHead>
-                    <TableHead>Periode</TableHead>
-                    <TableHead className="text-center">Anggota</TableHead>
-                    <TableHead className="text-center">Dokumen</TableHead>
-                    <TableHead className="text-center">Kelengkapan</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className="w-[26%]">Nama Kegiatan</TableHead>
+                    <TableHead className="w-[16%]">Pencatat</TableHead>
+                    {isKajur && <TableHead className="w-[14%]">Program Studi</TableHead>}
+                    <TableHead className="w-[14%]">Kategori</TableHead>
+                    <TableHead className="w-[130px]">Periode</TableHead>
+                    <TableHead className="w-[80px] text-center">Anggota</TableHead>
+                    <TableHead className="w-[80px] text-center">Dokumen</TableHead>
+                    <TableHead className="w-[110px] text-center">Kelengkapan</TableHead>
+                    <TableHead className="w-[70px] text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -742,16 +755,19 @@ export function AcademicRoleActivitiesPage() {
                   ) : (
                     activities.map((activity) => (
                       <TableRow key={activity.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">
-                              {activity.nama_kegiatan}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(activity.tanggal_mulai), "dd MMM yyyy")}
-                              {activity.tanggal_selesai && ` - ${format(new Date(activity.tanggal_selesai), "dd MMM yyyy")}`}
-                            </p>
-                          </div>
+                        <TableCell className="w-[26%]">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <p className="font-medium truncate cursor-default">
+                                {activity.nama_kegiatan}
+                              </p>
+                            </TooltipTrigger>
+                            <TooltipContent>{activity.nama_kegiatan}</TooltipContent>
+                          </Tooltip>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(activity.tanggal_mulai), "dd MMM yyyy")}
+                            {activity.tanggal_selesai && ` - ${format(new Date(activity.tanggal_selesai), "dd MMM yyyy")}`}
+                          </p>
                         </TableCell>
                         <TableCell>
                           <div>
@@ -812,6 +828,91 @@ export function AcademicRoleActivitiesPage() {
                   )}
                 </TableBody>
               </Table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-2">
+              {isLoading ? (
+                [...Array(3)].map((_, i) => (
+                  <Card key={i} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-muted animate-pulse shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                          <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : activities.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                  <Activity className="w-8 h-8" />
+                  <p className="text-sm">Tidak ada kegiatan yang sesuai dengan filter</p>
+                  {hasActiveFilters && (
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                      Reset Filter
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                activities.map((activity) => (
+                  <Card key={activity.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="w-10 h-10 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                            {activity.dosen.nama?.charAt(0) || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{activity.nama_kegiatan}</p>
+                              {getJenisBadge(activity.kategori_tridharma)}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 -mr-1 -mt-1"
+                              onClick={() => handleViewDetail(activity.id)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{activity.dosen.nama}</span>
+                            <span>·</span>
+                            <span className="font-mono">NIDN: {activity.dosen.nidn}</span>
+                          </div>
+                          {isKajur && (
+                            <p className="text-xs text-muted-foreground">
+                              {activity.dosen.program_studi.nama_prodi}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{activity.periode}</span>
+                            <span>·</span>
+                            <span className="capitalize">Sem. {activity.semester.toLowerCase()}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge variant="outline" className="text-xs">
+                              <Users className="w-3 h-3 mr-1" />
+                              {activity.partisipasi.length}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              <FileText className="w-3 h-3 mr-1" />
+                              {activity.lampiran_bukti.length}
+                            </Badge>
+                            {getKelengkapanBadge(activity)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
 
             {/* Pagination Controls added for real data support */}
@@ -883,7 +984,7 @@ export function AcademicRoleActivitiesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="rekap-tanggal-awal" className="text-sm font-semibold">Tanggal Mulai</Label>
                   <Input
@@ -917,9 +1018,9 @@ export function AcademicRoleActivitiesPage() {
                       variant={rekapForm.jenisTridharma.includes(jenis) ? "default" : "outline"}
                       className={`cursor-pointer text-xs px-3 py-1.5 ${
                         rekapForm.jenisTridharma.includes(jenis)
-                          ? jenis === "PENDIDIKAN" ? "bg-blue-500" :
-                            jenis === "PENELITIAN" ? "bg-green-500" :
-                            jenis === "PENGABDIAN" ? "bg-purple-500" : "bg-orange-500"
+                          ? jenis === "PENDIDIKAN" ? "border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300" :
+                             jenis === "PENELITIAN" ? "border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300" :
+                             jenis === "PENGABDIAN" ? "border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300" : "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300"
                           : ""
                       }`}
                       onClick={() => toggleJenisTridharma(jenis)}
@@ -951,7 +1052,7 @@ export function AcademicRoleActivitiesPage() {
               </div>
             </div>
 
-            <Button
+            <RippleButton
               variant="outline"
               className="w-full"
               onClick={handlePreview}
@@ -963,7 +1064,7 @@ export function AcademicRoleActivitiesPage() {
                 <Eye className="w-4 h-4 mr-2" />
               )}
               Lihat Preview Data
-            </Button>
+            </RippleButton>
 
             {(hasPreviewed || previewData.length > 0) && (
               <div className="rounded-lg border">
@@ -973,15 +1074,22 @@ export function AcademicRoleActivitiesPage() {
                   </span>
                   <Badge variant="secondary">{previewData.length} kegiatan</Badge>
                 </div>
-                <div className="overflow-auto max-h-[300px]">
-                  <Table>
+                <div className="overflow-x-auto max-h-[300px]">
+                  <Table className="table-fixed">
+                    <colgroup>
+                      <col className="w-12" />
+                      <col className="w-2/5" />
+                      <col className="w-1/6" />
+                      <col className="w-1/6" />
+                      <col className="w-28" />
+                    </colgroup>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">No</TableHead>
-                        <TableHead className="min-w-[180px]">Nama Kegiatan</TableHead>
-                        <TableHead className="min-w-[120px]">Dosen</TableHead>
-                        <TableHead className="min-w-[120px]">Kategori</TableHead>
-                        <TableHead className="min-w-[100px]">Tanggal</TableHead>
+                        <TableHead className="w-[26%]">Nama Kegiatan</TableHead>
+                        <TableHead className="w-[16%]">Dosen</TableHead>
+                        <TableHead className="w-[14%]">Kategori</TableHead>
+                        <TableHead className="w-[130px]">Tanggal</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1001,7 +1109,16 @@ export function AcademicRoleActivitiesPage() {
                         previewData.map((a, i) => (
                           <TableRow key={a.id}>
                             <TableCell className="text-xs">{i + 1}</TableCell>
-                            <TableCell className="text-sm font-medium">{a.nama_kegiatan}</TableCell>
+                            <TableCell className="w-[26%]">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="font-medium truncate cursor-default">
+                                    {a.nama_kegiatan}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>{a.nama_kegiatan}</TooltipContent>
+                              </Tooltip>
+                            </TableCell>
                             <TableCell className="text-sm">{a.dosen?.nama || '-'}</TableCell>
                             <TableCell>{getJenisBadge(a.kategori_tridharma)}</TableCell>
                             <TableCell className="text-xs whitespace-nowrap">
@@ -1016,18 +1133,18 @@ export function AcademicRoleActivitiesPage() {
               </div>
             )}
           </div>
-
-          <DialogFooter className="border-t p-6 pt-4 mt-0">
-            <Button variant="outline" onClick={() => setShowRekapModal(false)} disabled={isSubmittingRekap}>
-              Batal
-            </Button>
-            <Button onClick={handleBuatRekap} disabled={isSubmittingRekap || previewData.length === 0}>
-              {isSubmittingRekap && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Buat Rekap ({previewData.length} kegiatan)
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>
+            <DialogFooter className="border-t p-6 pt-4 mt-0">
+              <Button variant="outline" onClick={() => setShowRekapModal(false)} disabled={isSubmittingRekap}>
+                Batal
+              </Button>
+              <RippleButton onClick={handleBuatRekap} disabled={isSubmittingRekap || previewData.length === 0}>
+                {isSubmittingRekap && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Buat Rekap ({previewData.length} kegiatan)
+              </RippleButton>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+       </motion.div>
+      </MainLayout>
   );
 }

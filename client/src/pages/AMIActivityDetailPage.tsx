@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -120,13 +121,13 @@ export function AMIActivityDetailPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "pengajaran":
-        return <Badge className="bg-blue-500">Pendidikan</Badge>;
-      case "penelitian":
-        return <Badge className="bg-green-500">Penelitian</Badge>;
-      case "pengabdian":
-        return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case "tugas_tambahan":
-        return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
+         return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
+       case "penelitian":
+         return <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">Penelitian</Badge>;
+       case "pengabdian":
+         return <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Pengabdian</Badge>;
+       case "tugas_tambahan":
+         return <Badge className="border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300">Tugas Tambahan</Badge>;
       default:
         return <Badge variant="secondary">{jenis}</Badge>;
     }
@@ -135,14 +136,14 @@ export function AMIActivityDetailPage() {
   const getKelengkapanBadge = (status: string) => {
     if (status === "lengkap") {
       return (
-        <Badge className="bg-green-500 text-white">
+        <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
           <CheckCircle className="w-4 h-4 mr-1" />
           Dokumen Lengkap
         </Badge>
       );
     }
     return (
-      <Badge className="bg-red-500 text-white">
+      <Badge variant="outline" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300">
         <AlertCircle className="w-4 h-4 mr-1" />
         Dokumen Tidak Lengkap
       </Badge>
@@ -175,9 +176,14 @@ export function AMIActivityDetailPage() {
         { label: "Detail Kegiatan" },
       ]}
     >
-      <div className="space-y-6 max-w-5xl">
-        {/* Back Button */}
-        <Button variant="outline" onClick={() => navigate("/ami-recap")}>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-5xl">
+         {/* Back Button */}
+         <Button variant="outline" onClick={() => navigate("/ami-recap")}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Kembali ke Rekap AMI
         </Button>
@@ -296,11 +302,11 @@ export function AMIActivityDetailPage() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{dosen.name}</p>
                         {dosen.isPencatat && (
-                          <Badge className="bg-blue-500">Pencatat</Badge>
-                        )}
-                        {dosen.isKetua && (
-                          <Badge className="bg-purple-500">Ketua</Badge>
-                        )}
+                           <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pencatat</Badge>
+                         )}
+                         {dosen.isKetua && (
+                           <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Ketua</Badge>
+                         )}
                         {!dosen.isKetua && (
                           <Badge variant="secondary">Anggota</Badge>
                         )}
@@ -312,16 +318,16 @@ export function AMIActivityDetailPage() {
                   </div>
                   <div className="text-right">
                     {dosen.dokumen.length > 0 ? (
-                      <Badge className="bg-green-500">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        {dosen.dokumen.length} Dokumen
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-red-500">
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        Belum Upload
-                      </Badge>
-                    )}
+                       <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
+                         <CheckCircle className="w-3 h-3 mr-1" />
+                         {dosen.dokumen.length} Dokumen
+                       </Badge>
+                     ) : (
+                       <Badge className="border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300">
+                         <AlertCircle className="w-3 h-3 mr-1" />
+                         Belum Upload
+                       </Badge>
+                     )}
                   </div>
                 </div>
 
@@ -431,8 +437,9 @@ export function AMIActivityDetailPage() {
               </div>
             </div>
           </CardContent>
-        </Card>
-      </div>
-    </MainLayout>
+         </Card>
+       </div>
+       </motion.div>
+     </MainLayout>
   );
 }

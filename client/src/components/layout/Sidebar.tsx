@@ -1,26 +1,33 @@
-import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Link, useLocation } from "react-router";
 import {
   Home,
   FileText,
   Activity,
   FolderOpen,
-  History,
   Users,
   BarChart3,
   Menu,
   ChevronLeft,
   ChevronDown,
   BookOpen,
-  FileCheck,
   Send,
   Building2,
   Briefcase,
   GraduationCap,
   Landmark,
+  X,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useSidebarContext } from "../../contexts/SidebarContext";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { Switch } from "../ui/switch";
+import { ScrollArea } from "../ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
+import { useEffect, useState } from "react";
 import type { UserRole } from "../../contexts/AuthContext";
 
 interface NavItem {
@@ -162,8 +169,12 @@ function isAnyChildActive(locationPath: string, item: NavItem): boolean {
   );
 }
 
-export function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+interface SidebarNavProps {
+  isCollapsed: boolean;
+  onItemClick?: () => void;
+}
+
+function SidebarNav({ isCollapsed, onItemClick }: SidebarNavProps) {
   const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
   const { user } = useAuth();
   const location = useLocation();
@@ -175,11 +186,8 @@ export function Sidebar() {
   const toggleMenu = (label: string) => {
     setExpandedMenus((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
-      }
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
   };
@@ -194,133 +202,253 @@ export function Sidebar() {
     if (hasChildren) {
       return (
         <li key={item.label}>
-          <button
-            onClick={() => !isCollapsed && toggleMenu(item.label)}
+          <motion.button
+            onClick={() => {
+              if (!isCollapsed) toggleMenu(item.label);
+            }}
+            whileHover={{ x: 3 }}
+            whileTap={{ scale: 0.98 }}
             className={cn(
               "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group w-full text-left",
               "text-sidebar-foreground hover:bg-sidebar-accent/50"
             )}
           >
-            <Icon
-              className={cn(
-                "w-5 h-5 flex-shrink-0",
-                childActive ? "text-sidebar-primary" : ""
-              )}
-            />
+            <motion.div
+              whileHover={{ scale: 1.1 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Icon
+                className={cn(
+                  "w-5 h-5 flex-shrink-0",
+                  childActive ? "text-sidebar-primary" : ""
+                )}
+              />
+            </motion.div>
             {!isCollapsed && (
               <>
                 <span className="text-sm flex-1">{item.label}</span>
-                <ChevronDown
-                  className={cn(
-                    "w-4 h-4 transition-transform",
-                    isOpen ? "rotate-0" : "-rotate-90"
-                  )}
-                />
+                <motion.div
+                  animate={{ rotate: isOpen ? 0 : -90 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </motion.div>
               </>
             )}
-          </button>
-          {!isCollapsed && isOpen && (
-            <ul className="ml-3 mt-1 space-y-1 border-l border-sidebar-border pl-2">
-              {item.children!.map((child) => {
-                const ChildIcon = child.icon;
-                const isChildActive =
-                  location.pathname === child.path;
+          </motion.button>
+          <AnimatePresence>
+            {!isCollapsed && isOpen && (
+              <motion.ul
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="ml-3 mt-1 space-y-1 border-l border-sidebar-border pl-2 overflow-hidden"
+              >
+                {item.children!.map((child, childIndex) => {
+                  const ChildIcon = child.icon;
+                  const isChildActive = location.pathname === child.path;
 
-                return (
-                  <li key={child.path}>
-                    <Link
-                      to={child.path!}
-                      className={cn(
-                        "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group text-sm",
-                        isChildActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                      )}
+                  return (
+                    <motion.li
+                      key={child.path}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2, delay: childIndex * 0.03 }}
                     >
-                      <ChildIcon
+                      <Link
+                        to={child.path!}
+                        onClick={onItemClick}
                         className={cn(
-                          "w-4 h-4 flex-shrink-0",
-                          isChildActive ? "text-sidebar-primary" : ""
+                          "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group text-sm relative",
+                          isChildActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
                         )}
-                      />
-                      <span className="text-sm">{child.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+                      >
+                        {isChildActive && (
+                          <motion.div
+                            layoutId="sidebar-active"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-sidebar-primary rounded-full"
+                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                          />
+                        )}
+                        <motion.div
+                          whileHover={{ scale: 1.1 }}
+                          transition={{ type: "spring", stiffness: 300 }}
+                        >
+                          <ChildIcon
+                            className={cn(
+                              "w-4 h-4 flex-shrink-0",
+                              isChildActive ? "text-sidebar-primary" : ""
+                            )}
+                          />
+                        </motion.div>
+                        <span className="text-sm">{child.label}</span>
+                      </Link>
+                    </motion.li>
+                  );
+                })}
+              </motion.ul>
+            )}
+          </AnimatePresence>
         </li>
       );
     }
 
     return (
-      <li key={item.path}>
+      <motion.li
+        key={item.path}
+        whileHover={{ x: 3 }}
+        transition={{ type: "spring", stiffness: 300 }}
+      >
         <Link
           to={item.path!}
+          onClick={onItemClick}
           className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group",
+            "flex items-center gap-3 px-3 py-2 rounded-md transition-colors group relative",
             location.pathname === item.path
-              ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary"
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-sidebar-foreground hover:bg-sidebar-accent/50"
           )}
         >
-          <Icon
-            className={cn(
-              "w-5 h-5 flex-shrink-0",
-              location.pathname === item.path ? "text-sidebar-primary" : ""
-            )}
-          />
+          {location.pathname === item.path && (
+            <motion.div
+              layoutId="sidebar-active-desktop"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-sidebar-primary rounded-full"
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            />
+          )}
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 300 }}
+          >
+            <Icon
+              className={cn(
+                "w-5 h-5 flex-shrink-0",
+                location.pathname === item.path ? "text-sidebar-primary" : ""
+              )}
+            />
+          </motion.div>
           {!isCollapsed && (
             <span className="text-sm">{item.label}</span>
           )}
         </Link>
-      </li>
+      </motion.li>
     );
   };
 
   return (
+    <nav className="flex-1 overflow-y-auto p-2">
+      <motion.ul
+        className="space-y-1"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, staggerChildren: 0.05 }}
+      >
+        {filteredItems.map((item, index) => (
+          <motion.li
+            key={item.label}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+          >
+            {renderNavItem(item)}
+          </motion.li>
+        ))}
+      </motion.ul>
+    </nav>
+  );
+}
+
+export function Sidebar() {
+  const { isCollapsed, setCollapsed, isMobile, isMobileOpen, setMobileOpen } = useSidebarContext();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+        {!isCollapsed && (
+          <div className="flex items-center gap-2">
+            <img
+              src="/images/Logo_Polban.svg"
+              alt="POLBAN"
+              className="w-8 h-8"
+            />
+            <div className="flex flex-col">
+              <span className="font-semibold text-sm text-sidebar-foreground">
+                Portofolio Dosen
+              </span>
+              <span className="text-xs text-muted-foreground">POLBAN</span>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setCollapsed(!isCollapsed)}
+          className="p-1 hover:bg-sidebar-accent rounded-md transition-colors hidden md:block"
+        >
+          {isCollapsed ? (
+            <Menu className="w-5 h-5 text-sidebar-foreground" />
+          ) : (
+            <ChevronLeft className="w-5 h-5 text-sidebar-foreground" />
+          )}
+        </button>
+      </div>
+
+      <SidebarNav isCollapsed={isCollapsed} />
+
+      <div className="p-3 border-t border-sidebar-border">
+        {mounted && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2">
+            <div className="flex items-center gap-3 min-w-0">
+              {theme === "dark" ? (
+                <Moon className="w-4 h-4 shrink-0 text-sidebar-foreground" />
+              ) : (
+                <Sun className="w-4 h-4 shrink-0 text-sidebar-foreground" />
+              )}
+              {!isCollapsed && (
+                <span className="text-sm text-sidebar-foreground truncate">
+                  {theme === "dark" ? "Gelap" : "Terang"}
+                </span>
+              )}
+            </div>
+            <Switch
+              checked={theme === "dark"}
+              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              className={cn(isCollapsed && "mx-auto")}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={isMobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="p-0 w-72">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigasi</SheetTitle>
+          </SheetHeader>
+          <ScrollArea className="h-full">
+            {sidebarContent}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40",
+        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40 hidden md:block",
         isCollapsed ? "w-16" : "w-60"
       )}
     >
-      <div className="flex flex-col h-full">
-        {/* Logo Section */}
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          {!isCollapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-                <FileCheck className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-semibold text-sm text-sidebar-foreground">
-                  Portofolio Dosen
-                </span>
-                <span className="text-xs text-muted-foreground">POLBAN</span>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 hover:bg-sidebar-accent rounded-md transition-colors"
-          >
-            {isCollapsed ? (
-              <Menu className="w-5 h-5 text-sidebar-foreground" />
-            ) : (
-              <ChevronLeft className="w-5 h-5 text-sidebar-foreground" />
-            )}
-          </button>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-2">
-          <ul className="space-y-1">
-            {filteredItems.map((item) => renderNavItem(item))}
-          </ul>
-        </nav>
-      </div>
+      {sidebarContent}
     </aside>
   );
 }

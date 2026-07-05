@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const DEFAULT_JENIS_DOKUMEN = [
+let cachedJenisDokumen: { value: string; label: string }[] = [
   { value: 'SURAT_KEPUTUSAN', label: 'Surat Keputusan (SK)' },
   { value: 'SURAT_TUGAS', label: 'Surat Tugas' },
   { value: 'LEMBAR_PENGESAHAN', label: 'Lembar Pengesahan' },
@@ -17,15 +17,36 @@ const DEFAULT_JENIS_DOKUMEN = [
 ];
 
 export function getAllJenisDokumen(): { value: string; label: string }[] {
-  const tambahan: string[] = JSON.parse(localStorage.getItem('tu_jenis_tambahan') || '[]');
-  const tambahanMap = tambahan.map(t => ({ value: t, label: t.replace(/_/g, ' ') }));
-  return [...DEFAULT_JENIS_DOKUMEN, ...tambahanMap];
+  return cachedJenisDokumen;
 }
 
-export function tambahJenisDokumen(nama: string) {
-  const tambahan: string[] = JSON.parse(localStorage.getItem('tu_jenis_tambahan') || '[]');
-  if (!tambahan.includes(nama)) {
-    tambahan.push(nama);
-    localStorage.setItem('tu_jenis_tambahan', JSON.stringify(tambahan));
+export async function fetchAndCacheJenisDokumen() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jenis-dokumen`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    const result = await res.json();
+    if (result.status === 'success' && Array.isArray(result.data)) {
+      const labelMap: Record<string, string> = {
+        SURAT_KEPUTUSAN: 'Surat Keputusan (SK)',
+        SURAT_TUGAS: 'Surat Tugas',
+        LEMBAR_PENGESAHAN: 'Lembar Pengesahan',
+        KONTRAK_PENELITIAN: 'Kontrak Penelitian',
+        SERTIFIKAT: 'Sertifikat',
+        FOTO: 'Foto',
+        LAPORAN: 'Laporan',
+        BUKTI_PENDUKUNG_LAIN: 'Bukti Pendukung Lain'
+      };
+      cachedJenisDokumen = result.data.map((val: string) => ({
+        value: val,
+        label: labelMap[val] || val.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase())
+      }));
+    }
+  } catch (e) {
+    console.error('Gagal fetch jenis dokumen:', e);
   }
 }

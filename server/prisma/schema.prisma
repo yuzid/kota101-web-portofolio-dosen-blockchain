@@ -6,15 +6,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-enum JenisDokumen {
-  SURAT_KEPUTUSAN
-  SURAT_TUGAS
-  LEMBAR_PENGESAHAN
-  KONTRAK_PENELITIAN
-  SERTIFIKAT
-  FOTO
-  LAPORAN
-  BUKTI_PENDUKUNG_LAIN
+model JenisDokumen {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("jenis_dokumen")
 }
 
 enum SumberDokumen {
@@ -54,6 +51,7 @@ model User {
   email                   String               @unique @db.VarChar(255)
   password_hash           String               @db.VarChar(255)
   role                    String               @db.VarChar(50)
+  status                  String               @default("active") @db.VarChar(20)
   tata_usaha              TataUsaha?
   dosen                   Dosen?
   admin                   Admin?
@@ -189,7 +187,7 @@ model KepemilikanDokumen {
 model Dokumen {
   id             String               @id @default(uuid()) @db.Uuid
   nama           String               @db.VarChar(255)
-  jenis_dokumen  JenisDokumen
+  jenis_dokumen  String               @db.VarChar(100)
   file_path      String               @db.VarChar(512)
   hash_file      String               @db.VarChar(255)
   sumber_dokumen SumberDokumen

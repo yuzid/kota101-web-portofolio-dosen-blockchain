@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
+import { motion } from "motion/react";
+import { PageTransition } from "../components/ui/page-transition";
+import { EmptyState } from "../components/ui/empty-state";
 import { Badge } from "../components/ui/badge";
 import {
   Card,
@@ -65,7 +68,7 @@ export function PublicDocumentPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-10 h-10 animate-spin mx-auto text-primary" />
           <p className="mt-4 text-muted-foreground">Memuat dokumen...</p>
@@ -77,20 +80,19 @@ export function PublicDocumentPage() {
   if (error || !doc) {
     const is404 = error === "NOT_FOUND";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="pt-6 text-center">
-            <AlertTriangle className="w-12 h-12 mx-auto text-destructive mb-4" />
-            <h2 className="text-lg font-semibold mb-2">
-              {is404 ? "Dokumen Tidak Ditemukan" : "Gagal Memuat Data"}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {is404
-                ? "Dokumen yang Anda cari tidak tersedia atau telah dihapus."
-                : "Terjadi kesalahan saat memuat data. Silakan coba lagi nanti."}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <EmptyState
+          icon={<AlertTriangle className="w-10 h-10 text-destructive" />}
+          title={is404 ? "Dokumen Tidak Ditemukan" : "Gagal Memuat Data"}
+          description={is404
+            ? "Dokumen yang Anda cari tidak tersedia atau telah dihapus."
+            : "Terjadi kesalahan saat memuat data. Silakan coba lagi nanti."}
+          action={
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Kembali ke Beranda
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -104,11 +106,12 @@ export function PublicDocumentPage() {
     .map((lb: any) => lb.kegiatan) || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="border-b bg-white">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+    <PageTransition>
+      <div className="min-h-screen bg-background">
+       {/* Header */}
+       <div className="border-b bg-card">
+         <div className="max-w-4xl mx-auto px-4 py-4">
+           <div className="flex items-center justify-between">
             <Button variant="ghost" onClick={() => navigate(-1)}>
               <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
             </Button>
@@ -118,7 +121,7 @@ export function PublicDocumentPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
         {/* ── Metadata Header ── */}
-        <div className="bg-white rounded-xl border p-6">
+        <div className="bg-card rounded-xl border p-6">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <Badge variant="secondary" className="capitalize">
               {docType.replace(/_/g, " ")}
@@ -132,7 +135,7 @@ export function PublicDocumentPage() {
                   : "Dokumen"}
             </Badge>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {doc.nama || "Tanpa Nama"}
           </h1>
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -150,25 +153,30 @@ export function PublicDocumentPage() {
         {/* ── Blockchain Status ── */}
         <div
           className={`rounded-xl border-2 p-5 ${
-            verified
-              ? "border-green-200 bg-green-50"
-              : "border-yellow-200 bg-yellow-50"
-          }`}
-        >
-          <div className="flex items-start gap-4">
-            <div className={`p-2 rounded-full ${verified ? "bg-green-100" : "bg-yellow-100"}`}>
-              {verified ? (
-                <ShieldCheck className="w-6 h-6 text-green-600" />
-              ) : (
-                <AlertTriangle className="w-6 h-6 text-yellow-600" />
-              )}
-            </div>
-            <div>
-              <p className={`text-base font-semibold ${verified ? "text-green-800" : "text-yellow-800"}`}>
-                {verified
-                  ? "Terdokumentasi di Blockchain"
-                  : "Belum Tercatat di Blockchain"}
-              </p>
+             verified
+               ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
+               : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
+           }`}
+         >
+           <div className="flex items-start gap-4">
+             <div className={`p-2 rounded-full ${verified ? "bg-green-100 dark:bg-green-900" : "bg-yellow-100 dark:bg-yellow-900"}`}>
+               {verified ? (
+                 <ShieldCheck className="w-6 h-6 text-green-600 dark:text-green-400" />
+               ) : (
+                 <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+               )}
+             </div>
+             <div>
+               <p className={`text-base font-semibold ${verified ? "text-green-800 dark:text-green-300" : "text-yellow-800 dark:text-yellow-300"}`}>
+                 {verified
+                   ? "Terdokumentasi di Blockchain"
+                   : "Belum Tercatat di Blockchain"}
+               </p>
+               <p className={`text-sm mt-1 ${verified ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}`}>
+                 {verified
+                   ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
+                   : "Dokumen ini belum dicatat pada jaringan blockchain."}
+               </p>
               <p className={`text-sm mt-1 ${verified ? "text-green-600" : "text-yellow-600"}`}>
                 {verified
                   ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
@@ -180,7 +188,7 @@ export function PublicDocumentPage() {
 
         {/* ── Owner Info ── */}
         {owners.length > 0 && (
-          <div className="bg-white rounded-xl border p-5">
+          <div className="bg-card rounded-xl border p-5">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Pemilik Dokumen</span>
@@ -213,7 +221,7 @@ export function PublicDocumentPage() {
 
         {/* ── Kegiatan Terkait ── */}
         {kegiatanList.length > 0 && (
-          <div className="bg-white rounded-xl border p-5">
+          <div className="bg-card rounded-xl border p-5">
             <div className="flex items-center gap-2 mb-3">
               <FolderOpen className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Kegiatan Terkait ({kegiatanList.length})</span>
@@ -250,7 +258,7 @@ export function PublicDocumentPage() {
         )}
 
         {/* ── Document Preview ── */}
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-card rounded-xl border overflow-hidden">
           <div className="px-5 py-4 border-b bg-muted/10">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
@@ -266,7 +274,7 @@ export function PublicDocumentPage() {
                 />
               )}
               {fileType === "image" && (
-                <div className="p-6 flex justify-center bg-gray-50">
+                <div className="p-6 flex justify-center bg-muted">
                   <img
                     src={`${API_URL}/api/public/dokumen/${doc.id}/content`}
                     alt={doc.nama}
@@ -294,9 +302,11 @@ export function PublicDocumentPage() {
               )}
             </>
           ) : (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              File dokumen tidak tersedia
-            </div>
+            <EmptyState
+              icon={<FileText className="w-10 h-10" />}
+              title="File Dokumen Tidak Tersedia"
+              description="Dokumen ini tidak memiliki file yang dapat ditampilkan."
+            />
           )}
         </div>
 
@@ -305,5 +315,6 @@ export function PublicDocumentPage() {
         </p>
       </div>
     </div>
-  );
+    </PageTransition>
+   );
 }

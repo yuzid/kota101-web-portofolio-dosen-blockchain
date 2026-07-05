@@ -16,6 +16,10 @@ export class AuthService {
     const user = await this.userRepository.findByEmail(email);
     if (!user) return null;
 
+    if (user.status === 'inactive') {
+      throw new Error('Akun Anda telah dinonaktifkan. Silakan hubungi administrator.');
+    }
+
     const isValid = await bcrypt.compare(password_hash, user.password_hash);
     if (!isValid) return null;
 
@@ -41,6 +45,10 @@ export class AuthService {
     const user = await this.userRepository.findByEmail(payload.email);
     if (!user) {
       throw new Error('Email Google Anda belum terdaftar di sistem. Silakan hubungi admin.');
+    }
+
+    if (user.status === 'inactive') {
+      throw new Error('Akun Anda telah dinonaktifkan. Silakan hubungi administrator.');
     }
 
     return this.generateAuthData(user);

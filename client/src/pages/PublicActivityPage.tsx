@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation } from "react-router";
+import { motion } from "motion/react";
 import { Badge } from "../components/ui/badge";
 import {
   Card,
@@ -55,16 +56,16 @@ import { PublicPdfPreview } from "../components/public/PublicPdfPreview";
 const API_URL = import.meta.env.VITE_API_URL;
 
 const jenisColor: Record<string, string> = {
-  pendidikan: "border-l-blue-500",
-  penelitian: "border-l-green-500",
-  pengabdian: "border-l-purple-500",
-  tugas_tambahan: "border-l-orange-500",
+  pendidikan: "border-l-blue-500 dark:border-l-blue-400",
+  penelitian: "border-l-green-500 dark:border-l-green-400",
+  pengabdian: "border-l-purple-500 dark:border-l-purple-400",
+  tugas_tambahan: "border-l-orange-500 dark:border-l-orange-400",
 };
 const jenisBadge: Record<string, string> = {
-  pendidikan: "bg-blue-100 text-blue-800 border-blue-200",
-  penelitian: "bg-green-100 text-green-800 border-green-200",
-  pengabdian: "bg-purple-100 text-purple-800 border-purple-200",
-  tugas_tambahan: "bg-orange-100 text-orange-800 border-orange-200",
+  pendidikan: "border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
+  penelitian: "border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300",
+  pengabdian: "border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300",
+  tugas_tambahan: "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300",
 };
 const jenisIcon: Record<string, React.ReactNode> = {
   pendidikan: <GraduationCap className="w-4 h-4" />,
@@ -154,55 +155,55 @@ function getTimelineIcon(action: string) {
     case "status_changed":
       return <CheckCircle className="w-4 h-4 text-green-600" />;
     default:
-      return <History className="w-4 h-4 text-gray-600" />;
+      return <History className="w-4 h-4 text-muted-foreground" />;
   }
 }
 
 function getTimelineColor(action: string) {
-  switch (action) {
-    case "created":
-      return "border-green-300 bg-green-50";
-    case "updated":
-      return "border-blue-300 bg-blue-50";
-    case "deleted":
-      return "border-red-300 bg-red-50";
-    case "member_added":
-      return "border-purple-300 bg-purple-50";
-    case "member_removed":
-      return "border-orange-300 bg-orange-50";
-    case "dokumen_uploaded":
-      return "border-cyan-300 bg-cyan-50";
-    case "dokumen_removed":
-      return "border-red-300 bg-red-50";
-    case "status_changed":
-      return "border-green-300 bg-green-50";
-    default:
-      return "border-gray-300 bg-gray-50";
-  }
-}
+   switch (action) {
+     case "created":
+       return "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950";
+     case "updated":
+       return "border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950";
+     case "deleted":
+       return "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950";
+     case "member_added":
+       return "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950";
+     case "member_removed":
+       return "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950";
+     case "dokumen_uploaded":
+       return "border-cyan-300 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-950";
+     case "dokumen_removed":
+       return "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950";
+     case "status_changed":
+       return "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950";
+     default:
+        return "border-muted-foreground/20 bg-muted/50";
+   }
+ }
 
 function getTimelineDot(action: string) {
-  switch (action) {
-    case "created":
-      return "bg-green-500";
-    case "updated":
-      return "bg-blue-500";
-    case "deleted":
-      return "bg-red-500";
-    case "member_added":
-      return "bg-purple-500";
-    case "member_removed":
-      return "bg-orange-500";
-    case "dokumen_uploaded":
-      return "bg-cyan-500";
-    case "dokumen_removed":
-      return "bg-red-500";
-    case "status_changed":
-      return "bg-green-500";
-    default:
-      return "bg-gray-500";
-  }
-}
+   switch (action) {
+     case "created":
+       return "bg-green-500 dark:bg-green-400";
+     case "updated":
+       return "bg-blue-500 dark:bg-blue-400";
+     case "deleted":
+       return "bg-red-500 dark:bg-red-400";
+     case "member_added":
+       return "bg-purple-500 dark:bg-purple-400";
+     case "member_removed":
+       return "bg-orange-500 dark:bg-orange-400";
+     case "dokumen_uploaded":
+       return "bg-cyan-500 dark:bg-cyan-400";
+     case "dokumen_removed":
+       return "bg-red-500 dark:bg-red-400";
+     case "status_changed":
+       return "bg-green-500 dark:bg-green-400";
+     default:
+        return "bg-muted-foreground/50";
+   }
+ }
 
 export function PublicActivityPage() {
   const { id } = useParams();
@@ -216,22 +217,128 @@ export function PublicActivityPage() {
 
   const isDokumenMode = location.pathname.endsWith("/dokumen");
 
-  useEffect(() => {
-    if (!id) return;
-    const stored = localStorage.getItem("mock_public_audit_trail");
-    if (stored) {
-      try {
-        setLogs(JSON.parse(stored));
-        return;
-      } catch {
-        // ignore
+  const fetchAuditTrail = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/public/kegiatan/${id}/audit-trail`);
+      const result = await response.json();
+      if (result.status === 'success' && Array.isArray(result.data)) {
+        const sorted = result.data.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const processed: ActivityLog[] = [];
+        
+        const computeDiff = (current: any, prev: any) => {
+          const changes: Record<string, { old: unknown; new: unknown }> = {};
+          const collectionChanges: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }> = {};
+
+          if (!prev) {
+            return { changes, collectionChanges };
+          }
+
+          const curKegiatan = current.kegiatan || {};
+          const prevKegiatan = prev.kegiatan || {};
+
+          const keys = ['nama_kegiatan', 'kategori_tridharma', 'jenis_kegiatan', 'tanggal_mulai', 'tanggal_selesai', 'periode', 'semester'];
+          for (const key of keys) {
+            const curVal = curKegiatan[key];
+            const prevVal = prevKegiatan[key];
+            if (curVal !== prevVal) {
+              changes[key] = { old: prevVal, new: curVal };
+            }
+          }
+
+          const curPart = current.partisipasi || [];
+          const prevPart = prev.partisipasi || [];
+          const addedPart = curPart.filter((p: any) => !prevPart.some((op: any) => op.dosen_id === p.dosen_id));
+          const removedPart = prevPart.filter((op: any) => !curPart.some((p: any) => p.dosen_id === op.dosen_id));
+          if (addedPart.length > 0 || removedPart.length > 0) {
+            collectionChanges['anggota_kegiatan'] = {
+              added: addedPart,
+              removed: removedPart,
+              modified: []
+            };
+          }
+
+          const curDocs = current.dokumen_pendukung || [];
+          const prevDocs = prev.dokumen_pendukung || [];
+          const addedDocs = curDocs.filter((d: any) => !prevDocs.some((od: any) => od.dokumen_id === d.dokumen_id));
+          const removedDocs = prevDocs.filter((od: any) => !curDocs.some((d: any) => d.dokumen_id === od.dokumen_id));
+          if (addedDocs.length > 0 || removedDocs.length > 0) {
+            collectionChanges['dokumen_bukti'] = {
+              added: addedDocs,
+              removed: removedDocs,
+              modified: []
+            };
+          }
+
+          return { changes, collectionChanges };
+        };
+
+        const generateDescription = (action: string, changes: any, collectionChanges: any): string => {
+          if (action === 'created') return 'Membuat catatan kegiatan baru.';
+          
+          const descParts: string[] = [];
+          const modifiedFields = Object.keys(changes);
+          if (modifiedFields.length > 0) {
+            const fieldLabels = modifiedFields.map(f => activityFieldLabels[f] || f);
+            descParts.push(`Mengubah field: ${fieldLabels.join(', ')}.`);
+          }
+
+          const partChange = collectionChanges['anggota_kegiatan'];
+          if (partChange) {
+            if (partChange.added.length > 0) {
+              descParts.push(`Menambahkan anggota: ${partChange.added.map((p: any) => p.nama).join(', ')}.`);
+            }
+            if (partChange.removed.length > 0) {
+              descParts.push(`Mengeluarkan anggota: ${partChange.removed.map((p: any) => p.nama).join(', ')}.`);
+            }
+          }
+
+          const docChange = collectionChanges['dokumen_bukti'];
+          if (docChange) {
+            if (docChange.added.length > 0) {
+              descParts.push(`Mengunggah dokumen bukti baru: ${docChange.added.map((d: any) => d.nama).join(', ')}.`);
+            }
+            if (docChange.removed.length > 0) {
+              descParts.push(`Menghapus dokumen bukti: ${docChange.removed.map((d: any) => d.nama).join(', ')}.`);
+            }
+          }
+
+          return descParts.join(' ') || 'Melakukan pembaruan data kegiatan.';
+        };
+
+        for (let i = 0; i < sorted.length; i++) {
+          const item = sorted[i];
+          const rawPayload = item.payload || {};
+          const prevPayload = i > 0 ? sorted[i - 1].payload : null;
+          
+          let actionMapped = 'updated';
+          if (item.action === 'KEGIATAN_CREATED') actionMapped = 'created';
+          if (item.action === 'KEGIATAN_DELETED') actionMapped = 'deleted';
+          
+          const { changes, collectionChanges } = computeDiff(rawPayload, prevPayload);
+          const description = generateDescription(actionMapped, changes, collectionChanges);
+          
+          processed.push({
+            id: item.id,
+            action: actionMapped,
+            actor: typeof item.actor === 'string' ? { id: '', name: item.actor } : item.actor,
+            timestamp: item.timestamp,
+            description,
+            changes,
+            collectionChanges
+          });
+        }
+        setLogs(processed.reverse());
       }
+    } catch (e) {
+      console.error("Gagal memuat audit trail:", e);
     }
-    import("../mocks/mockPublicAuditTrail").then((m) => setLogs(m.mockAuditTrail));
-  }, [id]);
+  };
 
   useEffect(() => {
-    if (id) fetchActivity();
+    if (id) {
+      fetchAuditTrail();
+      fetchActivity();
+    }
   }, [id]);
 
   const fetchActivity = async () => {
@@ -323,43 +430,43 @@ export function PublicActivityPage() {
       .substring(0, 2);
 
   const statusBadge = (status: string) => {
-    switch (status) {
-      case "DITERIMA":
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-300 text-xs">
-            <CheckCircle className="w-3 h-3 mr-1" /> Diterima
-          </Badge>
-        );
-      case "DITOLAK":
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-300 text-xs">
-            <AlertCircle className="w-3 h-3 mr-1" /> Ditolak
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-xs">
-            <Clock className="w-3 h-3 mr-1" /> Menunggu
-          </Badge>
-        );
-    }
-  };
+     switch (status) {
+       case "DITERIMA":
+         return (
+           <Badge className="bg-green-100 text-green-800 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800 text-xs">
+             <CheckCircle className="w-3 h-3 mr-1" /> Diterima
+           </Badge>
+         );
+       case "DITOLAK":
+         return (
+           <Badge className="bg-red-100 text-red-800 border-red-300 dark:bg-red-950 dark:text-red-300 dark:border-red-800 text-xs">
+             <AlertCircle className="w-3 h-3 mr-1" /> Ditolak
+           </Badge>
+         );
+       default:
+         return (
+           <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800 text-xs">
+             <Clock className="w-3 h-3 mr-1" /> Menunggu
+           </Badge>
+         );
+     }
+   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-10 h-10 animate-spin mx-auto text-primary" />
           <p className="mt-4 text-muted-foreground">Memuat data kegiatan...</p>
         </div>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
   if (error || !activity) {
     const is404 = error === "NOT_FOUND";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="pt-6 text-center">
             <AlertTriangle className="w-12 h-12 mx-auto text-destructive mb-4" />
@@ -398,10 +505,15 @@ function renderFullMode(
   setSelectedLog: React.Dispatch<React.SetStateAction<ActivityLog | null>>
 ) {
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* ── Full-width Info Card (merged header + info) ── */}
-        <Card className={`overflow-hidden border-l-4 ${jenisColor[jType] || "border-l-gray-300"}`}>
+    <motion.div
+         initial={{ opacity: 0, y: 12 }}
+         animate={{ opacity: 1, y: 0 }}
+         transition={{ duration: 0.4, ease: "easeOut" }}
+       >
+       <div className="min-h-screen bg-background py-8 px-4">
+        <div className="max-w-6xl mx-auto space-y-6">
+         {/* ── Full-width Info Card (merged header + info) ── */}
+         <Card className={`overflow-hidden border-l-4 ${jenisColor[jType] || "border-l-gray-300"}`}>
           <CardContent className="pt-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-3 flex-1 min-w-0">
@@ -414,14 +526,14 @@ function renderFullMode(
                   </Badge>
                   <Badge variant="secondary">{activity.kategori}</Badge>
                   {activity.statusKelengkapan === "lengkap" ? (
-                    <Badge className="bg-green-500 text-white text-xs">
-                      <CheckCircle className="w-3 h-3 mr-1" /> Dokumen Lengkap
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-red-500 text-white text-xs">
-                      <AlertCircle className="w-3 h-3 mr-1" /> Dokumen Tidak Lengkap
-                    </Badge>
-                  )}
+                     <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs">
+                       <CheckCircle className="w-3 h-3 mr-1" /> Dokumen Lengkap
+                     </Badge>
+                   ) : (
+                     <Badge className="border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-xs">
+                       <AlertCircle className="w-3 h-3 mr-1" /> Dokumen Tidak Lengkap
+                     </Badge>
+                   )}
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">
                   {activity.namaKegiatan}
@@ -471,8 +583,8 @@ function renderFullMode(
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-medium text-sm truncate">{dosen.name}</span>
                             {dosen.peran === "KETUA" && (
-                              <Badge className="bg-purple-500 text-xs h-5">{dosen.peran}</Badge>
-                            )}
+                               <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">{dosen.peran}</Badge>
+                             )}
                           </div>
                           <p className="text-xs text-muted-foreground font-mono mt-0.5">NIDN: {dosen.nidn}</p>
                         </div>
@@ -692,9 +804,10 @@ function renderFullMode(
           </DialogContent>
         </Dialog>
       </div>
-    </div>
-  );
-}
+     </div>
+       </motion.div>
+   );
+ }
 
 function renderDokumenMode(
   activity: PublicActivity,
@@ -708,12 +821,17 @@ function renderDokumenMode(
       : activity.dosenTerlibat.flatMap((d) => d.dokumen);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-xl font-bold text-gray-900">
-            Dokumen Bukti Kegiatan
-          </h1>
+    <motion.div
+         initial={{ opacity: 0, y: 12 }}
+         animate={{ opacity: 1, y: 0 }}
+         transition={{ duration: 0.4, ease: "easeOut" }}
+       >
+       <div className="min-h-screen bg-background py-8 px-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-foreground">
+             Dokumen Bukti Kegiatan
+           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {activity.namaKegiatan}
           </p>
@@ -794,10 +912,10 @@ function renderDokumenMode(
                   <div
                     key={doc.id}
                     className={`rounded-lg border-2 p-4 ${
-                      verified
-                        ? "border-green-200 bg-green-50"
-                        : "border-yellow-200 bg-yellow-50"
-                    }`}
+                       verified
+                         ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
+                         : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
+                     }`}
                   >
                     <div className="flex items-start gap-3">
                       {verified ? (
@@ -834,9 +952,10 @@ function renderDokumenMode(
           Dokumen ini bersifat publik dan dapat dibagikan.
         </p>
       </div>
-    </div>
-  );
-}
+     </div>
+    </motion.div>
+    );
+  }
 
 function DocPreviewBlock({
   doc,
@@ -873,7 +992,7 @@ function DocPreviewBlock({
               : "Dokumen"}
         </Badge>
       </div>
-      <div className="bg-white">
+      <div className="bg-card">
         {fileType === "pdf" && (
           <PublicPdfPreview
             fileUrl={`${API_URL}/api/public/dokumen/${doc.id}/content`}
@@ -904,9 +1023,9 @@ function DocPreviewBlock({
           </div>
         )}
       </div>
-    </div>
-  );
-}
+     </div>
+    );
+  }
 
 function InfoItem({
   icon,

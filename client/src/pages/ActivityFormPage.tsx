@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
@@ -21,16 +23,7 @@ import {
 } from "../components/ui/card";
 import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -59,7 +52,6 @@ import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { getDokumenStatus, linkDokumen, unlinkDokumen, unlinkKegiatan } from "../lib/dokumenKegiatanMap";
 
 interface Dosen {
   id: string;
@@ -272,26 +264,8 @@ export function ActivityFormPage() {
           lampiranId: doc.lampiranId
         }));
         setLampiran([...docs, ...bersamDocs]);
-
-        // Task 6: filter deleted docs dari localStorage
-        if (id) {
-          const savedDeleted = JSON.parse(localStorage.getItem(LS_PREFIX + id + '_deleted') || '[]');
-          if (savedDeleted.length > 0) {
-            setLampiran(prev => prev.filter(l => !savedDeleted.includes(l.lampiranId)));
-            setDeletedLampiranIds(savedDeleted);
-          }
-        }
       }
     } catch {}
-    if (!apiSuccess && id) {
-      const mock = loadFromLocalStorage(id);
-      if (mock) {
-        setFormData(mock.data.formData || mock.data);
-        setAnggota(mock.anggota || []);
-        setLampiran(mock.lampiran || []);
-        setDeletedLampiranIds(mock.deletedLampiranIds || []);
-      }
-    }
     setIsLoading(false);
   };
 
@@ -366,13 +340,6 @@ export function ActivityFormPage() {
 
       const result = await response.json();
       if (result.status === 'success') {
-        if (isEdit && id) {
-          saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
-          localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
-          lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
-            linkDokumen(doc.id, id, formData.namaKegiatan);
-          });
-        }
         setDeletedLampiranIds([]);
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
@@ -380,19 +347,6 @@ export function ActivityFormPage() {
         toast.error(result.error || 'Gagal menyimpan kegiatan');
       }
     } catch (error) {
-      // Mock fallback: save to localStorage if API unavailable
-      if (isEdit && id) {
-        saveToLocalStorage(id, payload, deletedLampiranIds, lampiran, anggota);
-        localStorage.setItem(LS_PREFIX + id + '_deleted', JSON.stringify(deletedLampiranIds));
-        lampiran.filter(l => l.uploadedBy === user?.uuid).forEach(doc => {
-          linkDokumen(doc.id, id, formData.namaKegiatan);
-        });
-        setDeletedLampiranIds([]);
-        toast.success(isEdit ? "Kegiatan berhasil diperbarui (mock)." : "Kegiatan berhasil dicatat.");
-        navigate(isEdit ? `/activities/${id}` : "/activities");
-        setIsLoading(false);
-        return;
-      }
       toast.error('Terjadi kesalahan saat menyimpan');
     } finally {
       setIsLoading(false);
@@ -401,7 +355,6 @@ export function ActivityFormPage() {
 
   const handleDelete = async () => {
     setIsLoading(true);
-    if (id) unlinkKegiatan(id);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}`, {
         method: 'DELETE',
@@ -409,7 +362,6 @@ export function ActivityFormPage() {
       });
       const result = await response.json();
       if (result.status === 'success') {
-        if (id) localStorage.removeItem(LS_PREFIX + id);
         toast.success(`Kegiatan berhasil dihapus.`);
         navigate("/activities");
       } else {
@@ -449,11 +401,6 @@ export function ActivityFormPage() {
   );
 
   const handleAddDoc = (doc: Document) => {
-    const status = getDokumenStatus(doc.id, id);
-    if (!status.available) {
-      toast.error(`Dokumen "${doc.name}" sudah terikat ke kegiatan "${status.kegiatanNama}"`);
-      return;
-    }
     if (!lampiran.find(l => l.id === doc.id)) {
       setLampiran([...lampiran, doc]);
     }
@@ -469,7 +416,6 @@ export function ActivityFormPage() {
     }
     setLampiran(lampiran.filter(l => l.id !== docId));
     setRemoveDocId(null);
-    unlinkDokumen(docId);
   };
 
   const handleUploadFile = () => {
@@ -549,12 +495,17 @@ export function ActivityFormPage() {
         { label: isEdit ? "Edit" : "Tambah Kegiatan Baru" },
       ]}
     >
-      <div className="space-y-6 max-w-4xl relative">
-        {isLoading && (
-          <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
-            <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          </div>
-        )}
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-4xl mx-auto relative">
+         {isLoading && (
+           <div className="absolute inset-0 bg-background/50 z-50 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
+             <Loader2 className="w-10 h-10 animate-spin text-primary" />
+           </div>
+         )}
 
         <Card>
           <CardHeader>
@@ -804,8 +755,8 @@ export function ActivityFormPage() {
               </div>
               <div className="flex gap-2">
                 {isCurrentUserPencatat && (
-                  <Badge className="bg-blue-500">Pembuat</Badge>
-                )}
+                   <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                 )}
               </div>
             </div>
 
@@ -912,10 +863,10 @@ export function ActivityFormPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {d.isPencatat ? (
-                        <Badge className="bg-blue-500">Pembuat</Badge>
-                      ) : (
-                        <Badge variant="secondary">Anggota</Badge>
-                      )}
+                         <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                       ) : (
+                         <Badge variant="secondary">Anggota</Badge>
+                       )}
                       {!d.isPencatat && (
                         <Button
                           variant="ghost"
@@ -997,7 +948,7 @@ export function ActivityFormPage() {
                 : "Setiap dosen dapat mengupload dokumen bukti masing-masing"}
             </CardDescription>
             <div className="flex gap-2 pt-2">
-              <Button
+              <RippleButton
                 variant="outline"
                 size="sm"
                 className="flex-1"
@@ -1005,8 +956,8 @@ export function ActivityFormPage() {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Pilih dari Dokumen Saya
-              </Button>
-              <Button
+              </RippleButton>
+              <RippleButton
                 variant="outline"
                 size="sm"
                 className="flex-1"
@@ -1014,7 +965,7 @@ export function ActivityFormPage() {
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Unggah Dokumen Baru
-              </Button>
+              </RippleButton>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -1124,14 +1075,15 @@ export function ActivityFormPage() {
             <Button variant="outline" onClick={() => navigate(isEdit ? `/activities/${id}` : "/activities")}>
               Batal
             </Button>
-            <Button onClick={handleSubmit} disabled={isLoading}>
+            <RippleButton onClick={handleSubmit} disabled={isLoading}>
               {isLoading ? 'Menyimpan...' : 'Simpan Kegiatan'}
-            </Button>
+            </RippleButton>
           </div>
         </div>
-      </div>
+       </div>
+       </motion.div>
 
-      <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
+       <Dialog open={showDocPicker} onOpenChange={setShowDocPicker}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Pilih Dokumen Bukti</DialogTitle>
@@ -1142,23 +1094,17 @@ export function ActivityFormPage() {
             ) : (
               <div className="space-y-2">
                 {availableDocs.map(doc => {
-                  const status = getDokumenStatus(doc.id, id);
                   return (
                     <div key={doc.id}
-                      className={`flex items-start gap-3 p-3 border rounded-lg ${status.available ? 'hover:bg-accent cursor-pointer' : 'bg-muted/30 opacity-70'}`}
-                      onClick={() => status.available && handleAddDoc(doc)}
+                      className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer"
+                      onClick={() => handleAddDoc(doc)}
                     >
                       <FileText className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{doc.name}</p>
                         <p className="text-xs text-muted-foreground">{doc.jenis}</p>
-                        {!status.available ? (
-                          <Badge variant="secondary" className="text-xs mt-1">Terpakai di "{status.kegiatanNama}"</Badge>
-                        ) : null}
                       </div>
-                      {status.available ? (
-                        <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
-                      ) : null}
+                      <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
                     </div>
                   );
                 })}
@@ -1168,86 +1114,47 @@ export function ActivityFormPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!removeAnggotaId} onOpenChange={(open) => { if (!open) setRemoveAnggotaId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Keluarkan Anggota?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin mengeluarkan <strong>{anggotaToRemove?.name}</strong> dari kegiatan ini?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (removeAnggotaId) handleRemoveAnggota(removeAnggotaId);
-                setRemoveAnggotaId(null);
-              }}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Keluarkan
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!removeAnggotaId}
+        onOpenChange={(open) => { if (!open) setRemoveAnggotaId(null); }}
+        title="Keluarkan Anggota?"
+        description={`Apakah Anda yakin ingin mengeluarkan ${anggotaToRemove?.name} dari kegiatan ini?`}
+        confirmLabel="Keluarkan"
+        variant="destructive"
+        onConfirm={() => {
+          if (removeAnggotaId) handleRemoveAnggota(removeAnggotaId);
+          setRemoveAnggotaId(null);
+        }}
+      />
 
-      <AlertDialog open={!!removeDocId} onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus dokumen <strong>{docToRemove?.name}</strong> dari kegiatan ini?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRemoveDoc}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!removeDocId}
+        onOpenChange={(open) => { if (!open) setRemoveDocId(null); }}
+        title="Hapus Dokumen?"
+        description={`Apakah Anda yakin ingin menghapus dokumen ${docToRemove?.name} dari kegiatan ini?`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={confirmRemoveDoc}
+      />
 
-      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Konfirmasi Simpan</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin {isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan <strong>{formData.namaKegiatan}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSubmit}>
-              {isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showSubmitConfirm}
+        onOpenChange={setShowSubmitConfirm}
+        title="Konfirmasi Simpan"
+        description={`Apakah Anda yakin ingin ${isEdit ? 'menyimpan perubahan' : 'mencatat'} kegiatan ${formData.namaKegiatan}?`}
+        confirmLabel={isEdit ? 'Simpan Perubahan' : 'Catat Kegiatan'}
+        onConfirm={confirmSubmit}
+      />
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Kegiatan <strong>{formData.namaKegiatan}</strong> beserta seluruh
-              asosiasinya akan dihapus.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Kegiatan?"
+        description={`Kegiatan ${formData.namaKegiatan} beserta seluruh asosiasinya akan dihapus.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
     </MainLayout>
   );
 }

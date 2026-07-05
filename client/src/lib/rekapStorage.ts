@@ -64,68 +64,15 @@ export async function createRekap(data: any, isKajur: boolean): Promise<RekapLap
   });
   const result = await response.json();
   if (result.status !== 'success') throw new Error(result.error || 'Gagal membuat rekap');
-  const mapped = mapFromBackend(result.data);
-  // Save to mock_all_rekap agar kajur bisa lihat rekap kaprodi
-  try {
-    const all = JSON.parse(localStorage.getItem('mock_all_rekap') || '[]');
-    all.push(mapped);
-    localStorage.setItem('mock_all_rekap', JSON.stringify(all));
-  } catch {}
-  return mapped;
+  return mapFromBackend(result.data);
 }
 
 export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
-  if (!isKajur) {
-    // Kaprodi: fetch sendiri
-    const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/prodi/rekap`);
-    const result = await response.json();
-    if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
-    return result.data.map(mapFromBackend);
-  }
-
-  // Kajur: fetch jurusan + prodi rekap, merge
-  try {
-    const [jurusanRes, prodiRes] = await Promise.allSettled([
-      apiFetch(`${API_URL}/api/dosen/akademik-role/jurusan/rekap`),
-      apiFetch(`${API_URL}/api/dosen/akademik-role/prodi/rekap`),
-    ]);
-
-    let allData: RekapLaporan[] = [];
-
-    if (jurusanRes.status === 'fulfilled') {
-      const json = await jurusanRes.value.json();
-      if (json.status === 'success') {
-        allData.push(...json.data.map(mapFromBackend));
-      }
-    }
-
-    let prodiSuccess = false;
-    if (prodiRes.status === 'fulfilled') {
-      const json = await prodiRes.value.json();
-      if (json.status === 'success') {
-        allData.push(...json.data.map(mapFromBackend));
-        prodiSuccess = true;
-      }
-    }
-
-    // Jika prodi endpoint gagal atau tidak sukses, include mock data kaprodi
-    if (!prodiSuccess) {
-      const mock = JSON.parse(localStorage.getItem('mock_all_rekap') || '[]') as RekapLaporan[];
-      allData.push(...mock);
-    }
-
-    // Fallback ke mock jika tidak ada data sama sekali dari API
-    if (allData.length === 0) {
-      const mock = JSON.parse(localStorage.getItem('mock_all_rekap') || '[]') as RekapLaporan[];
-      return mock;
-    }
-
-    allData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return allData;
-  } catch {
-    const mock = JSON.parse(localStorage.getItem('mock_all_rekap') || '[]') as RekapLaporan[];
-    return mock;
-  }
+  const endpoint = isKajur ? 'kajur/rekap/semua' : 'prodi/rekap';
+  const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}`);
+  const result = await response.json();
+  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
+  return result.data.map(mapFromBackend);
 }
 
 export async function getRekap(id: string, isKajur: boolean): Promise<RekapLaporan> {
@@ -153,14 +100,6 @@ export async function deleteRekap(id: string, isKajur: boolean): Promise<boolean
     method: 'DELETE'
   });
   const result = await response.json();
-  if (result.status === 'success') {
-    // Clean up mock_all_rekap
-    try {
-      const all = JSON.parse(localStorage.getItem('mock_all_rekap') || '[]');
-      const filtered = all.filter((r: any) => r.id !== id);
-      localStorage.setItem('mock_all_rekap', JSON.stringify(filtered));
-    } catch {}
-  }
   return result.status === 'success';
 }
 
