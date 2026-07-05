@@ -210,7 +210,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
                       width: renderWidth,
                       height: pageHeightPx,
                     }}
-                    className="flex items-center justify-center bg-gray-50"
+                    className="flex items-center justify-center bg-muted"
                   >
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>

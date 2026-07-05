@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
@@ -515,13 +517,13 @@ export function AMIRecapPage() {
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "pengajaran":
-        return <Badge className="bg-blue-500">Pendidikan</Badge>;
-      case "penelitian":
-        return <Badge className="bg-green-500">Penelitian</Badge>;
-      case "pengabdian":
-        return <Badge className="bg-purple-500">Pengabdian</Badge>;
-      case "tugas_tambahan":
-        return <Badge className="bg-orange-500">Tugas Tambahan</Badge>;
+         return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
+       case "penelitian":
+         return <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">Penelitian</Badge>;
+       case "pengabdian":
+         return <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Pengabdian</Badge>;
+       case "tugas_tambahan":
+         return <Badge className="border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300">Tugas Tambahan</Badge>;
       default:
         return <Badge variant="secondary">{jenis}</Badge>;
     }
@@ -530,14 +532,14 @@ export function AMIRecapPage() {
   const getKelengkapanBadge = (status: string) => {
     if (status === "lengkap") {
       return (
-        <Badge className="bg-green-500">
+        <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
           <CheckCircle className="w-3 h-3 mr-1" />
           Lengkap
         </Badge>
       );
     }
     return (
-      <Badge className="bg-red-500">
+      <Badge variant="outline" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300">
         <AlertCircle className="w-3 h-3 mr-1" />
         Tidak Lengkap
       </Badge>
@@ -573,9 +575,14 @@ export function AMIRecapPage() {
         { label: "Rekap AMI" },
       ]}
     >
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4">
+         {/* Header */}
+         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Rekap AMI</h2>
             <p className="text-sm text-muted-foreground">
@@ -583,24 +590,24 @@ export function AMIRecapPage() {
               {isKajur && "Seluruh Jurusan"}
             </p>
           </div>
-          <Button onClick={handleExportRecap}>
+          <RippleButton onClick={handleExportRecap}>
             <Download className="w-4 h-4 mr-2" />
             Export Rekap
-          </Button>
+          </RippleButton>
         </div>
 
         {/* Info Banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
-          <p className="font-medium text-blue-900 mb-1">
-            ℹ️ Tentang Status Kelengkapan:
-          </p>
-          <p className="text-blue-800">
-            Status <strong>"Lengkap"</strong> berarti semua dosen yang terlibat
-            dalam kegiatan sudah mengupload minimal 1 dokumen bukti. Status{" "}
-            <strong>"Tidak Lengkap"</strong> berarti ada dosen yang belum
-            mengupload dokumen bukti.
-          </p>
-        </div>
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm">
+           <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+             ℹ️ Tentang Status Kelengkapan:
+           </p>
+           <p className="text-blue-800 dark:text-blue-400">
+             Status <strong>"Lengkap"</strong> berarti semua dosen yang terlibat
+             dalam kegiatan sudah mengupload minimal 1 dokumen bukti. Status{" "}
+             <strong>"Tidak Lengkap"</strong> berarti ada dosen yang belum
+             mengupload dokumen bukti.
+           </p>
+         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -821,8 +828,19 @@ export function AMIRecapPage() {
             </div>
 
             {/* Table */}
-            <div className="border rounded-lg">
-              <Table>
+            <div className="border rounded-lg overflow-x-auto">
+              <Table className="table-fixed">
+                <colgroup>
+                  <col className="w-2/5" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-1/6" />
+                  <col className="w-24" />
+                  <col className="w-20" />
+                  <col className="w-20" />
+                  <col className="w-24" />
+                  <col className="w-20" />
+                </colgroup>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nama Kegiatan</TableHead>
@@ -863,7 +881,7 @@ export function AMIRecapPage() {
                       <TableRow key={activity.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium">
+                            <p className="font-medium truncate max-w-[220px]">
                               {activity.namaKegiatan}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -943,12 +961,84 @@ export function AMIRecapPage() {
               </Table>
             </div>
 
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-2">
+              {filteredActivities.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                  <Activity className="w-8 h-8" />
+                  <p className="text-sm">Tidak ada kegiatan yang sesuai dengan filter</p>
+                  {hasActiveFilters && (
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                      Reset Filter
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                filteredActivities.map((activity) => (
+                  <Card key={activity.id} className="overflow-hidden">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="w-10 h-10 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                            {activity.pencatat?.charAt(0) || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{activity.namaKegiatan}</p>
+                              {getJenisBadge(activity.jenisTridharma)}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 -mr-1 -mt-1"
+                              onClick={() => handleViewDetail(activity.id)}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">{activity.pencatat}</span>
+                            <span>·</span>
+                            <span className="font-mono">NIDN: {activity.nidn}</span>
+                          </div>
+                          {isKajur && (
+                            <p className="text-xs text-muted-foreground">
+                              {activity.programStudi}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{activity.tahunAkademik}</span>
+                            <span>·</span>
+                            <span className="capitalize">Sem. {activity.semester}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <Badge variant="outline" className="text-xs">
+                              <Users className="w-3 h-3 mr-1" />
+                              {activity.dosenTerlibat.length}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              <FileText className="w-3 h-3 mr-1" />
+                              {activity.dosenTerlibat.reduce((s, d) => s + d.jumlahDokumen, 0)}
+                            </Badge>
+                            {getKelengkapanBadge(activity.statusKelengkapan)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+
             <div className="text-sm text-muted-foreground">
               Menampilkan {filteredActivities.length} kegiatan
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    </MainLayout>
+       </div>
+       </motion.div>
+     </MainLayout>
   );
 }

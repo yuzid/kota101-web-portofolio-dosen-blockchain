@@ -248,9 +248,9 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false, hi
                   <Copy className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                <Link2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                <p className="text-blue-900">
+              <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm">
+                <Link2 className="w-4 h-4 text-primary shrink-0" />
+                <p className="text-primary">
                   Siapapun dengan link ini dapat melihat dokumen
                 </p>
               </div>

@@ -208,4 +208,27 @@ export class AdminUserService {
     await this.userRepository.delete(id);
     return existing;
   }
+
+  async updateUserStatus(id: string, status: string, currentUser: any) {
+    if (currentUser.id === id) {
+      throw new Error('Tidak bisa menonaktifkan/mengaktifkan akun sendiri.');
+    }
+
+    const existing = await this.userRepository.findByIdWithDosen(id);
+    if (!existing) throw new Error('User tidak ditemukan.');
+
+    if (currentUser.role.toUpperCase() === 'TATA_USAHA') {
+      const isDosenInSameJurusan = (existing as any).dosen?.program_studi?.jurusan_id === currentUser.jurusan_id;
+      if (existing.role !== 'DOSEN' || !isDosenInSameJurusan) {
+        throw new Error('Akses ditolak. Anda tidak berwenang mengubah status user di luar jurusan Anda.');
+      }
+    }
+
+    if (status !== 'active' && status !== 'inactive') {
+      throw new Error('Status tidak valid. Harus "active" atau "inactive".');
+    }
+
+    await this.userRepository.update(id, { status }, {}, existing.role);
+    return await this.userRepository.findById(id);
+  }
 }

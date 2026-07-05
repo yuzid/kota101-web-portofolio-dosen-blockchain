@@ -154,6 +154,16 @@ export class DistributionRepository {
         dokumen_id: dokumenId,
         didistribusikan_oleh_id: { not: null },
       },
+      include: {
+        dosen: { select: { nama: true } },
+        dokumen: { select: { nama: true } },
+        didistribusikan_oleh: {
+          select: {
+            email: true,
+            tata_usaha: { select: { nama: true } },
+          },
+        },
+      },
     });
   }
 

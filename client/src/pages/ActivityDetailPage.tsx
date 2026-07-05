@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
+import { StatCard } from "../components/ui/stat-card";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
 import {
@@ -17,16 +20,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "../components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { EmptyState } from "../components/ui/empty-state";
 import {
   Dialog,
   DialogContent,
@@ -161,34 +156,32 @@ const statusBadge: Record<
 > = {
   MENUNGGU_KONFIRMASI: {
     label: "Menunggu Konfirmasi",
-    className: "bg-yellow-100 text-yellow-800 border-yellow-300",
+    className: "bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-800",
     icon: <Clock className="w-3 h-3" />,
   },
   DITERIMA: {
     label: "Diterima",
-    className: "bg-green-100 text-green-800 border-green-300",
+    className: "bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-200 border-green-300 dark:border-green-800",
     icon: <CheckCircle className="w-3 h-3" />,
   },
   DITOLAK: {
     label: "Ditolak",
-    className: "bg-red-100 text-red-800 border-red-300",
+    className: "bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-200 border-red-300 dark:border-red-800",
     icon: <XCircle className="w-3 h-3" />,
   },
 };
 
 const jenisColor: Record<string, string> = {
-  pendidikan: "border-l-blue-500",
-  penelitian: "border-l-green-500",
-  pengabdian: "border-l-purple-500",
-  tugas_tambahan: "border-l-orange-500",
+  pendidikan: "border-l-blue-500 dark:border-l-blue-400",
+  penelitian: "border-l-green-500 dark:border-l-green-400",
+  pengabdian: "border-l-purple-500 dark:border-l-purple-400",
+  tugas_tambahan: "border-l-orange-500 dark:border-l-orange-400",
 };
 const jenisBadge: Record<string, string> = {
-  pendidikan: "bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100",
-  penelitian: "bg-green-100 text-green-800 border-green-200 hover:bg-green-100",
-  pengabdian:
-    "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100",
-  tugas_tambahan:
-    "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100",
+  pendidikan: "border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300",
+  penelitian: "border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300",
+  pengabdian: "border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300",
+  tugas_tambahan: "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300",
 };
 const jenisIcon: Record<string, React.ReactNode> = {
   pendidikan: <GraduationCap className="w-4 h-4" />,
@@ -461,28 +454,33 @@ export function ActivityDetailPage() {
         { label: "Detail Kegiatan" },
       ]}
     >
-      <div className="space-y-6 max-w-5xl mx-auto">
-        {/* ── Top Bar ── */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
-          </Button>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-5xl mx-auto">
+         {/* ── Top Bar ── */}
+         <div className="flex items-center justify-between">
+           <Button variant="ghost" onClick={() => navigate(-1)}>
+             <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
+           </Button>
           <div className="flex gap-2">
-            <Button
+            <RippleButton
               variant="outline"
               size="sm"
               onClick={() => setShowShareDialog(true)}
             >
               <Share2 className="w-4 h-4 mr-1.5" /> Bagikan
-            </Button>
+            </RippleButton>
             {!isReadOnlyView && (
-              <Button
+              <RippleButton
                 variant="outline"
                 size="sm"
                 onClick={() => navigate(`/activities/${id}/edit`)}
               >
                 <Edit className="w-4 h-4 mr-1.5" /> Edit
-              </Button>
+              </RippleButton>
             )}
             {activity.isCurrentUserPencatat &&
               !location.pathname.includes("/ami-recap/") && (
@@ -583,31 +581,31 @@ export function ActivityDetailPage() {
         </Dialog>
 
         {fromPendingConfirmation && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-blue-900">Undangan Kegiatan</p>
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 p-4">
+             <div className="flex items-center justify-between">
+               <div>
+                 <p className="font-medium text-blue-900 dark:text-blue-300">Undangan Kegiatan</p>
                 <p className="text-sm text-blue-700 mt-1">
                   Anda diundang sebagai anggota kegiatan ini. Konfirmasi untuk melanjutkan.
                 </p>
               </div>
               <div className="flex gap-2 ml-4 flex-shrink-0">
-                <Button
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleConfirmAccept}
-                  disabled={isConfirming}
-                >
-                  <Check className="w-4 h-4 mr-1" /> Terima
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={handleConfirmReject}
-                  disabled={isConfirming}
-                >
-                  <XCircle className="w-4 h-4 mr-1" /> Tolak
-                </Button>
+              <RippleButton
+                size="sm"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleConfirmAccept}
+                disabled={isConfirming}
+              >
+                <Check className="w-4 h-4 mr-1" /> Terima
+              </RippleButton>
+              <RippleButton
+                size="sm"
+                variant="destructive"
+                onClick={handleConfirmReject}
+                disabled={isConfirming}
+              >
+                <XCircle className="w-4 h-4 mr-1" /> Tolak
+              </RippleButton>
               </div>
             </div>
           </div>
@@ -762,15 +760,15 @@ export function ActivityDetailPage() {
                               {dosen.name}
                             </span>
                             {dosen.isPencatat && (
-                              <Badge className="bg-blue-500 text-xs h-5">
-                                Pembuat
-                              </Badge>
-                            )}
-                            {dosen.isKetua && !dosen.isPencatat && (
-                              <Badge className="bg-purple-500 text-xs h-5">
-                                Ketua
-                              </Badge>
-                            )}
+                               <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs h-5">
+                                 Pembuat
+                               </Badge>
+                             )}
+                             {dosen.isKetua && !dosen.isPencatat && (
+                               <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">
+                                 Ketua
+                               </Badge>
+                             )}
                           </div>
                           {dosen.nidn && (
                             <p className="text-xs text-muted-foreground font-mono mt-0.5">
@@ -782,18 +780,18 @@ export function ActivityDetailPage() {
                       <div className="flex items-center gap-2 shrink-0">
                         {getStatusBadge(dosen.status || "MENUNGGU_KONFIRMASI")}
                         {activity.jenisBukti !== "BERSAMA" &&
-                          (dosen.dokumen.length > 0 ? (
-                            <Badge className="bg-green-500 text-xs whitespace-nowrap">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              {dosen.dokumen.length} dokumen
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-xs text-muted-foreground whitespace-nowrap"
-                            >
-                              Belum upload
-                            </Badge>
+                           (dosen.dokumen.length > 0 ? (
+                             <Badge className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs whitespace-nowrap">
+                               <CheckCircle className="w-3 h-3 mr-1" />
+                               {dosen.dokumen.length} dokumen
+                             </Badge>
+                           ) : (
+                             <Badge
+                               variant="outline"
+                               className="text-xs text-muted-foreground whitespace-nowrap"
+                             >
+                               Belum upload
+                             </Badge>
                           ))}
                       </div>
                     </div>
@@ -898,50 +896,49 @@ export function ActivityDetailPage() {
 
             {/* ── Summary Stats ── */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <SummaryCard
-                icon={<Users className="w-5 h-5 text-blue-600" />}
-                label="Total Dosen Terlibat"
-                value={activity.dosenTerlibat.length.toString()}
-                bg="bg-blue-50 border-blue-200"
-              />
-              <SummaryCard
-                icon={<FileText className="w-5 h-5 text-green-600" />}
-                label={
-                  activity.jenisBukti === "BERSAMA"
-                    ? "Total Dokumen Bersama"
-                    : "Total Dokumen Bukti"
-                }
-                value={
-                  activity.jenisBukti === "BERSAMA"
-                    ? (activity.dokumenBersama?.length || 0).toString()
-                    : activity.dosenTerlibat
-                        .reduce((s, d) => s + d.dokumen.length, 0)
-                        .toString()
-                }
-                bg="bg-green-50 border-green-200"
-              />
-              <SummaryCard
-                icon={<AlertCircle className="w-5 h-5 text-amber-600" />}
-                label={
-                  activity.jenisBukti === "BERSAMA"
-                    ? "Status Dokumen"
-                    : "Dosen Belum Upload"
-                }
-                value={
-                  activity.jenisBukti === "BERSAMA"
-                    ? activity.dokumenBersama &&
-                      activity.dokumenBersama.length > 0
-                      ? "Ada"
-                      : "Kosong"
-                    : activity.dosenTerlibat
-                        .filter(
-                          (d) =>
-                            d.dokumen.length === 0 && d.status === "DITERIMA"
-                        )
-                        .length.toString()
-                }
-                bg="bg-amber-50 border-amber-200"
-              />
+              <StatCard
+                icon={<Users className="w-5 h-5" />}
+                 label="Total Dosen Terlibat"
+                 value={activity.dosenTerlibat.length}
+                 color="blue"
+               />
+               <StatCard
+                 icon={<FileText className="w-5 h-5" />}
+                 label={
+                   activity.jenisBukti === "BERSAMA"
+                     ? "Total Dokumen Bersama"
+                     : "Total Dokumen Bukti"
+                 }
+                 value={
+                   activity.jenisBukti === "BERSAMA"
+                     ? (activity.dokumenBersama?.length || 0)
+                     : activity.dosenTerlibat
+                         .reduce((s, d) => s + d.dokumen.length, 0)
+                 }
+                 color="emerald"
+               />
+               <StatCard
+                 icon={<AlertCircle className="w-5 h-5" />}
+                 label={
+                   activity.jenisBukti === "BERSAMA"
+                     ? "Status Dokumen"
+                     : "Dosen Belum Upload"
+                 }
+                 value={
+                   activity.jenisBukti === "BERSAMA"
+                     ? activity.dokumenBersama &&
+                       activity.dokumenBersama.length > 0
+                       ? "Ada"
+                       : "Kosong"
+                     : activity.dosenTerlibat
+                         .filter(
+                           (d) =>
+                             d.dokumen.length === 0 && d.status === "DITERIMA"
+                         )
+                         .length
+                 }
+                 color="amber"
+               />
             </div>
           </TabsContent>
 
@@ -1030,29 +1027,18 @@ export function ActivityDetailPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+       </div>
+       </motion.div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Kegiatan?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus kegiatan{" "}
-              <strong>{activity?.namaKegiatan}</strong>? Tindakan ini tidak
-              dapat dibatalkan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+       <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Kegiatan?"
+        description={`Apakah Anda yakin ingin menghapus kegiatan ${activity?.namaKegiatan}? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={confirmDelete}
+      />
 
       <Dialog
         open={selectedLog !== null}
@@ -1139,35 +1125,35 @@ export function ActivityDetailPage() {
                       )}
 
                       {participantChanges.added.map((p) => (
-                        <div key={`pa-${getRecordId(p, "dosen_id")}`} className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 rounded-lg">
-                          Dosen ditambahkan: <strong>{String(p.nama ?? "-")}</strong> sebagai {formatAuditValue(p.peran)}.
-                        </div>
-                      ))}
-                      {participantChanges.removed.map((p) => (
-                        <div key={`pr-${getRecordId(p, "dosen_id")}`} className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 rounded-lg">
-                          Dosen dihapus: <strong>{String(p.nama ?? "-")}</strong>.
-                        </div>
-                      ))}
-                      {participantChanges.changed.map((p) => (
-                        <div key={`pc-${getRecordId(p, "dosen_id")}`} className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 rounded-lg">
-                          Data partisipasi berubah: <strong>{String(p.nama ?? "-")}</strong>.
-                        </div>
-                      ))}
-
-                      {documentChanges.added.map((d) => (
-                        <div key={`da-${getRecordId(d, "dokumen_id")}`} className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 rounded-lg">
-                          Dokumen ditambahkan: <strong>{String(d.nama ?? "-")}</strong>.
-                        </div>
-                      ))}
-                      {documentChanges.removed.map((d) => (
-                        <div key={`dr-${getRecordId(d, "dokumen_id")}`} className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 rounded-lg">
-                          Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
-                        </div>
-                      ))}
-                      {documentChanges.changed.map((d) => (
-                        <div key={`dc-${getRecordId(d, "dokumen_id")}`} className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 rounded-lg">
-                          Data atau hash dokumen berubah: <strong>{String(d.nama ?? "-")}</strong>.
-                        </div>
+                        <div key={`pa-${getRecordId(p, "dosen_id")}`} className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 px-4 py-3 text-sm text-green-900 dark:text-green-300 rounded-lg">
+                           Dosen ditambahkan: <strong>{String(p.nama ?? "-")}</strong> sebagai {formatAuditValue(p.peran)}.
+                         </div>
+                       ))}
+                       {participantChanges.removed.map((p) => (
+                         <div key={`pr-${getRecordId(p, "dosen_id")}`} className="border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-900 dark:text-red-300 rounded-lg">
+                           Dosen dihapus: <strong>{String(p.nama ?? "-")}</strong>.
+                         </div>
+                       ))}
+                       {participantChanges.changed.map((p) => (
+                         <div key={`pc-${getRecordId(p, "dosen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
+                           Data partisipasi berubah: <strong>{String(p.nama ?? "-")}</strong>.
+                         </div>
+                       ))}
+ 
+                       {documentChanges.added.map((d) => (
+                         <div key={`da-${getRecordId(d, "dokumen_id")}`} className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 px-4 py-3 text-sm text-green-900 dark:text-green-300 rounded-lg">
+                           Dokumen ditambahkan: <strong>{String(d.nama ?? "-")}</strong>.
+                         </div>
+                       ))}
+                       {documentChanges.removed.map((d) => (
+                         <div key={`dr-${getRecordId(d, "dokumen_id")}`} className="border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 px-4 py-3 text-sm text-red-900 dark:text-red-300 rounded-lg">
+                           Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
+                         </div>
+                       ))}
+                       {documentChanges.changed.map((d) => (
+                         <div key={`dc-${getRecordId(d, "dokumen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
+                           Data atau hash dokumen berubah: <strong>{String(d.nama ?? "-")}</strong>.
+                         </div>
                       ))}
 
                       {activityChanges.length === 0 && !hasCollectionChanges && (
@@ -1226,7 +1212,7 @@ export function ActivityDetailPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="border rounded-lg p-4 text-sm text-muted-foreground">Tidak ada data partisipan pada snapshot ini.</p>
+                        <EmptyState title="Tidak Ada Partisipan" description="Tidak ada data partisipan pada snapshot ini." icon={Users} />
                       )}
                     </section>
 
@@ -1305,29 +1291,7 @@ function InfoItem({
   );
 }
 
-function SummaryCard({
-  icon,
-  label,
-  value,
-  bg,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  bg: string;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 ${bg}`}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-xs text-muted-foreground">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 function FileRow({
   doc,
@@ -1341,8 +1305,8 @@ function FileRow({
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="p-2 rounded-lg bg-blue-50 border border-blue-100 shrink-0">
-          <FileText className="w-4 h-4 text-blue-600" />
+        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-100 dark:border-blue-800 shrink-0">
+           <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
         </div>
         <div className="min-w-0">
           <p className="font-medium text-sm truncate">{doc.name}</p>
@@ -1393,14 +1357,14 @@ function FileRow({
 function getKelengkapanBadge(status: string) {
   if (status === "lengkap") {
     return (
-      <Badge className="bg-green-500 text-white text-xs">
+      <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-xs">
         <CheckCircle className="w-3 h-3 mr-1" />
         Dokumen Lengkap
       </Badge>
     );
   }
   return (
-    <Badge className="bg-red-500 text-white text-xs">
+    <Badge variant="outline" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-xs">
       <AlertCircle className="w-3 h-3 mr-1" />
       Dokumen Tidak Lengkap
     </Badge>

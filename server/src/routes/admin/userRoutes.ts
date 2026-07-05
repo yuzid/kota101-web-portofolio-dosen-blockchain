@@ -14,6 +14,7 @@ router.get('/', asyncHandler(adminUserController.getAllUsers));
 router.get('/:id', asyncHandler(adminUserController.getUserById));
 router.post('/', asyncHandler(adminUserController.createUser));
 router.patch('/:id', asyncHandler(adminUserController.updateUser));
+router.patch('/:id/status', asyncHandler(adminUserController.updateUserStatus));
 router.delete('/:id', asyncHandler(adminUserController.deleteUser));
 
 export default router;

@@ -51,6 +51,7 @@ model User {
   email                   String               @unique @db.VarChar(255)
   password_hash           String               @db.VarChar(255)
   role                    String               @db.VarChar(50)
+  status                  String               @default("active") @db.VarChar(20)
   tata_usaha              TataUsaha?
   dosen                   Dosen?
   admin                   Admin?

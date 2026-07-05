@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
+import { motion } from "motion/react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
@@ -29,6 +30,7 @@ import {
 import { MainLayout } from "../components/layout/MainLayout";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { RippleButton } from "../components/ui/ripple-button";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { HighlightOverlay } from "../components/document/HighlightOverlay";
@@ -41,16 +43,7 @@ import {
   syncHighlights,
 } from "../services/highlightService";
 import type { Highlight } from "../services/highlightService";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "../components/ui/alert-dialog";
+import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -689,13 +682,18 @@ export function DocumentPreviewPage() {
 
   return (
     <MainLayout title="Detail Dokumen" breadcrumbs={breadcrumbs}>
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <X className="mr-2 h-4 w-4" />
-              Tutup
-            </Button>
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-4">
+         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+           <div className="flex min-w-0 items-center gap-3">
+             <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+               <X className="mr-2 h-4 w-4" />
+               Tutup
+             </Button>
             <div className="min-w-0">
               <p className="truncate font-medium">{document.name}</p>
               <p className="text-xs text-muted-foreground">
@@ -705,7 +703,7 @@ export function DocumentPreviewPage() {
           </div>
           <div className="flex items-center gap-2">
             {isDocumentOwner && (
-              <Button
+              <RippleButton
                 variant={addMode ? "default" : "outline"}
                 size="sm"
                 onClick={() => {
@@ -728,7 +726,7 @@ export function DocumentPreviewPage() {
               >
                 <Highlighter className="mr-2 h-4 w-4" />
                 {addMode ? "Simpan Highlight" : "Tambah Highlight"}
-              </Button>
+              </RippleButton>
             )}
             {isDocumentOwner && (
               <Button variant="outline" size="sm" onClick={handleEdit}>
@@ -755,7 +753,7 @@ export function DocumentPreviewPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 rounded-lg border bg-card p-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border bg-card p-4 text-sm">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Jenis Dokumen</p>
             <p className="font-medium">{document.jenis}</p>
@@ -1151,9 +1149,10 @@ export function DocumentPreviewPage() {
         )}
 
       </div>
+       </motion.div>
 
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={(open) => {
+       {/* Edit Dialog */}
+       <Dialog open={showEditDialog} onOpenChange={(open) => {
         if (!open) {
           setNewFile(null);
           setHasFileChange(false);
@@ -1247,7 +1246,7 @@ export function DocumentPreviewPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Batal</Button>
-            <Button onClick={saveEdit} disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</Button>
+            <RippleButton onClick={saveEdit} disabled={saving}>{saving ? "Menyimpan..." : "Simpan"}</RippleButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1264,22 +1263,17 @@ export function DocumentPreviewPage() {
       )}
 
       {/* Delete Confirmation */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Dokumen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Dokumen <strong>{document?.name}</strong> akan dihapus dari portofolio Anda.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive hover:bg-destructive/90">
-              {deleting ? "Menghapus..." : "Hapus"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Hapus Dokumen?"
+        description="Apakah Anda yakin ingin menghapus dokumen ini? Tindakan ini tidak dapat dibatalkan."
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={handleDelete}
+        disabled={deleting}
+        loading={deleting}
+      />
     </MainLayout>
   );
 }

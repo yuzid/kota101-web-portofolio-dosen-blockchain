@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { motion } from "motion/react";
 import { MainLayout } from '../components/layout/MainLayout';
 import { Button } from '../components/ui/button';
+import { RippleButton } from '../components/ui/ripple-button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent } from '../components/ui/card';
@@ -13,16 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../components/ui/alert-dialog';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -153,7 +146,7 @@ export function FileManagementPage() {
     if (type === 'application/pdf') {
       return <FileText className="w-5 h-5 text-red-500" />;
     }
-    return <FileText className="w-5 h-5 text-gray-500" />;
+    return <FileText className="w-5 h-5 text-muted-foreground" />;
   };
 
   const getCurrentVersion = (file: any) => {
@@ -168,19 +161,24 @@ export function FileManagementPage() {
         { label: 'Manajemen File' },
       ]}
     >
-      <div className="space-y-6 max-w-7xl">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+        <div className="space-y-6 max-w-7xl">
+         {/* Header */}
+         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold">Manajemen File</h2>
             <p className="text-sm text-muted-foreground">
               Upload, kelola versi, dan download file dengan mudah
             </p>
           </div>
-          <Button onClick={() => setShowUploadDialog(true)}>
+          <RippleButton onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Upload File Baru
-          </Button>
+          </RippleButton>
         </div>
 
         {/* Storage Quota */}
@@ -236,8 +234,17 @@ export function FileManagementPage() {
 
         {/* Files Table */}
         <Card>
-          <CardContent className="p-0">
-            <Table>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table className="table-fixed">
+              <colgroup>
+                <col className="w-2/5" />
+                <col className="w-24" />
+                <col className="w-24" />
+                <col className="w-28" />
+                <col className="w-1/6" />
+                <col className="w-1/6" />
+                <col className="w-20" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nama File</TableHead>
@@ -276,7 +283,7 @@ export function FileManagementPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getFileTypeIcon(file.type)}
-                            <span className="font-medium">{file.name}</span>
+                            <span className="font-medium truncate max-w-[200px]">{file.name}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -383,9 +390,10 @@ export function FileManagementPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+       </div>
+       </motion.div>
 
-      {/* Upload Dialog */}
+       {/* Upload Dialog */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -472,22 +480,15 @@ export function FileManagementPage() {
       </Dialog>
 
       {/* Delete File Confirmation */}
-      <AlertDialog open={showDeleteFileDialog} onOpenChange={setShowDeleteFileDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Hapus File?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Apakah Anda yakin ingin menghapus file <strong>{deleteFileData?.name}</strong> beserta seluruh versinya? Tindakan ini tidak dapat dibatalkan.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteFile} className="bg-destructive hover:bg-destructive/90">
-              Hapus
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDeleteFileDialog}
+        onOpenChange={setShowDeleteFileDialog}
+        title="Hapus File?"
+        description={`Apakah Anda yakin ingin menghapus file ${deleteFileData?.name} beserta seluruh versinya? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        variant="destructive"
+        onConfirm={confirmDeleteFile}
+      />
     </MainLayout>
   );
 }
