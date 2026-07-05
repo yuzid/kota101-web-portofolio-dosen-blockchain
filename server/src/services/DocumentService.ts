@@ -20,6 +20,10 @@ export class DocumentService {
     this.multiChainService = multiChainService;
   }
 
+  mapJenisToEnum(jenis: string): string {
+    return String(jenis).toUpperCase().trim();
+  }
+
   private canAccessDocument(document: any, currentUser: any) {
     // Non-dosen users (Admin, TU) can access all documents
     if (currentUser.role?.toUpperCase() !== "DOSEN") return true;

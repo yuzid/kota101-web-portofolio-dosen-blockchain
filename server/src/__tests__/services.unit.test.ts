@@ -406,7 +406,7 @@ describe('DocumentService unit', () => {
 
     await service.getDocumentContent('doc-1', user);
     await service.getDocumentPreview('doc-1', user);
-    expect(service.mapJenisToEnum(' Sertifikat ')).toBe('Sertifikat');
+    expect(service.mapJenisToEnum(' Sertifikat ')).toBe('SERTIFIKAT');
     await service.getDosenDocuments(VALID_ID, { tab: 'dosen', search: 'Dok', jenis: 'SERTIFIKAT' });
     await service.getTUDocuments({ role: 'ADMIN' });
     await service.uploadDosenDocument(VALID_ID, { nama: 'Dok', jenis_dokumen: 'SERTIFIKAT', tanggal_dokumen: '2025-01-01' }, file);
