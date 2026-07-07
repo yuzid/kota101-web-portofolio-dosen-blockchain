@@ -32,7 +32,7 @@ services:
       - AWS_REGION=ap-southeast-1
       - DATABASE_URL=postgresql://portfolio_user:secretpassword@postgres_db:5432/portfolio_blockchain_db
       - MULTICHAIN_RPC_URL=http://multichain_node:4242
-      - AWS_S3_BUCKET=kota101-ta
+      - AWS_S3_BUCKET=kota101-ta1
       - JWT_SECRET=your-super-secret-key-change-this-in-production
       - ADMIN_EMAIL=admin@university.ac.id
       - ADMIN_PASSWORD=AdminPassword123
