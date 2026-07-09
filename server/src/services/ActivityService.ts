@@ -1,7 +1,6 @@
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 import { prisma } from '../lib/prisma';
-import { resolveBlockchainNode } from '../lib/blockchainNode';
 import { EmailService } from './EmailService';
 import { MultiChainService } from './MultiChainService';
 
@@ -41,7 +40,6 @@ export class ActivityService {
         nip: activity.dosen.nip,
         nidn: activity.dosen.nidn,
         nama: activity.dosen.nama,
-        chain_address: activity.dosen.chain_address,
         program_studi: {
           id: activity.dosen.program_studi.id,
           kode: activity.dosen.program_studi.kode_prodi,
@@ -68,14 +66,7 @@ export class ActivityService {
   }
 
   private async publishActivitySnapshot(activity: any, eventType: string) {
-    if (!activity.dosen.chain_address) {
-      throw new Error('Dosen belum memiliki blockchain address.');
-    }
-
-    const blockchainNode = resolveBlockchainNode(activity.dosen.program_studi);
     return await this.multiChainService.publishJson(
-      blockchainNode,
-      activity.dosen.chain_address,
       activity.id,
       this.buildBlockchainPayload(activity, eventType),
     );
@@ -291,8 +282,7 @@ export class ActivityService {
     const activity = await this.activityRepository.findById(id);
     if (!activity) throw new Error('Kegiatan tidak ditemukan.');
 
-    const blockchainNode = resolveBlockchainNode(activity.dosen.program_studi);
-    const items = await this.multiChainService.getJsonStreamItems(blockchainNode, id);
+    const items = await this.multiChainService.getJsonStreamItems(id);
 
     return items.map((item) => {
       const payload = item.data.json || {};

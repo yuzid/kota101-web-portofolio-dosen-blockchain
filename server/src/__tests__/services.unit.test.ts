@@ -57,6 +57,11 @@ jest.mock('nodemailer', () => ({
   },
 }));
 
+jest.mock('mjml', () => ({
+  __esModule: true,
+  default: jest.fn(() => ({ html: '<html></html>', errors: [] })),
+}), { virtual: true });
+
 const s3SendMock = jest.fn();
 jest.mock('@aws-sdk/client-s3', () => ({
   S3Client: jest.fn().mockImplementation(() => ({ send: s3SendMock })),
@@ -128,14 +133,18 @@ beforeEach(() => {
   jest.clearAllMocks();
   process.env.JWT_SECRET = 'test-jwt-secret-key';
   process.env.AUDIT_STREAM_NAME = 'audit';
-  process.env.TI_IP = '127.0.0.1';
-  process.env.TI_RPC_PORT = '1234';
-  process.env.TI_RPC_USERNAME = 'user';
-  process.env.TI_RPC_PASSWORD = 'pass';
-  process.env.D4_IP = '127.0.0.1';
-  process.env.D4_RPC_PORT = '1234';
-  process.env.D4_RPC_USERNAME = 'user';
-  process.env.D4_RPC_PASSWORD = 'pass';
+  process.env.MULTICHAIN_N1_IP = '127.0.0.1';
+  process.env.MULTICHAIN_N1_RPC_PORT = '1234';
+  process.env.MULTICHAIN_N1_RPC_USERNAME = 'user';
+  process.env.MULTICHAIN_N1_RPC_PASSWORD = 'pass';
+  process.env.MULTICHAIN_N2_IP = '127.0.0.2';
+  process.env.MULTICHAIN_N2_RPC_PORT = '1234';
+  process.env.MULTICHAIN_N2_RPC_USERNAME = 'user';
+  process.env.MULTICHAIN_N2_RPC_PASSWORD = 'pass';
+  process.env.MULTICHAIN_N3_IP = '127.0.0.3';
+  process.env.MULTICHAIN_N3_RPC_PORT = '1234';
+  process.env.MULTICHAIN_N3_RPC_USERNAME = 'user';
+  process.env.MULTICHAIN_N3_RPC_PASSWORD = 'pass';
   (prisma.lampiranBukti.findFirst as jest.Mock).mockResolvedValue(null);
 });
 
@@ -275,7 +284,6 @@ describe('AuthService unit', () => {
 describe('AdminUserService unit', () => {
   let repo: any;
   let service: AdminUserService;
-  let chain: any;
 
   beforeEach(() => {
     repo = {
@@ -289,8 +297,7 @@ describe('AdminUserService unit', () => {
       update: jest.fn().mockResolvedValue(undefined),
       delete: jest.fn().mockResolvedValue(undefined),
     };
-    chain = { createPublisherAddress: jest.fn().mockResolvedValue('chain-address') };
-    service = new AdminUserService(repo, chain);
+    service = new AdminUserService(repo);
     (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
   });
 
@@ -302,7 +309,17 @@ describe('AdminUserService unit', () => {
     await service.deleteUser('user-1', { id: 'admin-1', role: 'ADMIN' });
 
     expect(repo.findAll).toHaveBeenCalledWith({ role: 'DOSEN' });
-    expect(chain.createPublisherAddress).toHaveBeenCalled();
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({
+      dosen: {
+        create: {
+          nip: '123',
+          nidn: '456',
+          nama: 'Dosen',
+          program_studi_id: 'prodi-1',
+          chain_address: 'UNUSED_LEGACY_FIELD',
+        },
+      },
+    }));
     expect(repo.delete).toHaveBeenCalledWith('user-1');
   });
 
@@ -642,14 +659,9 @@ describe('MultiChainService unit', () => {
 
   it('menjalankan semua RPC public method', async () => {
     const responses = [
-      'addr-new',
-      [{ name: 'audit', open: false, restrictions: { write: true } }],
-      'grant-ok',
-      'grant-ok',
-      'addr-created',
-      [{ name: 'audit', open: true }],
-      'grant-ok',
       'tx-publish',
+      'tx-publish-2',
+      'tx-publish-3',
       [
         { txid: 'tx-1', confirmations: 1, blocktime: 2, publishers: ['addr'], keys: ['k'], data: { json: { a: 1 } }, valid: true },
         { txid: 'tx-0', confirmations: 1, blocktime: 1, publishers: ['addr'], keys: ['k'], data: { json: { a: 0 } }, valid: true },
@@ -662,12 +674,19 @@ describe('MultiChainService unit', () => {
     });
 
     const service = new MultiChainService();
-    await expect(service.getNewAddress('TI' as any)).resolves.toBe('addr-new');
-    await expect(service.provisionPublisherAddress('TI' as any, 'addr')).resolves.toBeUndefined();
-    await expect(service.createPublisherAddress('TI' as any)).resolves.toBe('addr-created');
-    await expect(service.publishJson('TI' as any, 'addr', 'key', { ok: true })).resolves.toBe('tx-publish');
-    await expect(service.getJsonStreamItems('TI' as any, 'key')).resolves.toHaveLength(2);
+    await expect(service.publishJson('key-1', { ok: true })).resolves.toBe('tx-publish');
+    await expect(service.publishJson('key-2', { ok: true })).resolves.toBe('tx-publish-2');
+    await expect(service.publishJson('key-3', { ok: true })).resolves.toBe('tx-publish-3');
+    await expect(service.getJsonStreamItems('key')).resolves.toHaveLength(2);
 
     expect(global.fetch).toHaveBeenCalled();
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(calls[0][0]).toBe('http://127.0.0.1:1234');
+    expect(calls[1][0]).toBe('http://127.0.0.2:1234');
+    expect(calls[2][0]).toBe('http://127.0.0.3:1234');
+    expect(JSON.parse(calls[0][1].body)).toMatchObject({
+      method: 'publish',
+      params: ['audit', 'key-1', { json: { ok: true } }],
+    });
   });
 });

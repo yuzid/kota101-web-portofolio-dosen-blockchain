@@ -1,16 +1,12 @@
 import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import { UserRepository } from '../repositories/UserRepository';
-import { MultiChainService } from './MultiChainService';
-import { resolveBlockchainNode } from '../lib/blockchainNode';
 
 export class AdminUserService {
   private userRepository: UserRepository;
-  private multiChainService: MultiChainService;
 
-  constructor(userRepository: UserRepository, multiChainService = new MultiChainService()) {
+  constructor(userRepository: UserRepository) {
     this.userRepository = userRepository;
-    this.multiChainService = multiChainService;
   }
 
   async getAllUsers(currentUser: any, roleQuery?: string) {
@@ -88,16 +84,12 @@ export class AdminUserService {
     if (existing) throw new Error('Email sudah terdaftar.');
 
     const passwordHash = await bcrypt.hash(password, 12);
-    let chainAddress: string | undefined;
 
     if (roleUpper === 'DOSEN') {
       targetProdi = targetProdi || await this.userRepository.findProgramStudiById(program_studi_id);
       if (!targetProdi) {
         throw new Error('Program studi tidak ditemukan.');
       }
-
-      const blockchainNode = resolveBlockchainNode(targetProdi);
-      chainAddress = await this.multiChainService.createPublisherAddress(blockchainNode);
     }
 
     const createData = {
@@ -106,7 +98,17 @@ export class AdminUserService {
       role: roleUpper,
       ...(roleUpper === 'ADMIN' && { admin: { create: { nama } } }),
       ...(roleUpper === 'TATA_USAHA' && { tata_usaha: { create: { nip, nama, jurusan_id } } }),
-      ...(roleUpper === 'DOSEN' && { dosen: { create: { nip, nidn, nama, program_studi_id, chain_address: chainAddress! } } }),
+      ...(roleUpper === 'DOSEN' && {
+        dosen: {
+          create: {
+            nip,
+            nidn,
+            nama,
+            program_studi_id,
+            chain_address: 'UNUSED_LEGACY_FIELD',
+          },
+        },
+      }),
     };
 
     try {

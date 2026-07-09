@@ -3,7 +3,6 @@ import crypto from "crypto";
 import { DocumentRepository } from "../repositories/DocumentRepository";
 import { FileStorageService } from "./FileStorageService";
 import { MultiChainService } from "./MultiChainService";
-import { resolveBlockchainNode } from "../lib/blockchainNode";
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
@@ -92,9 +91,7 @@ export class DocumentService {
       .filter((activity: any) => !activityId || activity.id === activityId);
 
     for (const activity of linkedActivities) {
-      const node = resolveBlockchainNode(activity.dosen.program_studi);
       const items = await this.multiChainService.getJsonStreamItems(
-        node,
         activity.id
       );
 
