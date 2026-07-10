@@ -82,6 +82,8 @@ interface ActivityLog {
   description: string;
   changes?: Record<string, { old: unknown; new: unknown }>;
   collectionChanges?: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }>;
+  payload?: Record<string, unknown>;
+  previousPayload?: Record<string, unknown> | null;
 }
 
 interface DocPreviewItem {
@@ -134,6 +136,36 @@ function getCollectionChanges(
     removed: data.removed?.length || 0,
     modified: data.modified?.length || 0,
   }));
+}
+
+function isDocumentMetadataAction(action: string) {
+  return action === "document_metadata_updated";
+}
+
+function isDocumentHighlightAction(action: string) {
+  return action.startsWith("document_highlight");
+}
+
+function getDocumentMetadataChanges(
+  current: Record<string, unknown>,
+  previous?: Record<string, unknown>
+) {
+  if (!previous) return [];
+
+  const labels: Record<string, string> = {
+    nama: "Nama",
+    jenis_dokumen: "Jenis",
+    sumber_dokumen: "Sumber",
+    tanggal_upload: "Tanggal",
+  };
+
+  return Object.entries(labels)
+    .filter(([field]) => current[field] !== previous[field])
+    .map(([field, label]) => ({
+      label,
+      oldValue: formatAuditValue(previous[field]),
+      newValue: formatAuditValue(current[field]),
+    }));
 }
 
 function getTimelineIcon(action: string) {
@@ -297,7 +329,7 @@ export function PublicActivityPage() {
         const generateDescription = (action: string, changes: any, collectionChanges: any): string => {
           if (action === 'created') return 'Membuat catatan kegiatan baru.';
           if (action === 'document_metadata_updated') return 'Metadata dokumen diperbarui.';
-          if (action === 'document_highlight_synced') return 'Highlight dokumen disinkronkan.';
+          if (action === 'document_highlight_synced') return 'Highlight dokumen diperbarui.';
           if (action === 'document_highlight_added') return 'Highlight dokumen ditambahkan.';
           if (action === 'document_highlight_updated') return 'Highlight dokumen diperbarui.';
           if (action === 'document_highlight_deleted') return 'Highlight dokumen dihapus.';
@@ -347,6 +379,17 @@ export function PublicActivityPage() {
           if (item.action === 'DOKUMEN_HIGHLIGHT_DELETED') actionMapped = 'document_highlight_deleted';
           
           const { changes, collectionChanges } = computeDiff(rawPayload, prevPayload);
+          if (
+            (actionMapped === 'document_metadata_updated' || actionMapped === 'document_highlight_synced') &&
+            !collectionChanges.dokumen_bukti &&
+            Array.isArray(rawPayload.dokumen_pendukung)
+          ) {
+            collectionChanges.dokumen_bukti = {
+              added: [],
+              removed: [],
+              modified: rawPayload.dokumen_pendukung,
+            };
+          }
           const description = generateDescription(actionMapped, changes, collectionChanges);
           
           processed.push({
@@ -356,7 +399,9 @@ export function PublicActivityPage() {
             timestamp: item.timestamp,
             description,
             changes,
-            collectionChanges
+            collectionChanges,
+            payload: rawPayload,
+            previousPayload: prevPayload,
           });
         }
         setLogs(processed.reverse());
@@ -714,32 +759,32 @@ function renderFullMode(
                       </p>
                     </div>
                   ) : (
-                    <ScrollArea className="max-h-[600px] pr-2">
-                      <div className="space-y-0">
+                    <div className="max-h-[600px] overflow-y-auto pr-2">
+                      <div className="space-y-2">
                         {logs.map((log, idx) => (
                           <button
                             key={log.id}
                             onClick={() => setSelectedLog(log)}
-                            className="w-full text-left group"
+                            className="block w-full text-left group"
                           >
-                            <div className="relative flex gap-4 pb-6 last:pb-0">
+                            <div className="relative flex gap-3 rounded-md py-2">
                               {idx < logs.length - 1 && (
-                                <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
+                                <div className="absolute bottom-[-8px] left-[15px] top-10 w-px bg-border" />
                               )}
                               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
                                 <div className={`h-2.5 w-2.5 rounded-full ${getTimelineDot(log.action)}`} />
                               </div>
-                              <div className="min-w-0 flex-1 pt-0.5">
-                                <div className="flex items-center gap-2">
-                                  {getTimelineIcon(log.action)}
-                                  <p className="text-xs font-medium capitalize">
+                              <div className="min-w-0 flex-1 space-y-1 pt-0.5">
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <span className="mt-0.5 shrink-0">{getTimelineIcon(log.action)}</span>
+                                  <p className="min-w-0 break-words text-xs font-medium capitalize leading-snug">
                                     {log.action.replace(/_/g, " ")}
                                   </p>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                <p className="text-[11px] leading-snug text-muted-foreground">
                                   {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm", { locale: localeId })}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="break-words text-[11px] leading-snug text-muted-foreground">
                                   Oleh: {log.actor.name}
                                 </p>
                               </div>
@@ -747,7 +792,7 @@ function renderFullMode(
                           </button>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -802,16 +847,84 @@ function renderFullMode(
                     <div>
                       <h4 className="text-sm font-semibold mb-2">Perubahan Koleksi</h4>
                       <div className="space-y-2">
-                        {getCollectionChanges(selectedLog.collectionChanges).map((cc, i) => (
-                          <div key={i} className="rounded-lg border p-3 text-xs">
-                            <p className="font-medium capitalize mb-1">{cc.collection.replace(/_/g, " ")}</p>
-                            <div className="flex gap-3 text-muted-foreground">
-                              {cc.added > 0 && <span className="text-green-600">+{cc.added} ditambah</span>}
-                              {cc.removed > 0 && <span className="text-red-600">-{cc.removed} dihapus</span>}
-                              {cc.modified > 0 && <span className="text-blue-600">~{cc.modified} diubah</span>}
+                        {selectedLog.collectionChanges.dokumen_bukti?.modified?.map((doc: unknown, i: number) => {
+                          const currentDoc = doc as Record<string, unknown>;
+                          const previousDocs = Array.isArray(selectedLog.previousPayload?.dokumen_pendukung)
+                            ? selectedLog.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+                            : [];
+                          const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+                          const metadataChanges = getDocumentMetadataChanges(currentDoc, previousDoc);
+
+                          return (
+                            <div key={`doc-mod-${i}`} className="rounded-lg border p-3 text-xs">
+                              {isDocumentHighlightAction(selectedLog.action) ? (
+                                <p>
+                                  Highlight dokumen <strong>{String(currentDoc.nama ?? "-")}</strong> diperbarui.
+                                </p>
+                              ) : isDocumentMetadataAction(selectedLog.action) ? (
+                                <div className="space-y-2">
+                                  <p>
+                                    Metadata dokumen <strong>{String(currentDoc.nama ?? "-")}</strong> diperbarui.
+                                  </p>
+                                  {metadataChanges.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {metadataChanges.map((change) => (
+                                        <div key={change.label} className="grid gap-1 sm:grid-cols-[110px_1fr]">
+                                          <span className="font-medium">{change.label}</span>
+                                          <span>
+                                            <span className="text-muted-foreground line-through">{change.oldValue}</span>
+                                            <span className="mx-1 text-muted-foreground">→</span>
+                                            <strong>{change.newValue}</strong>
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-muted-foreground">
+                                      Detail field metadata sebelumnya tidak tersedia pada snapshot pembanding.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p>
+                                  Dokumen diubah: <strong>{String(currentDoc.nama ?? "-")}</strong>.
+                                </p>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
+                        {getCollectionChanges(selectedLog.collectionChanges)
+                          .filter((cc) => cc.collection !== "dokumen_bukti")
+                          .map((cc, i) => (
+                            <div key={i} className="rounded-lg border p-3 text-xs">
+                              <p className="font-medium capitalize mb-1">{cc.collection.replace(/_/g, " ")}</p>
+                              <div className="flex gap-3 text-muted-foreground">
+                                {cc.added > 0 && <span className="text-green-600">+{cc.added} ditambah</span>}
+                                {cc.removed > 0 && <span className="text-red-600">-{cc.removed} dihapus</span>}
+                                {cc.modified > 0 && <span className="text-blue-600">~{cc.modified} diubah</span>}
+                              </div>
+                            </div>
+                          ))}
+                        {selectedLog.collectionChanges.dokumen_bukti && (
+                          <>
+                            {selectedLog.collectionChanges.dokumen_bukti.added.map((doc: unknown, i: number) => {
+                              const d = doc as Record<string, unknown>;
+                              return (
+                                <div key={`doc-add-${i}`} className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+                                  Dokumen ditambahkan: <strong>{String(d.nama ?? "-")}</strong>.
+                                </div>
+                              );
+                            })}
+                            {selectedLog.collectionChanges.dokumen_bukti.removed.map((doc: unknown, i: number) => {
+                              const d = doc as Record<string, unknown>;
+                              return (
+                                <div key={`doc-remove-${i}`} className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                                  Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
+                                </div>
+                              );
+                            })}
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
