@@ -126,7 +126,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId, snapshotHighlights }:
 
   return (
     <div ref={containerRef}>
-      <div className="mb-3 flex items-center justify-center gap-3">
+      <div className="mb-3 flex items-center justify-center gap-3 pt-3">
         {numPages && numPages > 1 && (
           <>
             <Button

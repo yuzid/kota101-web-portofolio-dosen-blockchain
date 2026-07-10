@@ -100,6 +100,7 @@ interface SnapshotDocument {
   jenis: string;
   tanggalUpload: string;
   hashFile: string;
+  filePath: string;
   highlights: Highlight[];
 }
 
@@ -220,6 +221,7 @@ function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocume
       jenis: String(d.jenis_dokumen ?? "-"),
       tanggalUpload: String(d.tanggal_upload ?? ""),
       hashFile: String(d.hash_file ?? "-"),
+      filePath: String(d.file_path ?? d.nama ?? ""),
       highlights,
     };
   }).filter((doc) => doc.id);
@@ -261,7 +263,7 @@ function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActiv
       jenis: doc.jenis,
       tanggalUpload: doc.tanggalUpload,
       hashFile: doc.hashFile,
-      filePath: doc.name,
+      filePath: doc.filePath,
       fileUrl: `${API_URL}/api/public/kegiatan/${activityId}/audit-trail/${log.id}/dokumen/${doc.id}/content`,
       snapshotHighlights: doc.highlights,
     })),
@@ -355,6 +357,83 @@ function getTimelineDot(action: string) {
    }
  }
 
+function getNameChangedDocuments(log: ActivityLog) {
+  const modifiedDocs = log.collectionChanges?.dokumen_bukti?.modified || [];
+  const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
+    ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+    : [];
+
+  return modifiedDocs.filter((doc) => {
+    const currentDoc = toRecord(doc);
+    const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+    return previousDoc && currentDoc.nama !== previousDoc.nama;
+  });
+}
+
+function hasDocumentCollectionAddOrRemove(log: ActivityLog) {
+  const docChanges = log.collectionChanges?.dokumen_bukti;
+  return Boolean(
+    docChanges &&
+      ((docChanges.added?.length || 0) > 0 || (docChanges.removed?.length || 0) > 0)
+  );
+}
+
+function getDocumentHistoryLogs(logs: ActivityLog[]) {
+  return logs.filter((log) => {
+    if (isDocumentMetadataAction(log.action)) {
+      return getNameChangedDocuments(log).length > 0;
+    }
+
+    return hasDocumentCollectionAddOrRemove(log) || isDocumentHighlightAction(log.action);
+  });
+}
+
+function getDocumentNamesFromChanges(log: ActivityLog) {
+  if (isDocumentMetadataAction(log.action)) {
+    const names = getNameChangedDocuments(log)
+      .map((doc) => String(toRecord(doc).nama ?? ""))
+      .filter(Boolean);
+
+    return Array.from(new Set(names));
+  }
+
+  const docs = log.collectionChanges?.dokumen_bukti;
+  const changedDocs = [
+    ...(docs?.added || []),
+    ...(docs?.removed || []),
+    ...(docs?.modified || []),
+  ];
+  const names = changedDocs
+    .map((doc) => String(toRecord(doc).nama ?? ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(names));
+}
+
+function getDocumentHistoryDescription(log: ActivityLog) {
+  const names = getDocumentNamesFromChanges(log);
+  const docLabel = names.length > 0 ? names.join(", ") : "dokumen";
+
+  if (log.action === "dokumen_uploaded") return `Dokumen ditambahkan: ${docLabel}.`;
+  if (log.action === "dokumen_removed") return `Dokumen dihapus: ${docLabel}.`;
+  if (isDocumentMetadataAction(log.action)) {
+    const renamedDocs = getNameChangedDocuments(log);
+    const descriptions = renamedDocs.map((doc) => {
+      const currentDoc = toRecord(doc);
+      const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
+        ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+        : [];
+      const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+      return `Nama dokumen ${formatAuditValue(previousDoc?.nama)} diubah menjadi ${formatAuditValue(currentDoc.nama)}.`;
+    });
+
+    return descriptions.length > 0 ? descriptions.join(" ") : `Nama dokumen ${docLabel} diperbarui.`;
+  }
+  if (isDocumentHighlightAction(log.action)) return `Highlight ${docLabel} diperbarui.`;
+
+  return log.description;
+}
+
 export function PublicActivityPage() {
   const { id, txId } = useParams();
   const location = useLocation();
@@ -365,8 +444,20 @@ export function PublicActivityPage() {
   const [previewDoc, setPreviewDoc] = useState<DocPreviewItem | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
+  const [latestActivityName, setLatestActivityName] = useState<string>("");
 
-  const isDokumenMode = location.pathname.endsWith("/dokumen");
+  const isDokumenMode = location.pathname.includes("/dokumen");
+
+  const fetchLatestActivityName = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/public/kegiatan/${id}`);
+      if (!response.ok) return "";
+      const result = await response.json();
+      return result.status === "success" ? String(result.data?.nama_kegiatan || "") : "";
+    } catch {
+      return "";
+    }
+  };
 
   const fetchAuditTrail = async (): Promise<ActivityLog[]> => {
     try {
@@ -473,6 +564,8 @@ export function PublicActivityPage() {
           let actionMapped = 'updated';
           if (item.action === 'KEGIATAN_CREATED') actionMapped = 'created';
           if (item.action === 'KEGIATAN_DELETED') actionMapped = 'deleted';
+          if (item.action === 'DOKUMEN_ADDED') actionMapped = 'dokumen_uploaded';
+          if (item.action === 'DOKUMEN_REMOVED') actionMapped = 'dokumen_removed';
           if (item.action === 'DOKUMEN_METADATA_UPDATED') actionMapped = 'document_metadata_updated';
           if (item.action === 'DOKUMEN_HIGHLIGHTS_SYNCED') actionMapped = 'document_highlight_synced';
           if (item.action === 'DOKUMEN_HIGHLIGHT_ADDED') actionMapped = 'document_highlight_added';
@@ -532,7 +625,17 @@ export function PublicActivityPage() {
         setIsLoading(false);
         return;
       }
-      setActivity(transformSnapshotLog(selected, id!));
+      const snapshotActivity = transformSnapshotLog(selected, id!);
+      if (isDokumenMode) {
+        const latestName = latestActivityName || await fetchLatestActivityName();
+        if (latestName) setLatestActivityName(latestName);
+        setActivity({
+          ...snapshotActivity,
+          namaKegiatan: latestName || snapshotActivity.namaKegiatan,
+        });
+      } else {
+        setActivity(snapshotActivity);
+      }
       setIsLoading(false);
       return;
     }
@@ -556,6 +659,7 @@ export function PublicActivityPage() {
         throw new Error(result.error || "Kegiatan tidak ditemukan");
       }
       const { activity: transformed, docEntries } = transformPublicActivity(result.data);
+      setLatestActivityName(transformed.namaKegiatan);
 
       if (docEntries.length > 0) {
         const docResults = await Promise.allSettled(
@@ -686,7 +790,7 @@ export function PublicActivityPage() {
   const jType = activity.jenisTridharma?.toLowerCase() || "";
 
   if (isDokumenMode) {
-    return renderDokumenMode(activity, jType, getInitials, statusBadge);
+    return renderDokumenMode(activity, jType, getInitials, statusBadge, logs, navigate, txId, latestActivityName);
   }
 
   return renderFullMode(activity, jType, getInitials, statusBadge, previewDoc, setPreviewDoc, logs, selectedLog, setSelectedLog, navigate, txId);
@@ -1088,12 +1192,17 @@ function renderDokumenMode(
   activity: PublicActivity,
   _jType: string,
   _getInitials: (name: string) => string,
-  _statusBadge: (status: string) => React.ReactNode
+  _statusBadge: (status: string) => React.ReactNode,
+  logs: ActivityLog[],
+  navigate: ReturnType<typeof useNavigate>,
+  activeTxId?: string,
+  latestActivityName?: string
 ) {
   const allDocs =
     activity.jenisBukti === "BERSAMA"
       ? activity.dokumenBersama
       : activity.dosenTerlibat.flatMap((d) => d.dokumen);
+  const documentLogs = getDocumentHistoryLogs(logs);
 
   return (
     <motion.div
@@ -1102,126 +1211,185 @@ function renderDokumenMode(
          transition={{ duration: 0.4, ease: "easeOut" }}
        >
        <div className="min-h-screen bg-background py-8 px-4">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="mx-auto max-w-6xl space-y-6">
           <div className="text-center">
             <h1 className="text-xl font-bold text-foreground">
              Dokumen Bukti Kegiatan
            </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {activity.namaKegiatan}
+            {latestActivityName || activity.namaKegiatan}
           </p>
         </div>
 
-        {activity.jenisBukti === "BERSAMA" ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  Dokumen Bersama
-                  <Badge variant="secondary" className="text-xs">
-                    {activity.dokumenBersama.length} file
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {activity.dokumenBersama.map((doc) => (
-                  <div key={doc.id} className="space-y-3">
-                    <DocPreviewBlock doc={doc} label={doc.name} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {activity.dosenTerlibat.map((dosen) => (
-              <Card key={dosen.id}>
+            {activity.jenisBukti === "BERSAMA" ? (
+              <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    {dosen.name}
-                    <Badge variant="outline" className="text-xs">
-                      NIDN: {dosen.nidn}
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    Dokumen Bersama
+                    <Badge variant="secondary" className="text-xs">
+                      {activity.dokumenBersama.length} file
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {dosen.dokumen.length > 0 ? (
-                    dosen.dokumen.map((doc) => (
-                      <DocPreviewBlock
-                        key={doc.id}
-                        doc={doc}
-                        label={doc.name}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      Belum ada dokumen bukti
-                    </p>
-                  )}
+                  {activity.dokumenBersama.map((doc) => (
+                    <div key={doc.id} className="space-y-3">
+                      <DocPreviewBlock doc={doc} label={doc.name} />
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Blockchain status summary */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-              Verifikasi Blockchain
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {allDocs.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Belum ada dokumen yang tercatat
-                </p>
-              )}
-              {allDocs.map((doc) => {
-                const verified = doc.hashFile && doc.hashFile !== "-";
-                return (
-                  <div
-                    key={doc.id}
-                    className={`rounded-lg border-2 p-4 ${
-                       verified
-                         ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
-                         : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
-                     }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {verified ? (
-                        <ShieldCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            ) : (
+              <div className="space-y-6">
+                {activity.dosenTerlibat.map((dosen) => (
+                  <Card key={dosen.id}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        {dosen.name}
+                        <Badge variant="outline" className="text-xs">
+                          NIDN: {dosen.nidn}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {dosen.dokumen.length > 0 ? (
+                        dosen.dokumen.map((doc) => (
+                          <DocPreviewBlock
+                            key={doc.id}
+                            doc={doc}
+                            label={doc.name}
+                          />
+                        ))
                       ) : (
-                        <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                        <p className="text-sm text-muted-foreground italic">
+                          Belum ada dokumen bukti
+                        </p>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{doc.name}</p>
-                        <p className={`text-sm font-semibold mt-1 ${
-                          verified ? "text-green-700" : "text-yellow-700"
-                        }`}>
-                          {verified
-                            ? "Terdokumentasi di Blockchain"
-                            : "Belum Tercatat di Blockchain"}
-                        </p>
-                        <p className={`text-xs mt-0.5 ${
-                          verified ? "text-green-600" : "text-yellow-600"
-                        }`}>
-                          {verified
-                            ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
-                            : "Dokumen ini belum dicatat pada jaringan blockchain."}
-                        </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                  Verifikasi Blockchain
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {allDocs.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Belum ada dokumen yang tercatat
+                    </p>
+                  )}
+                  {allDocs.map((doc) => {
+                    const verified = doc.hashFile && doc.hashFile !== "-";
+                    return (
+                      <div
+                        key={doc.id}
+                        className={`rounded-lg border-2 p-4 ${
+                           verified
+                             ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
+                             : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
+                         }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {verified ? (
+                            <ShieldCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{doc.name}</p>
+                            <p className={`text-sm font-semibold mt-1 ${
+                              verified ? "text-green-700" : "text-yellow-700"
+                            }`}>
+                              {verified
+                                ? "Terdokumentasi di Blockchain"
+                                : "Belum Tercatat di Blockchain"}
+                            </p>
+                            <p className={`text-xs mt-0.5 ${
+                              verified ? "text-green-600" : "text-yellow-600"
+                            }`}>
+                              {verified
+                                ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
+                                : "Dokumen ini belum dicatat pada jaringan blockchain."}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="h-fit lg:sticky lg:top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <History className="w-4 h-4 text-muted-foreground" />
+                Riwayat Dokumen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {documentLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Belum ada riwayat perubahan dokumen.
+                </p>
+              ) : (
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <div className="relative space-y-1">
+                    {documentLogs.map((log, index) => (
+                      <button
+                        key={log.id}
+                        type="button"
+                        onClick={() => navigate(`/public/kegiatan/${activity.id}/dokumen/entry/${log.id}`)}
+                        className="group block w-full text-left"
+                      >
+                      <div className="relative flex items-center gap-3 rounded-md py-1.5">
+                        {index > 0 && (
+                          <div className="absolute bottom-1/2 left-4 top-[-0.25rem] w-px -translate-x-1/2 bg-border" />
+                        )}
+                        {index < documentLogs.length - 1 && (
+                          <div className="absolute bottom-[-0.25rem] left-4 top-1/2 w-px -translate-x-1/2 bg-border" />
+                        )}
+                        <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
+                          <div className={`h-2.5 w-2.5 rounded-full ${getTimelineDot(log.action)}`} />
+                        </div>
+                        <div className={`min-w-0 flex-1 space-y-1 rounded-md px-2 py-1 pt-1.5 ${activeTxId === log.id ? "bg-primary/5" : "group-hover:bg-muted/40"}`}>
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 shrink-0">{getTimelineIcon(log.action)}</span>
+                            <p className="min-w-0 break-words text-xs font-medium capitalize leading-snug">
+                              {log.action.replace(/_/g, " ")}
+                            </p>
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm", { locale: localeId })}
+                          </p>
+                          <p className="break-words text-[11px] leading-snug text-muted-foreground">
+                            Oleh: {log.actor.name}
+                          </p>
+                          <p className="break-words text-[11px] leading-snug text-muted-foreground">
+                            {getDocumentHistoryDescription(log)}
+                          </p>
+                        </div>
+                      </div>
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <p className="text-center text-xs text-muted-foreground py-4">
           Dokumen ini bersifat publik dan dapat dibagikan.
@@ -1294,18 +1462,28 @@ function DocPreviewBlock({
           </div>
         )}
         {fileType === "other" && (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p>Pratinjau tidak tersedia untuk format ini</p>
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline mt-2 inline-block"
-            >
-              Buka Dokumen
-            </a>
-          </div>
+          doc.fileUrl ? (
+            <div className="h-[720px] bg-muted/20">
+              <iframe
+                src={fileUrl}
+                title={label}
+                className="h-full w-full border-0"
+              />
+            </div>
+          ) : (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p>Pratinjau tidak tersedia untuk format ini</p>
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline mt-2 inline-block"
+              >
+                Buka Dokumen
+              </a>
+            </div>
+          )
         )}
       </div>
      </div>

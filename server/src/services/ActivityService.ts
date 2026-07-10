@@ -65,6 +65,7 @@ export class ActivityService {
         sumber_dokumen: lampiran.dokumen.sumber_dokumen,
         tanggal_upload: this.formatDateOnly(lampiran.dokumen.tanggal_upload),
         hash_file: lampiran.dokumen.hash_file,
+        file_path: lampiran.dokumen.file_path,
         highlights: (lampiran.dokumen.kepemilikan || []).flatMap((kepemilikan: any) =>
           (kepemilikan.highlights || []).map((highlight: any) => ({
             highlight_id: highlight.id,
