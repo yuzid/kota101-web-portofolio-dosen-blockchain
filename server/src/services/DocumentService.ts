@@ -413,4 +413,30 @@ export class DocumentService {
       contentHash: crypto.createHash("sha256").update(file.bytes).digest("hex"),
     };
   }
+
+  async getPublicSnapshotDocumentContent(activityId: string, txId: string, dokumenId: string) {
+    const items = await this.multiChainService.getJsonStreamItems(activityId);
+    const item = items.find((entry) => entry.txid === txId);
+    if (!item) throw new Error("Snapshot riwayat tidak ditemukan.");
+
+    const payload = item.data.json || {};
+    const documents = Array.isArray(payload.dokumen_pendukung)
+      ? payload.dokumen_pendukung as Array<Record<string, unknown>>
+      : [];
+    const snapshotDocument = documents.find((entry) => entry.dokumen_id === dokumenId);
+    if (!snapshotDocument) {
+      throw new Error("Dokumen tidak tercatat pada snapshot riwayat ini.");
+    }
+
+    const document = await this.documentRepository.findContentByIdIncludingDeleted(dokumenId);
+    if (!document) throw new Error("Dokumen tidak ditemukan.");
+
+    const file = await this.fileStorageService.getFile(document.file_path);
+    return {
+      ...file,
+      contentType: this.getMimeType(file.contentType, document.file_path),
+      fileName: document.nama,
+      contentHash: crypto.createHash("sha256").update(file.bytes).digest("hex"),
+    };
+  }
 }

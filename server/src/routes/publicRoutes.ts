@@ -45,6 +45,7 @@ router.get('/highlights/:kepemilikanId', asyncHandler(highlightController.getPub
 router.get('/kegiatan', asyncHandler(activityController.getPublicActivities));
 router.get('/kegiatan/:id', asyncHandler(activityController.getPublicActivityById));
 router.get('/kegiatan/:id/audit-trail', asyncHandler(activityController.getAuditTrail));
+router.get('/kegiatan/:activityId/audit-trail/:txId/dokumen/:dokumenId/content', asyncHandler(documentController.getPublicSnapshotDocumentContent));
 
 // Document routes (public)
 router.get('/dokumen', asyncHandler(documentController.getPublicDocuments));

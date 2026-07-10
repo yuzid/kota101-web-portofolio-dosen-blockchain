@@ -73,6 +73,19 @@ export class DocumentRepository {
     });
   }
 
+  async findContentByIdIncludingDeleted(id: string) {
+    return await prisma.dokumen.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nama: true,
+        file_path: true,
+        hash_file: true,
+        deleted_at: true,
+      },
+    });
+  }
+
   async create(data: any, recipientIds: string[]) {
     return await prisma.$transaction(async (tx) => {
       const doc = await tx.dokumen.create({ data });

@@ -194,6 +194,10 @@ function AppRoutes() {
           element={<PublicActivityPage />}
         />
         <Route
+          path="/public/kegiatan/:id/entry/:txId"
+          element={<PublicActivityPage />}
+        />
+        <Route
           path="/public/kegiatan/:id/dokumen"
           element={<PublicActivityPage />}
         />

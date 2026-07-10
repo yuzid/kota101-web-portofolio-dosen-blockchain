@@ -6,6 +6,8 @@ export interface PublicDosenDoc {
   hashFile: string;
   filePath: string;
   kepemilikanId?: string;
+  fileUrl?: string;
+  snapshotHighlights?: import("../services/highlightService").Highlight[];
 }
 
 export interface PublicDosenTerlibat {
@@ -25,6 +27,8 @@ export interface PublicDokumenBersama {
   hashFile: string;
   filePath: string;
   kepemilikanId?: string;
+  fileUrl?: string;
+  snapshotHighlights?: import("../services/highlightService").Highlight[];
 }
 
 export interface PublicActivity {
