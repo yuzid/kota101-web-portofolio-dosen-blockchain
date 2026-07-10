@@ -56,17 +56,24 @@ jobs:
         CONTAINER: ${{ env.CONTAINER_NAME }}
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-        AUDIT_STREAM_NAME: ${{ secrets.AUDIT_STREAM_NAME }}
-        D3_IP: ${{ secrets.D3_IP }}
-        D4_IP: ${{ secrets.D4_IP }}
-        D3_RPC_PORT: ${{ secrets.D3_RPC_PORT }}
-        D3_RPC_USERNAME: ${{ secrets.D3_RPC_USERNAME }}
-        D3_RPC_PASSWORD: ${{ secrets.D3_RPC_PASSWORD }}
-        D4_RPC_PORT: ${{ secrets.D4_RPC_PORT }}
-        D4_RPC_USERNAME: ${{ secrets.D4_RPC_USERNAME }}
-        D4_RPC_PASSWORD: ${{ secrets.D4_RPC_PASSWORD }}
+        AWS_REGION: ${{ env.AWS_REGION }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AUDIT_STREAM_NAME: ${{ secrets.AUDIT_STREAM_NAME }}
+        CHAIN_NAME: ${{ secrets.CHAIN_NAME }}
+        MULTICHAIN_RPC_URL: ${{ secrets.MULTICHAIN_RPC_URL }}
+        MULTICHAIN_N1_IP: ${{ secrets.MULTICHAIN_N1_IP }}
+        MULTICHAIN_N1_RPC_PORT: ${{ secrets.MULTICHAIN_N1_RPC_PORT }}
+        MULTICHAIN_N1_RPC_USERNAME: ${{ secrets.MULTICHAIN_N1_RPC_USERNAME }}
+        MULTICHAIN_N1_RPC_PASSWORD: ${{ secrets.MULTICHAIN_N1_RPC_PASSWORD }}
+        MULTICHAIN_N2_IP: ${{ secrets.MULTICHAIN_N2_IP }}
+        MULTICHAIN_N2_RPC_PORT: ${{ secrets.MULTICHAIN_N2_RPC_PORT }}
+        MULTICHAIN_N2_RPC_USERNAME: ${{ secrets.MULTICHAIN_N2_RPC_USERNAME }}
+        MULTICHAIN_N2_RPC_PASSWORD: ${{ secrets.MULTICHAIN_N2_RPC_PASSWORD }}
+        MULTICHAIN_N3_IP: ${{ secrets.MULTICHAIN_N3_IP }}
+        MULTICHAIN_N3_RPC_PORT: ${{ secrets.MULTICHAIN_N3_RPC_PORT }}
+        MULTICHAIN_N3_RPC_USERNAME: ${{ secrets.MULTICHAIN_N3_RPC_USERNAME }}
+        MULTICHAIN_N3_RPC_PASSWORD: ${{ secrets.MULTICHAIN_N3_RPC_PASSWORD }}
         SMTP_HOST: ${{ secrets.SMTP_HOST }}
         SMTP_PORT: ${{ secrets.SMTP_PORT }}
         SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
@@ -79,7 +86,7 @@ jobs:
           --task-definition ${{ env.ECS_TASK_DEFINITION_NAME }} \
           --query taskDefinition > raw-task-def.json
 
-        # 2. Hapus metadata read-only AWS dan injeksikan variabel runtime (termasuk GOOGLE_CLIENT_ID untuk backend)
+        # 2. Hapus metadata read-only AWS dan injeksikan variabel runtime
         jq --arg container "$CONTAINER" \
            --arg jwt "$JWT_SECRET" \
            --arg email "$ADMIN_EMAIL" \
@@ -88,17 +95,24 @@ jobs:
            --arg google_id "$GOOGLE_CLIENT_ID" \
            --arg database_url "$DATABASE_URL" \
            --arg s3_bucket "$AWS_S3_BUCKET" \
-           --arg audit_stream "$AUDIT_STREAM_NAME" \
-           --arg d3_ip "$D3_IP" \
-           --arg d4_ip "$D4_IP" \
-           --arg d3_port "$D3_RPC_PORT" \
-           --arg d3_user "$D3_RPC_USERNAME" \
-           --arg d3_pass "$D3_RPC_PASSWORD" \
-           --arg d4_port "$D4_RPC_PORT" \
-           --arg d4_user "$D4_RPC_USERNAME" \
-           --arg d4_pass "$D4_RPC_PASSWORD" \
+           --arg aws_region "$AWS_REGION" \
            --arg aws_access_key "$AWS_ACCESS_KEY_ID" \
            --arg aws_secret_key "$AWS_SECRET_ACCESS_KEY" \
+           --arg audit_stream "$AUDIT_STREAM_NAME" \
+           --arg chain_name "$CHAIN_NAME" \
+           --arg multichain_rpc_url "$MULTICHAIN_RPC_URL" \
+           --arg n1_ip "$MULTICHAIN_N1_IP" \
+           --arg n1_port "$MULTICHAIN_N1_RPC_PORT" \
+           --arg n1_user "$MULTICHAIN_N1_RPC_USERNAME" \
+           --arg n1_pass "$MULTICHAIN_N1_RPC_PASSWORD" \
+           --arg n2_ip "$MULTICHAIN_N2_IP" \
+           --arg n2_port "$MULTICHAIN_N2_RPC_PORT" \
+           --arg n2_user "$MULTICHAIN_N2_RPC_USERNAME" \
+           --arg n2_pass "$MULTICHAIN_N2_RPC_PASSWORD" \
+           --arg n3_ip "$MULTICHAIN_N3_IP" \
+           --arg n3_port "$MULTICHAIN_N3_RPC_PORT" \
+           --arg n3_user "$MULTICHAIN_N3_RPC_USERNAME" \
+           --arg n3_pass "$MULTICHAIN_N3_RPC_PASSWORD" \
            --arg smtp_host "$SMTP_HOST" \
            --arg smtp_port "$SMTP_PORT" \
            --arg smtp_secure "$SMTP_SECURE" \
@@ -106,32 +120,39 @@ jobs:
            --arg smtp_pass "$SMTP_PASS" \
            --arg smtp_from "$SMTP_FROM" \
            'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection) |
-            (.containerDefinitions[] | select(.name == $container) | .environment) |= 
-            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID" and . != "DATABASE_URL" and . != "AWS_S3_BUCKET" and . != "AUDIT_STREAM_NAME" and . != "D3_IP" and . != "D4_IP" and . != "D3_RPC_PORT" and . != "D3_RPC_USERNAME" and . != "D3_RPC_PASSWORD" and . != "D4_RPC_PORT" and . != "D4_RPC_USERNAME" and . != "D4_RPC_PASSWORD" and . != "SMTP_HOST" and . != "SMTP_PORT" and . != "SMTP_SECURE" and . != "SMTP_USER" and . != "SMTP_PASS" and . != "SMTP_FROM")) + [
-              {"name": "JWT_SECRET",       "value": $jwt},
-              {"name": "ADMIN_EMAIL",      "value": $email},
-              {"name": "ADMIN_PASSWORD",   "value": $password},
-              {"name": "ADMIN_NAME",       "value": $name},
-              {"name": "GOOGLE_CLIENT_ID", "value": $google_id},
-              {"name": "DATABASE_URL", "value": $database_url},
-              {"name": "AWS_S3_BUCKET", "value": $s3_bucket},
-              {"name": "AUDIT_STREAM_NAME", "value": $audit_stream},
-              {"name": "D3_IP", "value": $d3_ip},
-              {"name": "D4_IP", "value": $d4_ip},
-              {"name": "D3_RPC_PORT", "value": $d3_port},
-              {"name": "D3_RPC_USERNAME", "value": $d3_user},
-              {"name": "D3_RPC_PASSWORD", "value": $d3_pass},
-              {"name": "D4_RPC_PORT", "value": $d4_port},
-              {"name": "D4_RPC_USERNAME", "value": $d4_user},
-              {"name": "D4_RPC_PASSWORD", "value": $d4_pass},
-              {"name": "AWS_ACCESS_KEY_ID", "value": $aws_access_key},
-              {"name": "AWS_SECRET_ACCESS_KEY", "value": $aws_secret_key},
-              {"name": "SMTP_HOST", "value": $smtp_host},
-              {"name": "SMTP_PORT", "value": $smtp_port},
-              {"name": "SMTP_SECURE", "value": $smtp_secure},
-              {"name": "SMTP_USER", "value": $smtp_user},
-              {"name": "SMTP_PASS", "value": $smtp_pass},
-              {"name": "SMTP_FROM", "value": $smtp_from}
+            (.containerDefinitions[] | select(.name == $container) | .environment) |=
+            (map(select(.name | . != "JWT_SECRET" and . != "ADMIN_EMAIL" and . != "ADMIN_PASSWORD" and . != "ADMIN_NAME" and . != "GOOGLE_CLIENT_ID" and . != "DATABASE_URL" and . != "AWS_S3_BUCKET" and . != "AWS_REGION" and . != "AWS_ACCESS_KEY_ID" and . != "AWS_SECRET_ACCESS_KEY" and . != "AUDIT_STREAM_NAME" and . != "CHAIN_NAME" and . != "MULTICHAIN_RPC_URL" and . != "MULTICHAIN_N1_IP" and . != "MULTICHAIN_N1_RPC_PORT" and . != "MULTICHAIN_N1_RPC_USERNAME" and . != "MULTICHAIN_N1_RPC_PASSWORD" and . != "MULTICHAIN_N2_IP" and . != "MULTICHAIN_N2_RPC_PORT" and . != "MULTICHAIN_N2_RPC_USERNAME" and . != "MULTICHAIN_N2_RPC_PASSWORD" and . != "MULTICHAIN_N3_IP" and . != "MULTICHAIN_N3_RPC_PORT" and . != "MULTICHAIN_N3_RPC_USERNAME" and . != "MULTICHAIN_N3_RPC_PASSWORD" and . != "SMTP_HOST" and . != "SMTP_PORT" and . != "SMTP_SECURE" and . != "SMTP_USER" and . != "SMTP_PASS" and . != "SMTP_FROM")) + [
+              {"name": "JWT_SECRET",                  "value": $jwt},
+              {"name": "ADMIN_EMAIL",                 "value": $email},
+              {"name": "ADMIN_PASSWORD",              "value": $password},
+              {"name": "ADMIN_NAME",                  "value": $name},
+              {"name": "GOOGLE_CLIENT_ID",            "value": $google_id},
+              {"name": "DATABASE_URL",                "value": $database_url},
+              {"name": "AWS_S3_BUCKET",               "value": $s3_bucket},
+              {"name": "AWS_REGION",                  "value": $aws_region},
+              {"name": "AWS_ACCESS_KEY_ID",           "value": $aws_access_key},
+              {"name": "AWS_SECRET_ACCESS_KEY",       "value": $aws_secret_key},
+              {"name": "AUDIT_STREAM_NAME",           "value": $audit_stream},
+              {"name": "CHAIN_NAME",                  "value": $chain_name},
+              {"name": "MULTICHAIN_RPC_URL",          "value": $multichain_rpc_url},
+              {"name": "MULTICHAIN_N1_IP",            "value": $n1_ip},
+              {"name": "MULTICHAIN_N1_RPC_PORT",      "value": $n1_port},
+              {"name": "MULTICHAIN_N1_RPC_USERNAME",  "value": $n1_user},
+              {"name": "MULTICHAIN_N1_RPC_PASSWORD",  "value": $n1_pass},
+              {"name": "MULTICHAIN_N2_IP",            "value": $n2_ip},
+              {"name": "MULTICHAIN_N2_RPC_PORT",      "value": $n2_port},
+              {"name": "MULTICHAIN_N2_RPC_USERNAME",  "value": $n2_user},
+              {"name": "MULTICHAIN_N2_RPC_PASSWORD",  "value": $n2_pass},
+              {"name": "MULTICHAIN_N3_IP",            "value": $n3_ip},
+              {"name": "MULTICHAIN_N3_RPC_PORT",      "value": $n3_port},
+              {"name": "MULTICHAIN_N3_RPC_USERNAME",  "value": $n3_user},
+              {"name": "MULTICHAIN_N3_RPC_PASSWORD",  "value": $n3_pass},
+              {"name": "SMTP_HOST",                   "value": $smtp_host},
+              {"name": "SMTP_PORT",                   "value": $smtp_port},
+              {"name": "SMTP_SECURE",                 "value": $smtp_secure},
+              {"name": "SMTP_USER",                   "value": $smtp_user},
+              {"name": "SMTP_PASS",                   "value": $smtp_pass},
+              {"name": "SMTP_FROM",                   "value": $smtp_from}
             ])' raw-task-def.json > task-definition.json
 
     - name: Fill in the new image ID in the Amazon ECS task definition
