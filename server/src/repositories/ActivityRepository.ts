@@ -270,7 +270,7 @@ export class ActivityRepository {
               include: {
                 kepemilikan: {
                   where: { status: 'DISETUJUI' },
-                  include: { highlights: true }
+                  include: { highlights: { include: { highlight_rect: true } } }
                 }
               }
             }
@@ -308,6 +308,15 @@ export class ActivityRepository {
       where: { id },
       data: { tx_id: txId },
     });
+  }
+
+  async findActivityIdsByDocumentId(dokumenId: string): Promise<string[]> {
+    const lampiran = await prisma.lampiranBukti.findMany({
+      where: { dokumen_id: dokumenId },
+      select: { kegiatan_id: true },
+    });
+
+    return [...new Set(lampiran.map((item) => item.kegiatan_id))];
   }
 
   async delete(id: string) {

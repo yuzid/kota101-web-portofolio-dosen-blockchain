@@ -29,9 +29,10 @@ interface PageInfo {
 interface PublicPdfPreviewProps {
   fileUrl: string;
   kepemilikanId?: string;
+  snapshotHighlights?: Highlight[];
 }
 
-export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewProps) {
+export function PublicPdfPreview({ fileUrl, kepemilikanId, snapshotHighlights }: PublicPdfPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -56,6 +57,10 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
   useEffect(() => {
     let active = true;
     const loadPublicHighlights = async () => {
+      if (snapshotHighlights) {
+        if (active) setHighlights(snapshotHighlights);
+        return;
+      }
       if (!kepemilikanId) {
         if (active) setHighlights([]);
         return;
@@ -74,7 +79,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
     return () => {
       active = false;
     };
-  }, [kepemilikanId]);
+  }, [kepemilikanId, snapshotHighlights]);
 
   const renderWidth = useMemo(() => {
     if (containerWidth < 100) return 800;
@@ -121,7 +126,7 @@ export function PublicPdfPreview({ fileUrl, kepemilikanId }: PublicPdfPreviewPro
 
   return (
     <div ref={containerRef}>
-      <div className="mb-3 flex items-center justify-center gap-3">
+      <div className="mb-3 flex items-center justify-center gap-3 pt-3">
         {numPages && numPages > 1 && (
           <>
             <Button

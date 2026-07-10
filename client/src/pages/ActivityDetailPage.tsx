@@ -1055,13 +1055,20 @@ export function ActivityDetailPage() {
             const recorder = selectedLog.payload.pencatat ?? {};
             const participants = selectedLog.payload.partisipasi ?? [];
             const documents = selectedLog.payload.dokumen_pendukung ?? [];
+            const previousDocuments = getPreviousLog(selectedLog)?.payload.dokumen_pendukung ?? [];
+            const isDocumentEvent = isDocumentChangeAction(selectedLog.action);
+            const documentEventChanges = documentChanges.changed.length > 0
+              ? documentChanges.changed
+              : isDocumentEvent
+                ? documents
+                : [];
             const hasCollectionChanges =
               participantChanges.added.length > 0 ||
               participantChanges.removed.length > 0 ||
               participantChanges.changed.length > 0 ||
               documentChanges.added.length > 0 ||
               documentChanges.removed.length > 0 ||
-              documentChanges.changed.length > 0;
+              documentEventChanges.length > 0;
 
             return (
               <>
@@ -1150,11 +1157,50 @@ export function ActivityDetailPage() {
                            Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
                          </div>
                        ))}
-                       {documentChanges.changed.map((d) => (
-                         <div key={`dc-${getRecordId(d, "dokumen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
-                           Data atau hash dokumen berubah: <strong>{String(d.nama ?? "-")}</strong>.
-                         </div>
-                      ))}
+                       {documentEventChanges.map((d) => {
+                         const previousDoc = previousDocuments.find(
+                           (item) => getRecordId(item, "dokumen_id") === getRecordId(d, "dokumen_id")
+                         );
+                         const metadataChanges = isDocumentMetadataAction(selectedLog.action)
+                           ? getDocumentMetadataChanges(d, previousDoc)
+                           : [];
+
+                         return (
+                           <div key={`dc-${getRecordId(d, "dokumen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
+                             {isDocumentHighlightAction(selectedLog.action) ? (
+                               <p>
+                                 Highlight dokumen <strong>{String(d.nama ?? "-")}</strong> telah diperbarui.
+                               </p>
+                             ) : (
+                               <div className="space-y-2">
+                                 <p>
+                                   Metadata dokumen <strong>{String(d.nama ?? "-")}</strong> diperbarui.
+                                 </p>
+                                 {metadataChanges.length > 0 ? (
+                                   <div className="space-y-1">
+                                     {metadataChanges.map((change) => (
+                                       <div key={change.label} className="grid gap-1 sm:grid-cols-[140px_1fr]">
+                                         <span className="font-medium">{change.label}</span>
+                                         <span>
+                                           <span className="text-amber-800/70 dark:text-amber-200/70 line-through">
+                                             {formatAuditValue(change.before)}
+                                           </span>
+                                           <ChevronRight className="mx-1 inline h-3.5 w-3.5 text-amber-800/60 dark:text-amber-200/60" />
+                                           <strong>{formatAuditValue(change.after)}</strong>
+                                         </span>
+                                       </div>
+                                     ))}
+                                   </div>
+                                 ) : (
+                                   <p className="text-amber-800/80 dark:text-amber-200/80">
+                                     Detail field metadata sebelumnya tidak tersedia pada snapshot pembanding.
+                                   </p>
+                                 )}
+                               </div>
+                             )}
+                           </div>
+                         );
+                      })}
 
                       {activityChanges.length === 0 && !hasCollectionChanges && (
                         <div className="border bg-muted/30 px-4 py-3 text-sm text-muted-foreground rounded-lg">
@@ -1268,6 +1314,52 @@ function getTimelineIcon(action: string) {
 }
 
 /* ── Helper Components ── */
+
+function getDocumentChangeDescription(action: string) {
+  const a = action.toUpperCase();
+  if (a.includes("METADATA")) return "Metadata dokumen diperbarui";
+  if (a.includes("HIGHLIGHTS_SYNCED")) return "Highlight dokumen diperbarui";
+  if (a.includes("HIGHLIGHT_ADDED")) return "Highlight dokumen ditambahkan";
+  if (a.includes("HIGHLIGHT_UPDATED")) return "Highlight dokumen diperbarui";
+  if (a.includes("HIGHLIGHT_DELETED")) return "Highlight dokumen dihapus";
+  if (a.includes("HIGHLIGHT")) return "Highlight dokumen diperbarui";
+  return "Data atau hash dokumen berubah";
+}
+
+function isDocumentChangeAction(action: string) {
+  const a = action.toUpperCase();
+  return a.includes("DOKUMEN_METADATA") || a.includes("DOKUMEN_HIGHLIGHT");
+}
+
+function isDocumentMetadataAction(action: string) {
+  return action.toUpperCase().includes("DOKUMEN_METADATA");
+}
+
+function isDocumentHighlightAction(action: string) {
+  return action.toUpperCase().includes("DOKUMEN_HIGHLIGHT");
+}
+
+function getDocumentMetadataChanges(
+  current: Record<string, unknown>,
+  previous?: Record<string, unknown>,
+) {
+  if (!previous) return [];
+
+  const labels: Record<string, string> = {
+    nama: "Nama",
+    jenis_dokumen: "Jenis",
+    sumber_dokumen: "Sumber",
+    tanggal_upload: "Tanggal",
+  };
+
+  return Object.entries(labels)
+    .filter(([field]) => current[field] !== previous[field])
+    .map(([field, label]) => ({
+      label,
+      before: previous[field],
+      after: current[field],
+    }));
+}
 
 function InfoItem({
   icon,

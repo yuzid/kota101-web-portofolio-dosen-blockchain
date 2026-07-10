@@ -57,17 +57,13 @@ Express REST API
 
 ## Alur Blockchain
 
-Setiap dosen memiliki alamat MultiChain yang dibuat ketika akun dosen dibuat.
-Node RPC dipilih berdasarkan program studi:
+Backend menggunakan tiga node RPC MultiChain generik yang berada pada chain yang
+sama dan memiliki permission setara. Node tidak lagi dipilih berdasarkan program
+studi, dan akun dosen tidak lagi membutuhkan alamat MultiChain khusus.
 
-| Program studi | Node RPC |
-|---|---|
-| `D3-TI` / `D3 TEKNIK INFORMATIKA` | D3 |
-| `D4-TI` / `D4 TEKNIK INFORMATIKA` | D4 |
-
-Kedua node berada pada chain yang sama. Snapshot kegiatan diterbitkan ke stream
-yang dikonfigurasi melalui `AUDIT_STREAM_NAME`, menggunakan ID kegiatan sebagai
-stream key.
+Setiap publish/read audit trail dikirim melalui node yang dipilih bergiliran
+oleh backend. Snapshot kegiatan diterbitkan ke stream yang dikonfigurasi melalui
+`AUDIT_STREAM_NAME`, menggunakan ID kegiatan sebagai stream key.
 
 Event yang saat ini diterbitkan:
 
@@ -97,7 +93,7 @@ pendukung, dan hash SHA-256 file. File fisik tidak disimpan di blockchain.
 |   |   `-- seed.ts         Seed admin, jurusan, D3-TI, dan D4-TI
 |   `-- src/
 |       |-- controllers/    Adapter request dan response HTTP
-|       |-- lib/            Prisma dan pemetaan node blockchain
+|       |-- lib/            Prisma dan daftar node blockchain
 |       |-- middleware/     JWT, role, dan error handler
 |       |-- repositories/   Akses data Prisma
 |       |-- routes/         Deklarasi endpoint
@@ -145,14 +141,18 @@ Environment root digunakan oleh Docker Compose dan Vite build:
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key |
 | `CHAIN_NAME` | Nama chain MultiChain |
 | `AUDIT_STREAM_NAME` | Nama stream audit kegiatan |
-| `D3_IP` | Host RPC node D3 |
-| `D3_RPC_PORT` | Port RPC node D3 |
-| `D3_RPC_USERNAME` | Username RPC node D3 |
-| `D3_RPC_PASSWORD` | Password RPC node D3 |
-| `D4_IP` | Host RPC node D4 |
-| `D4_RPC_PORT` | Port RPC node D4 |
-| `D4_RPC_USERNAME` | Username RPC node D4 |
-| `D4_RPC_PASSWORD` | Password RPC node D4 |
+| `MULTICHAIN_N1_IP` | Host RPC node MultiChain 1 |
+| `MULTICHAIN_N1_RPC_PORT` | Port RPC node MultiChain 1 |
+| `MULTICHAIN_N1_RPC_USERNAME` | Username RPC node MultiChain 1 |
+| `MULTICHAIN_N1_RPC_PASSWORD` | Password RPC node MultiChain 1 |
+| `MULTICHAIN_N2_IP` | Host RPC node MultiChain 2 |
+| `MULTICHAIN_N2_RPC_PORT` | Port RPC node MultiChain 2 |
+| `MULTICHAIN_N2_RPC_USERNAME` | Username RPC node MultiChain 2 |
+| `MULTICHAIN_N2_RPC_PASSWORD` | Password RPC node MultiChain 2 |
+| `MULTICHAIN_N3_IP` | Host RPC node MultiChain 3 |
+| `MULTICHAIN_N3_RPC_PORT` | Port RPC node MultiChain 3 |
+| `MULTICHAIN_N3_RPC_USERNAME` | Username RPC node MultiChain 3 |
+| `MULTICHAIN_N3_RPC_PASSWORD` | Password RPC node MultiChain 3 |
 
 Konfigurasi server tersedia pada `server/.env.example`:
 

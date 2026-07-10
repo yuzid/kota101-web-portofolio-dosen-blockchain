@@ -161,21 +161,10 @@ export function DocumentDistributionEditPage() {
   };
 
   const handleFileSelect = () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) return;
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
-      return;
-    }
-    setShowReplaceConfirm(true);
+    toast.info("Penggantian file dokumen tidak diperbolehkan. Ubah metadata atau highlight saja.");
   };
 
   const confirmReplaceFile = () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (file) {
-      setNewFile(file);
-      setHasFileChange(true);
-    }
     setShowReplaceConfirm(false);
   };
 
@@ -199,18 +188,7 @@ export function DocumentDistributionEditPage() {
       const metaResult = await metaRes.json();
       if (metaResult.status !== "success") throw new Error(metaResult.error || "Gagal menyimpan metadata.");
 
-      // 2. Save file change
-      if (hasFileChange && newFile) {
-        const formDataFile = new FormData();
-        formDataFile.append("file", newFile);
-        const fileRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/replace-file`, {
-          method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: formDataFile,
-        });
-        const fileResult = await fileRes.json();
-        if (fileResult.status !== "success") throw new Error(fileResult.error || "Gagal mengganti file.");
-      }
-
-      // 3. Sync recipients
+      // 2. Sync recipients
       const toRemove = initialRecipientIds.filter(id => !selectedRecipientIds.includes(id));
       const toAdd = selectedRecipientIds.filter(id => !initialRecipientIds.includes(id));
 
@@ -410,7 +388,7 @@ export function DocumentDistributionEditPage() {
               <Label className="text-sm font-medium">File Dokumen</Label>
 
               {/* Existing file */}
-              {existingFile && !hasFileChange && (
+              {existingFile && (
                 <div className="flex items-center gap-4 p-4 border rounded-xl bg-gray-50/70 border-gray-200">
                   <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 shrink-0">
                      <FileText className="w-6 h-6 text-red-500 dark:text-red-400" />
@@ -448,7 +426,7 @@ export function DocumentDistributionEditPage() {
               )}
 
               {/* Upload dropzone */}
-              <div className="space-y-1">
+              <div className="hidden">
                 <p className="text-xs text-muted-foreground">Ganti File</p>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.docx" onChange={handleFileSelect} />
                 <div

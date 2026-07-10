@@ -1,23 +1,27 @@
 import crypto from "crypto";
 
 import { DocumentRepository } from "../repositories/DocumentRepository";
+import { ActivityRepository } from "../repositories/ActivityRepository";
 import { FileStorageService } from "./FileStorageService";
 import { MultiChainService } from "./MultiChainService";
-import { resolveBlockchainNode } from "../lib/blockchainNode";
+import { ActivityService } from "./ActivityService";
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
   private fileStorageService: FileStorageService;
   private multiChainService: MultiChainService;
+  private activityService: ActivityService;
 
   constructor(
     documentRepository: DocumentRepository,
     fileStorageService: FileStorageService,
-    multiChainService = new MultiChainService()
+    multiChainService = new MultiChainService(),
+    activityService = new ActivityService(new ActivityRepository())
   ) {
     this.documentRepository = documentRepository;
     this.fileStorageService = fileStorageService;
     this.multiChainService = multiChainService;
+    this.activityService = activityService;
   }
 
   mapJenisToEnum(jenis: string): string {
@@ -92,9 +96,7 @@ export class DocumentService {
       .filter((activity: any) => !activityId || activity.id === activityId);
 
     for (const activity of linkedActivities) {
-      const node = resolveBlockchainNode(activity.dosen.program_studi);
       const items = await this.multiChainService.getJsonStreamItems(
-        node,
         activity.id
       );
 
@@ -353,46 +355,18 @@ export class DocumentService {
     }
 
     const { nama, jenis_dokumen, tanggal_upload } = data;
-    return await this.documentRepository.update(id, {
+    const updated = await this.documentRepository.update(id, {
       nama,
       jenis_dokumen: String(jenis_dokumen).toUpperCase().trim(),
       tanggal_upload: new Date(tanggal_upload),
     });
+
+    await this.activityService.publishDocumentChangeSnapshots(id, "DOKUMEN_METADATA_UPDATED");
+    return updated;
   }
 
   async replaceFile(id: string, file: Express.Multer.File, currentUser: any) {
-    const existing = await this.documentRepository.findById(id);
-    if (!existing) throw new Error("Dokumen tidak ditemukan.");
-
-    if (currentUser.role.toUpperCase() === "DOSEN") {
-      if (existing.sumber_dokumen === "TATA_USAHA") {
-        throw new Error(
-          "Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha."
-        );
-      }
-      const isOwner = existing.kepemilikan.some(
-        (k: any) => k.dosen_id === currentUser.id
-      );
-      if (!isOwner) {
-        throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
-      }
-    }
-
-    const hashFile = crypto
-      .createHash("sha256")
-      .update(file.buffer)
-      .digest("hex");
-    const filePath = await this.fileStorageService.uploadFile(
-      file,
-      "documents"
-    );
-
-    await this.documentRepository.update(id, {
-      file_path: filePath,
-      hash_file: hashFile,
-    });
-
-    return { id, file_path: filePath, hash_file: hashFile };
+    throw new Error("Penggantian file dokumen tidak diperbolehkan. Ubah metadata atau highlight saja.");
   }
 
   async deleteDocument(id: string, currentUser: any) {
@@ -430,6 +404,32 @@ export class DocumentService {
     const document = await this.documentRepository.findByIdPublic(id);
     if (!document || document.deleted_at)
       throw new Error("Dokumen tidak ditemukan.");
+
+    const file = await this.fileStorageService.getFile(document.file_path);
+    return {
+      ...file,
+      contentType: this.getMimeType(file.contentType, document.file_path),
+      fileName: document.nama,
+      contentHash: crypto.createHash("sha256").update(file.bytes).digest("hex"),
+    };
+  }
+
+  async getPublicSnapshotDocumentContent(activityId: string, txId: string, dokumenId: string) {
+    const items = await this.multiChainService.getJsonStreamItems(activityId);
+    const item = items.find((entry) => entry.txid === txId);
+    if (!item) throw new Error("Snapshot riwayat tidak ditemukan.");
+
+    const payload = item.data.json || {};
+    const documents = Array.isArray(payload.dokumen_pendukung)
+      ? payload.dokumen_pendukung as Array<Record<string, unknown>>
+      : [];
+    const snapshotDocument = documents.find((entry) => entry.dokumen_id === dokumenId);
+    if (!snapshotDocument) {
+      throw new Error("Dokumen tidak tercatat pada snapshot riwayat ini.");
+    }
+
+    const document = await this.documentRepository.findContentByIdIncludingDeleted(dokumenId);
+    if (!document) throw new Error("Dokumen tidak ditemukan.");
 
     const file = await this.fileStorageService.getFile(document.file_path);
     return {

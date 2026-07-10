@@ -1,4 +1,4 @@
-import { BlockchainNode } from '../lib/blockchainNode';
+import { BLOCKCHAIN_NODES, BlockchainNode } from '../lib/blockchainNode';
 
 type MultiChainConfig = {
   ip: string;
@@ -10,14 +10,6 @@ type MultiChainConfig = {
 type RpcResponse<T> = {
   result?: T;
   error?: { message?: string } | null;
-};
-
-type MultiChainStream = {
-  name?: string;
-  open?: boolean;
-  restrictions?: {
-    write?: boolean;
-  };
 };
 
 export type MultiChainStreamItem = {
@@ -35,6 +27,8 @@ export type MultiChainStreamItem = {
 };
 
 export class MultiChainService {
+  private nextNodeIndex = 0;
+
   private getConfig(node: BlockchainNode): MultiChainConfig {
     const config = {
       ip: process.env[`${node}_IP`],
@@ -52,6 +46,34 @@ export class MultiChainService {
     }
 
     return config as MultiChainConfig;
+  }
+
+  private hasCompleteConfig(node: BlockchainNode) {
+    return Boolean(
+      process.env[`${node}_IP`] &&
+      process.env[`${node}_RPC_PORT`] &&
+      process.env[`${node}_RPC_USERNAME`] &&
+      process.env[`${node}_RPC_PASSWORD`],
+    );
+  }
+
+  private getConfiguredNodes(): BlockchainNode[] {
+    const nodes = BLOCKCHAIN_NODES.filter((node) => this.hasCompleteConfig(node));
+
+    if (nodes.length === 0) {
+      throw new Error(
+        `Konfigurasi blockchain belum lengkap. Isi minimal satu node: ${BLOCKCHAIN_NODES.join(', ')}.`,
+      );
+    }
+
+    return nodes;
+  }
+
+  private getNextNode(): BlockchainNode {
+    const nodes = this.getConfiguredNodes();
+    const node = nodes[this.nextNodeIndex % nodes.length];
+    this.nextNodeIndex = (this.nextNodeIndex + 1) % nodes.length;
+    return node;
   }
 
   private async callRpc<T>(node: BlockchainNode, method: string, params: unknown[]): Promise<T> {
@@ -97,46 +119,7 @@ export class MultiChainService {
     }
   }
 
-  async getNewAddress(node: BlockchainNode): Promise<string> {
-    const address = await this.callRpc<string>(node, 'getnewaddress', []);
-
-    if (typeof address !== 'string' || !address) {
-      throw new Error('Response getnewaddress tidak berisi alamat blockchain.');
-    }
-
-    return address;
-  }
-
-  async provisionPublisherAddress(node: BlockchainNode, address: string): Promise<void> {
-    const streamName = process.env.AUDIT_STREAM_NAME;
-    if (!streamName) {
-      throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
-    }
-
-    const streams = await this.callRpc<MultiChainStream[]>(node, 'liststreams', [streamName]);
-    const stream = streams[0];
-
-    if (!stream) {
-      throw new Error(`Stream blockchain "${streamName}" tidak ditemukan.`);
-    }
-
-    await this.callRpc<unknown>(node, 'grant', [address, 'send,receive']);
-
-    const isWriteRestricted = stream.open === false || stream.restrictions?.write === true;
-    if (isWriteRestricted) {
-      await this.callRpc<unknown>(node, 'grant', [address, `${streamName}.write`]);
-    }
-  }
-
-  async createPublisherAddress(node: BlockchainNode): Promise<string> {
-    const address = await this.getNewAddress(node);
-    await this.provisionPublisherAddress(node, address);
-    return address;
-  }
-
   async publishJson(
-    node: BlockchainNode,
-    address: string,
     key: string,
     payload: Record<string, unknown>,
   ): Promise<string> {
@@ -146,20 +129,19 @@ export class MultiChainService {
     }
 
     const txId = await this.callRpc<string>(
-      node,
-      'publishfrom',
-      [address, streamName, key, { json: payload }],
+      this.getNextNode(),
+      'publish',
+      [streamName, key, { json: payload }],
     );
 
     if (typeof txId !== 'string' || !txId) {
-      throw new Error('Response publishfrom tidak berisi transaction ID.');
+      throw new Error('Response publish tidak berisi transaction ID.');
     }
 
     return txId;
   }
 
   async getJsonStreamItems(
-    node: BlockchainNode,
     key: string,
     count = 100,
   ): Promise<MultiChainStreamItem[]> {
@@ -169,7 +151,7 @@ export class MultiChainService {
     }
 
     const items = await this.callRpc<MultiChainStreamItem[]>(
-      node,
+      this.getNextNode(),
       'liststreamkeyitems',
       [streamName, key, true, count, 0],
     );

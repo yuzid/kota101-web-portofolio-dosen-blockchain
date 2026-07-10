@@ -13,7 +13,6 @@ import {
   Download,
   Eye,
   FileText,
-  FileWarning,
   Highlighter,
   List,
   Loader2,
@@ -156,11 +155,7 @@ export function DocumentPreviewPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", jenis: "", tanggal: undefined as Date | undefined });
   const [saving, setSaving] = useState(false);
-  const [newFile, setNewFile] = useState<File | null>(null);
-  const [hasFileChange, setHasFileChange] = useState(false);
 
-  const [docxWarning, setDocxWarning] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [allowHighlight] = useState(() => {
     return (location.state as Record<string, unknown>)?.allowHighlight === true;
   });
@@ -626,21 +621,6 @@ export function DocumentPreviewPage() {
       }
 
       setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: editForm.tanggal.toISOString() });
-
-      // 2. Replace file if changed
-      if (hasFileChange && newFile) {
-        const formData = new FormData();
-        formData.append("file", newFile);
-        const res = await fetch(`${import.meta.env.VITE_API_URL}${apiPrefix}/${id}/replace-file`, {
-          method: "PUT",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
-        const result = await res.json();
-        if (!res.ok || result.status === "error") throw new Error(result.error);
-        setHasFileChange(false);
-        setNewFile(null);
-      }
 
       setShowEditDialog(false);
       toast.success("Dokumen berhasil diperbarui.");
@@ -1194,55 +1174,6 @@ export function DocumentPreviewPage() {
               </Popover>
             </div>
 
-            <div className="space-y-2">
-              <Label>Ganti File (opsional)</Label>
-              <input type="file" ref={fileInputRef} className="hidden" accept=".pdf,.docx" onChange={() => {
-                const file = fileInputRef.current?.files?.[0];
-                if (!file) return;
-                if (file.size > 20 * 1024 * 1024) {
-                  toast.error("Ukuran file terlalu besar. Maksimal 20MB!");
-                  return;
-                }
-                setDocxWarning(file.name.endsWith('.docx') ? 'File yang dipilih tipenya DOCX. Preview hanya tersedia untuk file PDF.' : null);
-                setNewFile(file);
-                setHasFileChange(true);
-              }} />
-              {!hasFileChange ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed border-gray-300 p-3 text-sm text-muted-foreground hover:border-gray-400 hover:bg-gray-50"
-                >
-                  <FileText className="h-5 w-5 shrink-0" />
-                  <span className="flex-1 truncate">{document?.name}</span>
-                  <span className="shrink-0 text-xs">
-                    {(document.size / 1024).toFixed(1)} KB
-                  </span>
-                  <span className="ml-2 shrink-0 rounded border bg-white px-2 py-0.5 text-xs font-medium text-gray-600">
-                    Ganti
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-                  <FileWarning className="h-5 w-5 shrink-0 text-amber-600" />
-                  <span className="flex-1 truncate">{newFile?.name}</span>
-                  <span className="shrink-0 text-xs text-amber-600">
-                    {(newFile!.size / 1024).toFixed(1)} KB
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setNewFile(null); setHasFileChange(false); }}
-                    className="shrink-0 text-red-500 hover:text-red-700"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-            {docxWarning && (
-              <div className="flex items-start gap-2 p-3 border border-amber-200 bg-amber-50 rounded-lg text-sm text-amber-900">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{docxWarning}</span>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Batal</Button>
