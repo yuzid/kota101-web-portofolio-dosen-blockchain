@@ -200,22 +200,10 @@ export class DocumentController {
   };
 
   replaceFile = async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
-        return;
-      }
-      const result = await this.documentService.replaceFile(req.params.id as string, req.file!, req.user);
-      res.json({
-        status: 'success',
-        message: 'File dokumen berhasil diganti.',
-        data: { id: result.id, file_path: result.file_path, hash_file: result.hash_file },
-      });
-    } catch (error: any) {
-      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
-                     error.message.includes('Akses ditolak') || error.message.includes('bukan pemilik') ? 403 : 400;
-      res.status(status).json({ status: 'error', error: error.message });
-    }
+    res.status(405).json({
+      status: 'error',
+      error: 'Penggantian file dokumen tidak diperbolehkan. Ubah metadata atau highlight saja.',
+    });
   };
 
   // Common

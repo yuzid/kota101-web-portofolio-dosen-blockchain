@@ -1,10 +1,22 @@
 import { HighlightRepository } from '../repositories/HighlightRepository';
+import { ActivityRepository } from '../repositories/ActivityRepository';
+import { ActivityService } from './ActivityService';
 
 export class HighlightService {
   private highlightRepository: HighlightRepository;
+  private activityService: ActivityService;
 
-  constructor(highlightRepository: HighlightRepository) {
+  constructor(
+    highlightRepository: HighlightRepository,
+    activityService = new ActivityService(new ActivityRepository()),
+  ) {
     this.highlightRepository = highlightRepository;
+    this.activityService = activityService;
+  }
+
+  private async publishHighlightChange(dokumenId: string | null) {
+    if (!dokumenId) return [];
+    return await this.activityService.publishDocumentChangeSnapshots(dokumenId, 'DOKUMEN_HIGHLIGHTS_SYNCED');
   }
 
   async getHighlightsByDocument(kepemilikanId: string) {
@@ -40,6 +52,8 @@ export class HighlightService {
       throw new Error('Highlights must be an array.');
     }
 
+    const dokumenId = await this.highlightRepository.findDocumentIdByKepemilikanId(kepemilikanId);
+
     // Process synchronization in a way that minimizes disruption if needed,
     // but a simple "delete and recreate" is often what's expected for a full sync.
     await this.highlightRepository.deleteByKepemilikanId(kepemilikanId);
@@ -63,6 +77,7 @@ export class HighlightService {
       createdHighlights.push(created);
     }
 
+    await this.publishHighlightChange(dokumenId);
     return createdHighlights;
   }
 
@@ -81,10 +96,13 @@ export class HighlightService {
       }
     }
 
-    return await this.highlightRepository.create({
+    const created = await this.highlightRepository.create({
       kepemilikan_id: kepemilikanId,
       ...highlightData
     });
+    const dokumenId = await this.highlightRepository.findDocumentIdByKepemilikanId(kepemilikanId);
+    await this.publishHighlightChange(dokumenId);
+    return created;
   }
 
   /**
@@ -105,7 +123,10 @@ export class HighlightService {
       }
     }
 
-    return await this.highlightRepository.update(id, highlightData);
+    const updated = await this.highlightRepository.update(id, highlightData);
+    const dokumenId = await this.highlightRepository.findDocumentIdByHighlightId(id);
+    await this.publishHighlightChange(dokumenId);
+    return updated;
   }
 
   /**
@@ -125,6 +146,9 @@ export class HighlightService {
       }
     }
 
-    return await this.highlightRepository.delete(id);
+    const dokumenId = await this.highlightRepository.findDocumentIdByHighlightId(id);
+    const deleted = await this.highlightRepository.delete(id);
+    await this.publishHighlightChange(dokumenId);
+    return deleted;
   }
 }

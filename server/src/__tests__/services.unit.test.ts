@@ -57,11 +57,6 @@ jest.mock('nodemailer', () => ({
   },
 }));
 
-jest.mock('mjml', () => ({
-  __esModule: true,
-  default: jest.fn(() => ({ html: '<html></html>', errors: [] })),
-}), { virtual: true });
-
 const s3SendMock = jest.fn();
 jest.mock('@aws-sdk/client-s3', () => ({
   S3Client: jest.fn().mockImplementation(() => ({ send: s3SendMock })),
@@ -330,6 +325,7 @@ describe('AdminUserService unit', () => {
 
 describe('HighlightService unit', () => {
   let repo: any;
+  let activity: any;
   let service: HighlightService;
 
   beforeEach(() => {
@@ -343,8 +339,11 @@ describe('HighlightService unit', () => {
       verifyOwnership: jest.fn().mockResolvedValue(true),
       update: jest.fn().mockResolvedValue({ id: 'hl-1' }),
       delete: jest.fn().mockResolvedValue({ id: 'hl-1' }),
+      findDocumentIdByKepemilikanId: jest.fn().mockResolvedValue('doc-1'),
+      findDocumentIdByHighlightId: jest.fn().mockResolvedValue('doc-1'),
     };
-    service = new HighlightService(repo);
+    activity = { publishDocumentChangeSnapshots: jest.fn().mockResolvedValue([]) };
+    service = new HighlightService(repo, activity);
   });
 
   it('menjalankan semua method highlight', async () => {
@@ -357,6 +356,7 @@ describe('HighlightService unit', () => {
 
     expect(repo.deleteByKepemilikanId).toHaveBeenCalledWith('kep-1');
     expect(repo.update).toHaveBeenCalledWith('hl-1', { highlighted_text: 'baru' });
+    expect(activity.publishDocumentChangeSnapshots).toHaveBeenCalled();
   });
 
   it('menolak highlight bukan pemilik', async () => {
@@ -384,6 +384,7 @@ describe('DocumentService unit', () => {
   let repo: any;
   let storage: any;
   let chain: any;
+  let activity: any;
   let service: DocumentService;
   const doc = {
     id: 'doc-1',
@@ -415,7 +416,8 @@ describe('DocumentService unit', () => {
       uploadFile: jest.fn().mockResolvedValue('folder/upload.pdf'),
     };
     chain = { getJsonStreamItems: jest.fn().mockResolvedValue([]) };
-    service = new DocumentService(repo, storage, chain);
+    activity = { publishDocumentChangeSnapshots: jest.fn().mockResolvedValue([]) };
+    service = new DocumentService(repo, storage, chain, activity);
   });
 
   it('menjalankan semua method dokumen', async () => {
@@ -429,7 +431,7 @@ describe('DocumentService unit', () => {
     await service.uploadDosenDocument(VALID_ID, { nama: 'Dok', jenis_dokumen: 'SERTIFIKAT', tanggal_dokumen: '2025-01-01' }, file);
     await service.uploadTUDocument({ nama: 'Dok', jenis_dokumen: 'SK', tanggal_upload: '2025-01-01', dosen_penerima_ids: JSON.stringify([VALID_ID]) }, file);
     await service.updateMetadata('doc-1', { nama: 'Baru', jenis_dokumen: 'SK', tanggal_upload: '2025-02-01' }, user);
-    await service.replaceFile('doc-1', file, user);
+    await expect(service.replaceFile('doc-1', file, user)).rejects.toThrow(/tidak diperbolehkan/);
     await service.deleteDocument('doc-1', user);
     await service.getPublicDocuments();
     await service.getPublicDocumentById('doc-1');
@@ -437,6 +439,7 @@ describe('DocumentService unit', () => {
 
     expect(repo.create).toHaveBeenCalled();
     expect(repo.update).toHaveBeenCalled();
+    expect(activity.publishDocumentChangeSnapshots).toHaveBeenCalledWith('doc-1', 'DOKUMEN_METADATA_UPDATED');
     expect(repo.softDelete).toHaveBeenCalledWith('doc-1');
   });
 

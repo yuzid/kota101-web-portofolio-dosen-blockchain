@@ -1,22 +1,27 @@
 import crypto from "crypto";
 
 import { DocumentRepository } from "../repositories/DocumentRepository";
+import { ActivityRepository } from "../repositories/ActivityRepository";
 import { FileStorageService } from "./FileStorageService";
 import { MultiChainService } from "./MultiChainService";
+import { ActivityService } from "./ActivityService";
 
 export class DocumentService {
   private documentRepository: DocumentRepository;
   private fileStorageService: FileStorageService;
   private multiChainService: MultiChainService;
+  private activityService: ActivityService;
 
   constructor(
     documentRepository: DocumentRepository,
     fileStorageService: FileStorageService,
-    multiChainService = new MultiChainService()
+    multiChainService = new MultiChainService(),
+    activityService = new ActivityService(new ActivityRepository())
   ) {
     this.documentRepository = documentRepository;
     this.fileStorageService = fileStorageService;
     this.multiChainService = multiChainService;
+    this.activityService = activityService;
   }
 
   mapJenisToEnum(jenis: string): string {
@@ -350,46 +355,18 @@ export class DocumentService {
     }
 
     const { nama, jenis_dokumen, tanggal_upload } = data;
-    return await this.documentRepository.update(id, {
+    const updated = await this.documentRepository.update(id, {
       nama,
       jenis_dokumen: String(jenis_dokumen).toUpperCase().trim(),
       tanggal_upload: new Date(tanggal_upload),
     });
+
+    await this.activityService.publishDocumentChangeSnapshots(id, "DOKUMEN_METADATA_UPDATED");
+    return updated;
   }
 
   async replaceFile(id: string, file: Express.Multer.File, currentUser: any) {
-    const existing = await this.documentRepository.findById(id);
-    if (!existing) throw new Error("Dokumen tidak ditemukan.");
-
-    if (currentUser.role.toUpperCase() === "DOSEN") {
-      if (existing.sumber_dokumen === "TATA_USAHA") {
-        throw new Error(
-          "Akses ditolak. Anda tidak diperbolehkan mengganti file dokumen resmi dari Tata Usaha."
-        );
-      }
-      const isOwner = existing.kepemilikan.some(
-        (k: any) => k.dosen_id === currentUser.id
-      );
-      if (!isOwner) {
-        throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
-      }
-    }
-
-    const hashFile = crypto
-      .createHash("sha256")
-      .update(file.buffer)
-      .digest("hex");
-    const filePath = await this.fileStorageService.uploadFile(
-      file,
-      "documents"
-    );
-
-    await this.documentRepository.update(id, {
-      file_path: filePath,
-      hash_file: hashFile,
-    });
-
-    return { id, file_path: filePath, hash_file: hashFile };
+    throw new Error("Penggantian file dokumen tidak diperbolehkan. Ubah metadata atau highlight saja.");
   }
 
   async deleteDocument(id: string, currentUser: any) {

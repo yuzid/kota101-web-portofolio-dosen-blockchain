@@ -150,6 +150,12 @@ function getTimelineIcon(action: string) {
       return <UserX className="w-4 h-4 text-orange-600" />;
     case "dokumen_uploaded":
       return <Upload className="w-4 h-4 text-cyan-600" />;
+    case "document_metadata_updated":
+    case "document_highlight_synced":
+    case "document_highlight_added":
+    case "document_highlight_updated":
+    case "document_highlight_deleted":
+      return <Pencil className="w-4 h-4 text-amber-600" />;
     case "dokumen_removed":
       return <X className="w-4 h-4 text-red-600" />;
     case "status_changed":
@@ -173,6 +179,12 @@ function getTimelineColor(action: string) {
        return "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950";
      case "dokumen_uploaded":
        return "border-cyan-300 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-950";
+     case "document_metadata_updated":
+     case "document_highlight_synced":
+     case "document_highlight_added":
+     case "document_highlight_updated":
+     case "document_highlight_deleted":
+       return "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950";
      case "dokumen_removed":
        return "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950";
      case "status_changed":
@@ -196,6 +208,12 @@ function getTimelineDot(action: string) {
        return "bg-orange-500 dark:bg-orange-400";
      case "dokumen_uploaded":
        return "bg-cyan-500 dark:bg-cyan-400";
+     case "document_metadata_updated":
+     case "document_highlight_synced":
+     case "document_highlight_added":
+     case "document_highlight_updated":
+     case "document_highlight_deleted":
+       return "bg-amber-500 dark:bg-amber-400";
      case "dokumen_removed":
        return "bg-red-500 dark:bg-red-400";
      case "status_changed":
@@ -261,11 +279,15 @@ export function PublicActivityPage() {
           const prevDocs = prev.dokumen_pendukung || [];
           const addedDocs = curDocs.filter((d: any) => !prevDocs.some((od: any) => od.dokumen_id === d.dokumen_id));
           const removedDocs = prevDocs.filter((od: any) => !curDocs.some((d: any) => d.dokumen_id === od.dokumen_id));
-          if (addedDocs.length > 0 || removedDocs.length > 0) {
+          const modifiedDocs = curDocs.filter((d: any) => {
+            const oldDoc = prevDocs.find((od: any) => od.dokumen_id === d.dokumen_id);
+            return oldDoc && JSON.stringify(oldDoc) !== JSON.stringify(d);
+          });
+          if (addedDocs.length > 0 || removedDocs.length > 0 || modifiedDocs.length > 0) {
             collectionChanges['dokumen_bukti'] = {
               added: addedDocs,
               removed: removedDocs,
-              modified: []
+              modified: modifiedDocs
             };
           }
 
@@ -274,6 +296,11 @@ export function PublicActivityPage() {
 
         const generateDescription = (action: string, changes: any, collectionChanges: any): string => {
           if (action === 'created') return 'Membuat catatan kegiatan baru.';
+          if (action === 'document_metadata_updated') return 'Metadata dokumen diperbarui.';
+          if (action === 'document_highlight_synced') return 'Highlight dokumen disinkronkan.';
+          if (action === 'document_highlight_added') return 'Highlight dokumen ditambahkan.';
+          if (action === 'document_highlight_updated') return 'Highlight dokumen diperbarui.';
+          if (action === 'document_highlight_deleted') return 'Highlight dokumen dihapus.';
           
           const descParts: string[] = [];
           const modifiedFields = Object.keys(changes);
@@ -313,6 +340,11 @@ export function PublicActivityPage() {
           let actionMapped = 'updated';
           if (item.action === 'KEGIATAN_CREATED') actionMapped = 'created';
           if (item.action === 'KEGIATAN_DELETED') actionMapped = 'deleted';
+          if (item.action === 'DOKUMEN_METADATA_UPDATED') actionMapped = 'document_metadata_updated';
+          if (item.action === 'DOKUMEN_HIGHLIGHTS_SYNCED') actionMapped = 'document_highlight_synced';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_ADDED') actionMapped = 'document_highlight_added';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_UPDATED') actionMapped = 'document_highlight_updated';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_DELETED') actionMapped = 'document_highlight_deleted';
           
           const { changes, collectionChanges } = computeDiff(rawPayload, prevPayload);
           const description = generateDescription(actionMapped, changes, collectionChanges);

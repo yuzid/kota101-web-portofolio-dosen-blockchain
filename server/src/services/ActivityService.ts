@@ -19,6 +19,10 @@ export class ActivityService {
     this.emailService = emailService;
   }
 
+  private formatDateOnly(date: Date) {
+    return date.toISOString().split('T')[0];
+  }
+
   private buildBlockchainPayload(activity: any, eventType: string) {
     return {
       event_type: eventType,
@@ -59,8 +63,27 @@ export class ActivityService {
         nama: lampiran.dokumen.nama,
         jenis_dokumen: lampiran.dokumen.jenis_dokumen,
         sumber_dokumen: lampiran.dokumen.sumber_dokumen,
-        tanggal_upload: lampiran.dokumen.tanggal_upload.toISOString(),
+        tanggal_upload: this.formatDateOnly(lampiran.dokumen.tanggal_upload),
         hash_file: lampiran.dokumen.hash_file,
+        highlights: (lampiran.dokumen.kepemilikan || []).flatMap((kepemilikan: any) =>
+          (kepemilikan.highlights || []).map((highlight: any) => ({
+            highlight_id: highlight.id,
+            kepemilikan_id: kepemilikan.id,
+            dosen_id: kepemilikan.dosen_id,
+            page_number: highlight.page_number,
+            highlighted_text: highlight.highlighted_text,
+            rects: (highlight.highlight_rect || []).map((rect: any) => ({
+              id: rect.id,
+              x1: rect.x1,
+              x2: rect.x2,
+              y1: rect.y1,
+              y2: rect.y2,
+              width: rect.width,
+              height: rect.height,
+              boundary_rect: rect.boundary_rect,
+            })),
+          })),
+        ),
       })),
     };
   }
@@ -70,6 +93,27 @@ export class ActivityService {
       activity.id,
       this.buildBlockchainPayload(activity, eventType),
     );
+  }
+
+  async publishSnapshotForActivityId(activityId: string, eventType: string) {
+    const activity = await this.activityRepository.findById(activityId);
+    if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+
+    const txId = await this.publishActivitySnapshot(activity, eventType);
+    await this.activityRepository.updateTransactionId(activity.id, txId);
+    return txId;
+  }
+
+  async publishDocumentChangeSnapshots(dokumenId: string, eventType: string) {
+    const activityIds = await this.activityRepository.findActivityIdsByDocumentId(dokumenId);
+    const published: Array<{ activityId: string; txId: string }> = [];
+
+    for (const activityId of activityIds) {
+      const txId = await this.publishSnapshotForActivityId(activityId, eventType);
+      published.push({ activityId, txId });
+    }
+
+    return published;
   }
 
   private async notifyInvitedMembers(activityId: string, memberIds: string[]) {
