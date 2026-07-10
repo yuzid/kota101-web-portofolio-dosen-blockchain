@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router";
+import { useParams, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { Badge } from "../components/ui/badge";
 import {
@@ -42,7 +42,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/ui/dialog";
-
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
   transformPublicActivity,
@@ -52,6 +51,7 @@ import {
   type RawDocEntry,
 } from "../lib/publicActivityTransform";
 import { PublicPdfPreview } from "../components/public/PublicPdfPreview";
+import type { Highlight } from "../services/highlightService";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -82,6 +82,8 @@ interface ActivityLog {
   description: string;
   changes?: Record<string, { old: unknown; new: unknown }>;
   collectionChanges?: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }>;
+  payload?: Record<string, unknown>;
+  previousPayload?: Record<string, unknown> | null;
 }
 
 interface DocPreviewItem {
@@ -89,6 +91,21 @@ interface DocPreviewItem {
   name: string;
   fileUrl: string;
   kepemilikanId?: string;
+  snapshotHighlights?: Highlight[];
+}
+
+interface SnapshotDocument {
+  id: string;
+  name: string;
+  jenis: string;
+  tanggalUpload: string;
+  hashFile: string;
+  filePath: string;
+  highlights: Highlight[];
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
 const activityFieldLabels: Record<string, string> = {
@@ -136,6 +153,123 @@ function getCollectionChanges(
   }));
 }
 
+function isDocumentMetadataAction(action: string) {
+  return action === "document_metadata_updated";
+}
+
+function isDocumentHighlightAction(action: string) {
+  return action.startsWith("document_highlight");
+}
+
+function getDocumentMetadataChanges(
+  current: Record<string, unknown>,
+  previous?: Record<string, unknown>
+) {
+  if (!previous) return [];
+
+  const labels: Record<string, string> = {
+    nama: "Nama",
+    jenis_dokumen: "Jenis",
+    sumber_dokumen: "Sumber",
+    tanggal_upload: "Tanggal",
+  };
+
+  return Object.entries(labels)
+    .filter(([field]) => current[field] !== previous[field])
+    .map(([field, label]) => ({
+      label,
+      oldValue: formatAuditValue(previous[field]),
+      newValue: formatAuditValue(current[field]),
+    }));
+}
+
+function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocument[] {
+  const documents = Array.isArray(payload?.dokumen_pendukung)
+    ? payload.dokumen_pendukung
+    : [];
+
+  return documents.map((doc: unknown) => {
+    const d = toRecord(doc);
+    const rawHighlights = Array.isArray(d.highlights) ? d.highlights : [];
+    const highlights: Highlight[] = rawHighlights.map((highlight: unknown) => {
+      const h = toRecord(highlight);
+      const rects = Array.isArray(h.rects) ? h.rects : [];
+      return {
+        id: String(h.highlight_id ?? crypto.randomUUID()),
+        kepemilikan_id: String(h.kepemilikan_id ?? ""),
+        page_number: Number(h.page_number ?? 1),
+        highlighted_text: String(h.highlighted_text ?? ""),
+        highlight_rect: rects.map((rect: unknown) => {
+          const r = toRecord(rect);
+          return {
+            id: String(r.id ?? crypto.randomUUID()),
+            x1: Number(r.x1 ?? 0),
+            x2: Number(r.x2 ?? 0),
+            y1: Number(r.y1 ?? 0),
+            y2: Number(r.y2 ?? 0),
+            width: Number(r.width ?? 0),
+            height: Number(r.height ?? 0),
+            boundary_rect: Boolean(r.boundary_rect),
+          };
+        }),
+      };
+    });
+
+    return {
+      id: String(d.dokumen_id ?? ""),
+      name: String(d.nama ?? "Tanpa Nama"),
+      jenis: String(d.jenis_dokumen ?? "-"),
+      tanggalUpload: String(d.tanggal_upload ?? ""),
+      hashFile: String(d.hash_file ?? "-"),
+      filePath: String(d.file_path ?? d.nama ?? ""),
+      highlights,
+    };
+  }).filter((doc) => doc.id);
+}
+
+function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActivity {
+  const payload = log.payload || {};
+  const kegiatan = toRecord(payload.kegiatan);
+  const pencatat = toRecord(payload.pencatat);
+  const programStudi = toRecord(pencatat.program_studi);
+  const documents = getSnapshotDocuments(payload);
+  const participants = Array.isArray(payload.partisipasi)
+    ? payload.partisipasi.map((item) => toRecord(item))
+    : [];
+
+  return {
+    id: activityId,
+    namaKegiatan: String(kegiatan.nama_kegiatan ?? ""),
+    jenisTridharma: String(kegiatan.kategori_tridharma ?? "").toLowerCase(),
+    kategori: String(kegiatan.jenis_kegiatan ?? ""),
+    tanggalMulai: String(kegiatan.tanggal_mulai ?? ""),
+    tanggalSelesai: String(kegiatan.tanggal_selesai ?? ""),
+    tahunAkademik: String(kegiatan.periode ?? ""),
+    semester: String(kegiatan.semester ?? "").toLowerCase(),
+    programStudi: String(programStudi.nama ?? "Umum"),
+    statusKelengkapan: documents.length > 0 ? "lengkap" : "tidak_lengkap",
+    jenisBukti: "BERSAMA",
+    dosenTerlibat: participants.map((participant) => ({
+      id: String(participant.dosen_id ?? participant.nama ?? crypto.randomUUID()),
+      name: String(participant.nama ?? "Unknown"),
+      nidn: String(participant.nidn ?? participant.nip ?? "-"),
+      peran: String(participant.peran ?? "ANGGOTA"),
+      status: String(participant.status ?? "DITERIMA"),
+      dokumen: [],
+    })),
+    dokumenBersama: documents.map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      jenis: doc.jenis,
+      tanggalUpload: doc.tanggalUpload,
+      hashFile: doc.hashFile,
+      filePath: doc.filePath,
+      fileUrl: `${API_URL}/api/public/kegiatan/${activityId}/audit-trail/${log.id}/dokumen/${doc.id}/content`,
+      snapshotHighlights: doc.highlights,
+    })),
+  };
+}
+
 function getTimelineIcon(action: string) {
   switch (action) {
     case "created":
@@ -150,6 +284,12 @@ function getTimelineIcon(action: string) {
       return <UserX className="w-4 h-4 text-orange-600" />;
     case "dokumen_uploaded":
       return <Upload className="w-4 h-4 text-cyan-600" />;
+    case "document_metadata_updated":
+    case "document_highlight_synced":
+    case "document_highlight_added":
+    case "document_highlight_updated":
+    case "document_highlight_deleted":
+      return <Pencil className="w-4 h-4 text-amber-600" />;
     case "dokumen_removed":
       return <X className="w-4 h-4 text-red-600" />;
     case "status_changed":
@@ -173,6 +313,12 @@ function getTimelineColor(action: string) {
        return "border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950";
      case "dokumen_uploaded":
        return "border-cyan-300 dark:border-cyan-700 bg-cyan-50 dark:bg-cyan-950";
+     case "document_metadata_updated":
+     case "document_highlight_synced":
+     case "document_highlight_added":
+     case "document_highlight_updated":
+     case "document_highlight_deleted":
+       return "border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950";
      case "dokumen_removed":
        return "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950";
      case "status_changed":
@@ -196,6 +342,12 @@ function getTimelineDot(action: string) {
        return "bg-orange-500 dark:bg-orange-400";
      case "dokumen_uploaded":
        return "bg-cyan-500 dark:bg-cyan-400";
+     case "document_metadata_updated":
+     case "document_highlight_synced":
+     case "document_highlight_added":
+     case "document_highlight_updated":
+     case "document_highlight_deleted":
+       return "bg-amber-500 dark:bg-amber-400";
      case "dokumen_removed":
        return "bg-red-500 dark:bg-red-400";
      case "status_changed":
@@ -205,19 +357,109 @@ function getTimelineDot(action: string) {
    }
  }
 
+function getNameChangedDocuments(log: ActivityLog) {
+  const modifiedDocs = log.collectionChanges?.dokumen_bukti?.modified || [];
+  const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
+    ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+    : [];
+
+  return modifiedDocs.filter((doc) => {
+    const currentDoc = toRecord(doc);
+    const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+    return previousDoc && currentDoc.nama !== previousDoc.nama;
+  });
+}
+
+function hasDocumentCollectionAddOrRemove(log: ActivityLog) {
+  const docChanges = log.collectionChanges?.dokumen_bukti;
+  return Boolean(
+    docChanges &&
+      ((docChanges.added?.length || 0) > 0 || (docChanges.removed?.length || 0) > 0)
+  );
+}
+
+function getDocumentHistoryLogs(logs: ActivityLog[]) {
+  return logs.filter((log) => {
+    if (isDocumentMetadataAction(log.action)) {
+      return getNameChangedDocuments(log).length > 0;
+    }
+
+    return hasDocumentCollectionAddOrRemove(log) || isDocumentHighlightAction(log.action);
+  });
+}
+
+function getDocumentNamesFromChanges(log: ActivityLog) {
+  if (isDocumentMetadataAction(log.action)) {
+    const names = getNameChangedDocuments(log)
+      .map((doc) => String(toRecord(doc).nama ?? ""))
+      .filter(Boolean);
+
+    return Array.from(new Set(names));
+  }
+
+  const docs = log.collectionChanges?.dokumen_bukti;
+  const changedDocs = [
+    ...(docs?.added || []),
+    ...(docs?.removed || []),
+    ...(docs?.modified || []),
+  ];
+  const names = changedDocs
+    .map((doc) => String(toRecord(doc).nama ?? ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(names));
+}
+
+function getDocumentHistoryDescription(log: ActivityLog) {
+  const names = getDocumentNamesFromChanges(log);
+  const docLabel = names.length > 0 ? names.join(", ") : "dokumen";
+
+  if (log.action === "dokumen_uploaded") return `Dokumen ditambahkan: ${docLabel}.`;
+  if (log.action === "dokumen_removed") return `Dokumen dihapus: ${docLabel}.`;
+  if (isDocumentMetadataAction(log.action)) {
+    const renamedDocs = getNameChangedDocuments(log);
+    const descriptions = renamedDocs.map((doc) => {
+      const currentDoc = toRecord(doc);
+      const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
+        ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+        : [];
+      const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+      return `Nama dokumen ${formatAuditValue(previousDoc?.nama)} diubah menjadi ${formatAuditValue(currentDoc.nama)}.`;
+    });
+
+    return descriptions.length > 0 ? descriptions.join(" ") : `Nama dokumen ${docLabel} diperbarui.`;
+  }
+  if (isDocumentHighlightAction(log.action)) return `Highlight ${docLabel} diperbarui.`;
+
+  return log.description;
+}
+
 export function PublicActivityPage() {
-  const { id } = useParams();
+  const { id, txId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [activity, setActivity] = useState<PublicActivity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocPreviewItem | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
+  const [latestActivityName, setLatestActivityName] = useState<string>("");
 
-  const isDokumenMode = location.pathname.endsWith("/dokumen");
+  const isDokumenMode = location.pathname.includes("/dokumen");
 
-  const fetchAuditTrail = async () => {
+  const fetchLatestActivityName = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/public/kegiatan/${id}`);
+      if (!response.ok) return "";
+      const result = await response.json();
+      return result.status === "success" ? String(result.data?.nama_kegiatan || "") : "";
+    } catch {
+      return "";
+    }
+  };
+
+  const fetchAuditTrail = async (): Promise<ActivityLog[]> => {
     try {
       const response = await fetch(`${API_URL}/api/public/kegiatan/${id}/audit-trail`);
       const result = await response.json();
@@ -261,11 +503,15 @@ export function PublicActivityPage() {
           const prevDocs = prev.dokumen_pendukung || [];
           const addedDocs = curDocs.filter((d: any) => !prevDocs.some((od: any) => od.dokumen_id === d.dokumen_id));
           const removedDocs = prevDocs.filter((od: any) => !curDocs.some((d: any) => d.dokumen_id === od.dokumen_id));
-          if (addedDocs.length > 0 || removedDocs.length > 0) {
+          const modifiedDocs = curDocs.filter((d: any) => {
+            const oldDoc = prevDocs.find((od: any) => od.dokumen_id === d.dokumen_id);
+            return oldDoc && JSON.stringify(oldDoc) !== JSON.stringify(d);
+          });
+          if (addedDocs.length > 0 || removedDocs.length > 0 || modifiedDocs.length > 0) {
             collectionChanges['dokumen_bukti'] = {
               added: addedDocs,
               removed: removedDocs,
-              modified: []
+              modified: modifiedDocs
             };
           }
 
@@ -274,6 +520,11 @@ export function PublicActivityPage() {
 
         const generateDescription = (action: string, changes: any, collectionChanges: any): string => {
           if (action === 'created') return 'Membuat catatan kegiatan baru.';
+          if (action === 'document_metadata_updated') return 'Metadata dokumen diperbarui.';
+          if (action === 'document_highlight_synced') return 'Highlight dokumen diperbarui.';
+          if (action === 'document_highlight_added') return 'Highlight dokumen ditambahkan.';
+          if (action === 'document_highlight_updated') return 'Highlight dokumen diperbarui.';
+          if (action === 'document_highlight_deleted') return 'Highlight dokumen dihapus.';
           
           const descParts: string[] = [];
           const modifiedFields = Object.keys(changes);
@@ -313,8 +564,26 @@ export function PublicActivityPage() {
           let actionMapped = 'updated';
           if (item.action === 'KEGIATAN_CREATED') actionMapped = 'created';
           if (item.action === 'KEGIATAN_DELETED') actionMapped = 'deleted';
+          if (item.action === 'DOKUMEN_ADDED') actionMapped = 'dokumen_uploaded';
+          if (item.action === 'DOKUMEN_REMOVED') actionMapped = 'dokumen_removed';
+          if (item.action === 'DOKUMEN_METADATA_UPDATED') actionMapped = 'document_metadata_updated';
+          if (item.action === 'DOKUMEN_HIGHLIGHTS_SYNCED') actionMapped = 'document_highlight_synced';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_ADDED') actionMapped = 'document_highlight_added';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_UPDATED') actionMapped = 'document_highlight_updated';
+          if (item.action === 'DOKUMEN_HIGHLIGHT_DELETED') actionMapped = 'document_highlight_deleted';
           
           const { changes, collectionChanges } = computeDiff(rawPayload, prevPayload);
+          if (
+            (actionMapped === 'document_metadata_updated' || actionMapped === 'document_highlight_synced') &&
+            !collectionChanges.dokumen_bukti &&
+            Array.isArray(rawPayload.dokumen_pendukung)
+          ) {
+            collectionChanges.dokumen_bukti = {
+              added: [],
+              removed: [],
+              modified: rawPayload.dokumen_pendukung,
+            };
+          }
           const description = generateDescription(actionMapped, changes, collectionChanges);
           
           processed.push({
@@ -324,22 +593,55 @@ export function PublicActivityPage() {
             timestamp: item.timestamp,
             description,
             changes,
-            collectionChanges
+            collectionChanges,
+            payload: rawPayload,
+            previousPayload: prevPayload,
           });
         }
-        setLogs(processed.reverse());
+        const reversed = processed.reverse();
+        setLogs(reversed);
+        return reversed;
       }
     } catch (e) {
       console.error("Gagal memuat audit trail:", e);
     }
+    return [];
   };
 
   useEffect(() => {
     if (id) {
-      fetchAuditTrail();
-      fetchActivity();
+      void loadPage();
     }
-  }, [id]);
+  }, [id, txId]);
+
+  const loadPage = async () => {
+    setIsLoading(true);
+    setError(null);
+    const auditLogs = await fetchAuditTrail();
+    if (txId) {
+      const selected = auditLogs.find((log) => log.id === txId);
+      if (!selected) {
+        setError("NOT_FOUND");
+        setIsLoading(false);
+        return;
+      }
+      const snapshotActivity = transformSnapshotLog(selected, id!);
+      if (isDokumenMode) {
+        const latestName = latestActivityName || await fetchLatestActivityName();
+        if (latestName) setLatestActivityName(latestName);
+        setActivity({
+          ...snapshotActivity,
+          namaKegiatan: latestName || snapshotActivity.namaKegiatan,
+        });
+      } else {
+        setActivity(snapshotActivity);
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    await fetchActivity();
+  };
 
   const fetchActivity = async () => {
     setIsLoading(true);
@@ -357,6 +659,7 @@ export function PublicActivityPage() {
         throw new Error(result.error || "Kegiatan tidak ditemukan");
       }
       const { activity: transformed, docEntries } = transformPublicActivity(result.data);
+      setLatestActivityName(transformed.namaKegiatan);
 
       if (docEntries.length > 0) {
         const docResults = await Promise.allSettled(
@@ -487,10 +790,10 @@ export function PublicActivityPage() {
   const jType = activity.jenisTridharma?.toLowerCase() || "";
 
   if (isDokumenMode) {
-    return renderDokumenMode(activity, jType, getInitials, statusBadge);
+    return renderDokumenMode(activity, jType, getInitials, statusBadge, logs, navigate, txId, latestActivityName);
   }
 
-  return renderFullMode(activity, jType, getInitials, statusBadge, previewDoc, setPreviewDoc, logs, selectedLog, setSelectedLog);
+  return renderFullMode(activity, jType, getInitials, statusBadge, previewDoc, setPreviewDoc, logs, selectedLog, setSelectedLog, navigate, txId);
 }
 
 function renderFullMode(
@@ -502,7 +805,9 @@ function renderFullMode(
   setPreviewDoc: React.Dispatch<React.SetStateAction<DocPreviewItem | null>>,
   logs: ActivityLog[],
   selectedLog: ActivityLog | null,
-  setSelectedLog: React.Dispatch<React.SetStateAction<ActivityLog | null>>
+  setSelectedLog: React.Dispatch<React.SetStateAction<ActivityLog | null>>,
+  navigate: ReturnType<typeof useNavigate>,
+  activeTxId?: string,
 ) {
   return (
     <motion.div
@@ -604,8 +909,9 @@ function renderFullMode(
                                 setPreviewDoc({
                                   id: doc.id,
                                   name: doc.name,
-                                  fileUrl: `${API_URL}/api/public/dokumen/${doc.id}/content`,
+                                  fileUrl: doc.fileUrl || `${API_URL}/api/public/dokumen/${doc.id}/content`,
                                   kepemilikanId: doc.kepemilikanId,
+                                  snapshotHighlights: doc.snapshotHighlights,
                                 })
                               }
                               className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
@@ -647,8 +953,9 @@ function renderFullMode(
                         setPreviewDoc({
                           id: doc.id,
                           name: doc.name,
-                          fileUrl: `${API_URL}/api/public/dokumen/${doc.id}/content`,
+                          fileUrl: doc.fileUrl || `${API_URL}/api/public/dokumen/${doc.id}/content`,
                           kepemilikanId: doc.kepemilikanId,
+                          snapshotHighlights: doc.snapshotHighlights,
                         })
                       }
                       className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
@@ -682,32 +989,32 @@ function renderFullMode(
                       </p>
                     </div>
                   ) : (
-                    <ScrollArea className="max-h-[600px] pr-2">
-                      <div className="space-y-0">
+                    <div className="max-h-[600px] overflow-y-auto pr-2">
+                      <div className="relative space-y-1">
+                        {logs.length > 1 && (
+                          <div className="absolute bottom-6 left-4 top-6 w-px -translate-x-1/2 bg-border" />
+                        )}
                         {logs.map((log, idx) => (
                           <button
                             key={log.id}
-                            onClick={() => setSelectedLog(log)}
-                            className="w-full text-left group"
+                            onClick={() => navigate(`/public/kegiatan/${activity.id}/entry/${log.id}`)}
+                            className="relative block w-full text-left group"
                           >
-                            <div className="relative flex gap-4 pb-6 last:pb-0">
-                              {idx < logs.length - 1 && (
-                                <div className="absolute left-[15px] top-8 h-full w-px bg-border" />
-                              )}
-                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
+                            <div className="relative flex items-center gap-3 rounded-md py-1.5">
+                              <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
                                 <div className={`h-2.5 w-2.5 rounded-full ${getTimelineDot(log.action)}`} />
                               </div>
-                              <div className="min-w-0 flex-1 pt-0.5">
-                                <div className="flex items-center gap-2">
-                                  {getTimelineIcon(log.action)}
-                                  <p className="text-xs font-medium capitalize">
+                              <div className={`min-w-0 flex-1 space-y-1 rounded-md px-2 py-1 pt-1.5 ${activeTxId === log.id ? "bg-primary/5" : "group-hover:bg-muted/40"}`}>
+                                <div className="flex min-w-0 items-start gap-2">
+                                  <span className="mt-0.5 shrink-0">{getTimelineIcon(log.action)}</span>
+                                  <p className="min-w-0 break-words text-xs font-medium capitalize leading-snug">
                                     {log.action.replace(/_/g, " ")}
                                   </p>
                                 </div>
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                <p className="text-[11px] leading-snug text-muted-foreground">
                                   {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm", { locale: localeId })}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="break-words text-[11px] leading-snug text-muted-foreground">
                                   Oleh: {log.actor.name}
                                 </p>
                               </div>
@@ -715,7 +1022,7 @@ function renderFullMode(
                           </button>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -734,56 +1041,124 @@ function renderFullMode(
             </DialogHeader>
             {selectedLog && (
               <ScrollArea className="max-h-[60vh] pr-4">
-                <div className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    {format(new Date(selectedLog.timestamp), "dd MMMM yyyy, HH:mm", { locale: localeId })} &mdash; Oleh: {selectedLog.actor.name}
-                  </div>
-                  <p className="text-sm">{selectedLog.description}</p>
-
-                  {selectedLog.changes && getActivityChanges(selectedLog.changes).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2">Perubahan Data</h4>
-                      <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-muted/50">
-                              <th className="text-left p-2 font-medium">Field</th>
-                              <th className="text-left p-2 font-medium">Nilai Lama</th>
-                              <th className="text-left p-2 font-medium">Nilai Baru</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {getActivityChanges(selectedLog.changes).map((change, i) => (
-                              <tr key={i} className="border-t">
-                                <td className="p-2 font-medium">{change.field}</td>
-                                <td className="p-2 text-muted-foreground">{change.oldValue}</td>
-                                <td className="p-2">{change.newValue}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                    <div className="space-y-4">
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(selectedLog.timestamp), "dd MMMM yyyy, HH:mm", { locale: localeId })} &mdash; Oleh: {selectedLog.actor.name}
                       </div>
-                    </div>
-                  )}
+                      <p className="text-sm">{selectedLog.description}</p>
 
-                  {selectedLog.collectionChanges && getCollectionChanges(selectedLog.collectionChanges).length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-2">Perubahan Koleksi</h4>
-                      <div className="space-y-2">
-                        {getCollectionChanges(selectedLog.collectionChanges).map((cc, i) => (
-                          <div key={i} className="rounded-lg border p-3 text-xs">
-                            <p className="font-medium capitalize mb-1">{cc.collection.replace(/_/g, " ")}</p>
-                            <div className="flex gap-3 text-muted-foreground">
-                              {cc.added > 0 && <span className="text-green-600">+{cc.added} ditambah</span>}
-                              {cc.removed > 0 && <span className="text-red-600">-{cc.removed} dihapus</span>}
-                              {cc.modified > 0 && <span className="text-blue-600">~{cc.modified} diubah</span>}
-                            </div>
+                      {selectedLog.changes && getActivityChanges(selectedLog.changes).length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">Perubahan Data</h4>
+                          <div className="rounded-lg border overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-muted/50">
+                                  <th className="text-left p-2 font-medium">Field</th>
+                                  <th className="text-left p-2 font-medium">Nilai Lama</th>
+                                  <th className="text-left p-2 font-medium">Nilai Baru</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {getActivityChanges(selectedLog.changes).map((change, i) => (
+                                  <tr key={i} className="border-t">
+                                    <td className="p-2 font-medium">{change.field}</td>
+                                    <td className="p-2 text-muted-foreground">{change.oldValue}</td>
+                                    <td className="p-2">{change.newValue}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      )}
+
+                      {selectedLog.collectionChanges && getCollectionChanges(selectedLog.collectionChanges).length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold mb-2">Perubahan Koleksi</h4>
+                          <div className="space-y-2">
+                            {selectedLog.collectionChanges.dokumen_bukti?.modified?.map((doc: unknown, i: number) => {
+                              const currentDoc = doc as Record<string, unknown>;
+                              const previousDocs = Array.isArray(selectedLog.previousPayload?.dokumen_pendukung)
+                                ? selectedLog.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
+                                : [];
+                              const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
+                              const metadataChanges = getDocumentMetadataChanges(currentDoc, previousDoc);
+
+                              return (
+                                <div key={`doc-mod-${i}`} className="rounded-lg border p-3 text-xs">
+                                  {isDocumentHighlightAction(selectedLog.action) ? (
+                                    <p>
+                                      Highlight dokumen <strong>{String(currentDoc.nama ?? "-")}</strong> diperbarui.
+                                    </p>
+                                  ) : isDocumentMetadataAction(selectedLog.action) ? (
+                                    <div className="space-y-2">
+                                      <p>
+                                        Metadata dokumen <strong>{String(currentDoc.nama ?? "-")}</strong> diperbarui.
+                                      </p>
+                                      {metadataChanges.length > 0 ? (
+                                        <div className="space-y-1">
+                                          {metadataChanges.map((change) => (
+                                            <div key={change.label} className="grid gap-1 sm:grid-cols-[110px_1fr]">
+                                              <span className="font-medium">{change.label}</span>
+                                              <span>
+                                                <span className="text-muted-foreground line-through">{change.oldValue}</span>
+                                                <span className="mx-1 text-muted-foreground">→</span>
+                                                <strong>{change.newValue}</strong>
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-muted-foreground">
+                                          Detail field metadata sebelumnya tidak tersedia pada snapshot pembanding.
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p>
+                                      Dokumen diubah: <strong>{String(currentDoc.nama ?? "-")}</strong>.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {getCollectionChanges(selectedLog.collectionChanges)
+                              .filter((cc) => cc.collection !== "dokumen_bukti")
+                              .map((cc, i) => (
+                                <div key={i} className="rounded-lg border p-3 text-xs">
+                                  <p className="font-medium capitalize mb-1">{cc.collection.replace(/_/g, " ")}</p>
+                                  <div className="flex gap-3 text-muted-foreground">
+                                    {cc.added > 0 && <span className="text-green-600">+{cc.added} ditambah</span>}
+                                    {cc.removed > 0 && <span className="text-red-600">-{cc.removed} dihapus</span>}
+                                    {cc.modified > 0 && <span className="text-blue-600">~{cc.modified} diubah</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            {selectedLog.collectionChanges.dokumen_bukti && (
+                              <>
+                                {selectedLog.collectionChanges.dokumen_bukti.added.map((doc: unknown, i: number) => {
+                                  const d = doc as Record<string, unknown>;
+                                  return (
+                                    <div key={`doc-add-${i}`} className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
+                                      Dokumen ditambahkan: <strong>{String(d.nama ?? "-")}</strong>.
+                                    </div>
+                                  );
+                                })}
+                                {selectedLog.collectionChanges.dokumen_bukti.removed.map((doc: unknown, i: number) => {
+                                  const d = doc as Record<string, unknown>;
+                                  return (
+                                    <div key={`doc-remove-${i}`} className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                                      Dokumen dihapus: <strong>{String(d.nama ?? "-")}</strong>.
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
               </ScrollArea>
             )}
           </DialogContent>
@@ -799,7 +1174,11 @@ function renderFullMode(
               </DialogTitle>
             </DialogHeader>
             {previewDoc && (
-              <PublicPdfPreview fileUrl={previewDoc.fileUrl} kepemilikanId={previewDoc.kepemilikanId} />
+              <PublicPdfPreview
+                fileUrl={previewDoc.fileUrl}
+                kepemilikanId={previewDoc.kepemilikanId}
+                snapshotHighlights={previewDoc.snapshotHighlights}
+              />
             )}
           </DialogContent>
         </Dialog>
@@ -813,12 +1192,17 @@ function renderDokumenMode(
   activity: PublicActivity,
   _jType: string,
   _getInitials: (name: string) => string,
-  _statusBadge: (status: string) => React.ReactNode
+  _statusBadge: (status: string) => React.ReactNode,
+  logs: ActivityLog[],
+  navigate: ReturnType<typeof useNavigate>,
+  activeTxId?: string,
+  latestActivityName?: string
 ) {
   const allDocs =
     activity.jenisBukti === "BERSAMA"
       ? activity.dokumenBersama
       : activity.dosenTerlibat.flatMap((d) => d.dokumen);
+  const documentLogs = getDocumentHistoryLogs(logs);
 
   return (
     <motion.div
@@ -827,126 +1211,185 @@ function renderDokumenMode(
          transition={{ duration: 0.4, ease: "easeOut" }}
        >
        <div className="min-h-screen bg-background py-8 px-4">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="mx-auto max-w-6xl space-y-6">
           <div className="text-center">
             <h1 className="text-xl font-bold text-foreground">
              Dokumen Bukti Kegiatan
            </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {activity.namaKegiatan}
+            {latestActivityName || activity.namaKegiatan}
           </p>
         </div>
 
-        {activity.jenisBukti === "BERSAMA" ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-muted-foreground" />
-                  Dokumen Bersama
-                  <Badge variant="secondary" className="text-xs">
-                    {activity.dokumenBersama.length} file
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {activity.dokumenBersama.map((doc) => (
-                  <div key={doc.id} className="space-y-3">
-                    <DocPreviewBlock doc={doc} label={doc.name} />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {activity.dosenTerlibat.map((dosen) => (
-              <Card key={dosen.id}>
+            {activity.jenisBukti === "BERSAMA" ? (
+              <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    {dosen.name}
-                    <Badge variant="outline" className="text-xs">
-                      NIDN: {dosen.nidn}
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    Dokumen Bersama
+                    <Badge variant="secondary" className="text-xs">
+                      {activity.dokumenBersama.length} file
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {dosen.dokumen.length > 0 ? (
-                    dosen.dokumen.map((doc) => (
-                      <DocPreviewBlock
-                        key={doc.id}
-                        doc={doc}
-                        label={doc.name}
-                      />
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      Belum ada dokumen bukti
-                    </p>
-                  )}
+                  {activity.dokumenBersama.map((doc) => (
+                    <div key={doc.id} className="space-y-3">
+                      <DocPreviewBlock doc={doc} label={doc.name} />
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Blockchain status summary */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-              Verifikasi Blockchain
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {allDocs.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Belum ada dokumen yang tercatat
-                </p>
-              )}
-              {allDocs.map((doc) => {
-                const verified = doc.hashFile && doc.hashFile !== "-";
-                return (
-                  <div
-                    key={doc.id}
-                    className={`rounded-lg border-2 p-4 ${
-                       verified
-                         ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
-                         : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
-                     }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {verified ? (
-                        <ShieldCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+            ) : (
+              <div className="space-y-6">
+                {activity.dosenTerlibat.map((dosen) => (
+                  <Card key={dosen.id}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        {dosen.name}
+                        <Badge variant="outline" className="text-xs">
+                          NIDN: {dosen.nidn}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {dosen.dokumen.length > 0 ? (
+                        dosen.dokumen.map((doc) => (
+                          <DocPreviewBlock
+                            key={doc.id}
+                            doc={doc}
+                            label={doc.name}
+                          />
+                        ))
                       ) : (
-                        <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                        <p className="text-sm text-muted-foreground italic">
+                          Belum ada dokumen bukti
+                        </p>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{doc.name}</p>
-                        <p className={`text-sm font-semibold mt-1 ${
-                          verified ? "text-green-700" : "text-yellow-700"
-                        }`}>
-                          {verified
-                            ? "Terdokumentasi di Blockchain"
-                            : "Belum Tercatat di Blockchain"}
-                        </p>
-                        <p className={`text-xs mt-0.5 ${
-                          verified ? "text-green-600" : "text-yellow-600"
-                        }`}>
-                          {verified
-                            ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
-                            : "Dokumen ini belum dicatat pada jaringan blockchain."}
-                        </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                  Verifikasi Blockchain
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {allDocs.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Belum ada dokumen yang tercatat
+                    </p>
+                  )}
+                  {allDocs.map((doc) => {
+                    const verified = doc.hashFile && doc.hashFile !== "-";
+                    return (
+                      <div
+                        key={doc.id}
+                        className={`rounded-lg border-2 p-4 ${
+                           verified
+                             ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950"
+                             : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950"
+                         }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {verified ? (
+                            <ShieldCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{doc.name}</p>
+                            <p className={`text-sm font-semibold mt-1 ${
+                              verified ? "text-green-700" : "text-yellow-700"
+                            }`}>
+                              {verified
+                                ? "Terdokumentasi di Blockchain"
+                                : "Belum Tercatat di Blockchain"}
+                            </p>
+                            <p className={`text-xs mt-0.5 ${
+                              verified ? "text-green-600" : "text-yellow-600"
+                            }`}>
+                              {verified
+                                ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
+                                : "Dokumen ini belum dicatat pada jaringan blockchain."}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="h-fit lg:sticky lg:top-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <History className="w-4 h-4 text-muted-foreground" />
+                Riwayat Dokumen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {documentLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Belum ada riwayat perubahan dokumen.
+                </p>
+              ) : (
+                <div className="max-h-[600px] overflow-y-auto pr-2">
+                  <div className="relative space-y-1">
+                    {documentLogs.map((log, index) => (
+                      <button
+                        key={log.id}
+                        type="button"
+                        onClick={() => navigate(`/public/kegiatan/${activity.id}/dokumen/entry/${log.id}`)}
+                        className="group block w-full text-left"
+                      >
+                      <div className="relative flex items-center gap-3 rounded-md py-1.5">
+                        {index > 0 && (
+                          <div className="absolute bottom-1/2 left-4 top-[-0.25rem] w-px -translate-x-1/2 bg-border" />
+                        )}
+                        {index < documentLogs.length - 1 && (
+                          <div className="absolute bottom-[-0.25rem] left-4 top-1/2 w-px -translate-x-1/2 bg-border" />
+                        )}
+                        <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 ${getTimelineColor(log.action)}`}>
+                          <div className={`h-2.5 w-2.5 rounded-full ${getTimelineDot(log.action)}`} />
+                        </div>
+                        <div className={`min-w-0 flex-1 space-y-1 rounded-md px-2 py-1 pt-1.5 ${activeTxId === log.id ? "bg-primary/5" : "group-hover:bg-muted/40"}`}>
+                          <div className="flex min-w-0 items-start gap-2">
+                            <span className="mt-0.5 shrink-0">{getTimelineIcon(log.action)}</span>
+                            <p className="min-w-0 break-words text-xs font-medium capitalize leading-snug">
+                              {log.action.replace(/_/g, " ")}
+                            </p>
+                          </div>
+                          <p className="text-[11px] leading-snug text-muted-foreground">
+                            {format(new Date(log.timestamp), "dd MMM yyyy, HH:mm", { locale: localeId })}
+                          </p>
+                          <p className="break-words text-[11px] leading-snug text-muted-foreground">
+                            Oleh: {log.actor.name}
+                          </p>
+                          <p className="break-words text-[11px] leading-snug text-muted-foreground">
+                            {getDocumentHistoryDescription(log)}
+                          </p>
+                        </div>
+                      </div>
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <p className="text-center text-xs text-muted-foreground py-4">
           Dokumen ini bersifat publik dan dapat dibagikan.
@@ -961,10 +1404,19 @@ function DocPreviewBlock({
   doc,
   label,
 }: {
-  doc: { id: string; name: string; filePath: string; hashFile: string };
+  doc: {
+    id: string;
+    name: string;
+    filePath: string;
+    hashFile: string;
+    kepemilikanId?: string;
+    fileUrl?: string;
+    snapshotHighlights?: Highlight[];
+  };
   label: string;
 }) {
   const fileType = getFileType(doc.filePath);
+  const fileUrl = doc.fileUrl || `${API_URL}/api/public/dokumen/${doc.id}/content`;
 
   if (!doc.filePath) {
     return (
@@ -995,32 +1447,43 @@ function DocPreviewBlock({
       <div className="bg-card">
         {fileType === "pdf" && (
           <PublicPdfPreview
-            fileUrl={`${API_URL}/api/public/dokumen/${doc.id}/content`}
+            fileUrl={fileUrl}
             kepemilikanId={doc.kepemilikanId}
+            snapshotHighlights={doc.snapshotHighlights}
           />
         )}
         {fileType === "image" && (
           <div className="p-4 flex justify-center">
             <img
-              src={`${API_URL}/api/public/dokumen/${doc.id}/content`}
+              src={fileUrl}
               alt={label}
               className="max-w-full max-h-[600px] object-contain rounded"
             />
           </div>
         )}
         {fileType === "other" && (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p>Pratinjau tidak tersedia untuk format ini</p>
-            <a
-              href={`${API_URL}/api/public/dokumen/${doc.id}/content`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline mt-2 inline-block"
-            >
-              Buka Dokumen
-            </a>
-          </div>
+          doc.fileUrl ? (
+            <div className="h-[720px] bg-muted/20">
+              <iframe
+                src={fileUrl}
+                title={label}
+                className="h-full w-full border-0"
+              />
+            </div>
+          ) : (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p>Pratinjau tidak tersedia untuk format ini</p>
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline mt-2 inline-block"
+              >
+                Buka Dokumen
+              </a>
+            </div>
+          )
         )}
       </div>
      </div>

@@ -107,6 +107,28 @@ export class HighlightRepository {
     return kepemilikan?.id;
   }
 
+  async findDocumentIdByKepemilikanId(kepemilikanId: string) {
+    const kepemilikan = await prisma.kepemilikanDokumen.findUnique({
+      where: { id: kepemilikanId },
+      select: { dokumen_id: true },
+    });
+
+    return kepemilikan?.dokumen_id || null;
+  }
+
+  async findDocumentIdByHighlightId(highlightId: string) {
+    const highlight = await prisma.highlight.findUnique({
+      where: { id: highlightId },
+      select: {
+        kepemilikan: {
+          select: { dokumen_id: true },
+        },
+      },
+    });
+
+    return highlight?.kepemilikan.dokumen_id || null;
+  }
+
   /**
    * Verify if a highlight belongs to the specified dosen
    * Returns true if the dosen owns the highlight, false otherwise

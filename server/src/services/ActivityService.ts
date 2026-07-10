@@ -1,7 +1,6 @@
 import { KategoriTridharma, JenisKegiatan, PeranTridharma } from '@prisma/client';
 import { ActivityRepository } from '../repositories/ActivityRepository';
 import { prisma } from '../lib/prisma';
-import { resolveBlockchainNode } from '../lib/blockchainNode';
 import { EmailService } from './EmailService';
 import { MultiChainService } from './MultiChainService';
 
@@ -18,6 +17,10 @@ export class ActivityService {
     this.activityRepository = activityRepository;
     this.multiChainService = multiChainService;
     this.emailService = emailService;
+  }
+
+  private formatDateOnly(date: Date) {
+    return date.toISOString().split('T')[0];
   }
 
   private buildBlockchainPayload(activity: any, eventType: string) {
@@ -41,7 +44,6 @@ export class ActivityService {
         nip: activity.dosen.nip,
         nidn: activity.dosen.nidn,
         nama: activity.dosen.nama,
-        chain_address: activity.dosen.chain_address,
         program_studi: {
           id: activity.dosen.program_studi.id,
           kode: activity.dosen.program_studi.kode_prodi,
@@ -61,24 +63,58 @@ export class ActivityService {
         nama: lampiran.dokumen.nama,
         jenis_dokumen: lampiran.dokumen.jenis_dokumen,
         sumber_dokumen: lampiran.dokumen.sumber_dokumen,
-        tanggal_upload: lampiran.dokumen.tanggal_upload.toISOString(),
+        tanggal_upload: this.formatDateOnly(lampiran.dokumen.tanggal_upload),
         hash_file: lampiran.dokumen.hash_file,
+        file_path: lampiran.dokumen.file_path,
+        highlights: (lampiran.dokumen.kepemilikan || []).flatMap((kepemilikan: any) =>
+          (kepemilikan.highlights || []).map((highlight: any) => ({
+            highlight_id: highlight.id,
+            kepemilikan_id: kepemilikan.id,
+            dosen_id: kepemilikan.dosen_id,
+            page_number: highlight.page_number,
+            highlighted_text: highlight.highlighted_text,
+            rects: (highlight.highlight_rect || []).map((rect: any) => ({
+              id: rect.id,
+              x1: rect.x1,
+              x2: rect.x2,
+              y1: rect.y1,
+              y2: rect.y2,
+              width: rect.width,
+              height: rect.height,
+              boundary_rect: rect.boundary_rect,
+            })),
+          })),
+        ),
       })),
     };
   }
 
   private async publishActivitySnapshot(activity: any, eventType: string) {
-    if (!activity.dosen.chain_address) {
-      throw new Error('Dosen belum memiliki blockchain address.');
-    }
-
-    const blockchainNode = resolveBlockchainNode(activity.dosen.program_studi);
     return await this.multiChainService.publishJson(
-      blockchainNode,
-      activity.dosen.chain_address,
       activity.id,
       this.buildBlockchainPayload(activity, eventType),
     );
+  }
+
+  async publishSnapshotForActivityId(activityId: string, eventType: string) {
+    const activity = await this.activityRepository.findById(activityId);
+    if (!activity) throw new Error('Kegiatan tidak ditemukan.');
+
+    const txId = await this.publishActivitySnapshot(activity, eventType);
+    await this.activityRepository.updateTransactionId(activity.id, txId);
+    return txId;
+  }
+
+  async publishDocumentChangeSnapshots(dokumenId: string, eventType: string) {
+    const activityIds = await this.activityRepository.findActivityIdsByDocumentId(dokumenId);
+    const published: Array<{ activityId: string; txId: string }> = [];
+
+    for (const activityId of activityIds) {
+      const txId = await this.publishSnapshotForActivityId(activityId, eventType);
+      published.push({ activityId, txId });
+    }
+
+    return published;
   }
 
   private async notifyInvitedMembers(activityId: string, memberIds: string[]) {
@@ -291,8 +327,7 @@ export class ActivityService {
     const activity = await this.activityRepository.findById(id);
     if (!activity) throw new Error('Kegiatan tidak ditemukan.');
 
-    const blockchainNode = resolveBlockchainNode(activity.dosen.program_studi);
-    const items = await this.multiChainService.getJsonStreamItems(blockchainNode, id);
+    const items = await this.multiChainService.getJsonStreamItems(id);
 
     return items.map((item) => {
       const payload = item.data.json || {};

@@ -49,6 +49,27 @@ export class DocumentController {
     }
   };
 
+  getPublicSnapshotDocumentContent = async (req: Request, res: Response) => {
+    try {
+      const file = await this.documentService.getPublicSnapshotDocumentContent(
+        req.params.activityId as string,
+        req.params.txId as string,
+        req.params.dokumenId as string,
+      );
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Content-Length', file.contentLength);
+      res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.fileName)}`);
+      res.setHeader('X-Content-SHA256', file.contentHash);
+      res.send(file.bytes);
+    } catch (error: any) {
+      const status =
+        error.message === 'Snapshot riwayat tidak ditemukan.' ||
+        error.message === 'Dokumen tidak ditemukan.' ? 404 :
+        error.message === 'Dokumen tidak tercatat pada snapshot riwayat ini.' ? 403 : 500;
+      res.status(status).json({ status: 'error', error: error.message });
+    }
+  };
+
   // Dosen Handlers
   getDosenDocuments = async (req: AuthRequest, res: Response) => {
     try {
@@ -200,22 +221,10 @@ export class DocumentController {
   };
 
   replaceFile = async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        res.status(401).json({ status: 'error', error: 'Otentikasi diperlukan.' });
-        return;
-      }
-      const result = await this.documentService.replaceFile(req.params.id as string, req.file!, req.user);
-      res.json({
-        status: 'success',
-        message: 'File dokumen berhasil diganti.',
-        data: { id: result.id, file_path: result.file_path, hash_file: result.hash_file },
-      });
-    } catch (error: any) {
-      const status = error.message === 'Dokumen tidak ditemukan.' ? 404 :
-                     error.message.includes('Akses ditolak') || error.message.includes('bukan pemilik') ? 403 : 400;
-      res.status(status).json({ status: 'error', error: error.message });
-    }
+    res.status(405).json({
+      status: 'error',
+      error: 'Penggantian file dokumen tidak diperbolehkan. Ubah metadata atau highlight saja.',
+    });
   };
 
   // Common
