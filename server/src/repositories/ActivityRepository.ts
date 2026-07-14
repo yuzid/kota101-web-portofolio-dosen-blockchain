@@ -280,7 +280,7 @@ export class ActivityRepository {
         dosen: { include: { program_studi: true, user: { select: { email: true } } } },
         partisipasi: {
           include: {
-            dosen: { include: { user: { select: { email: true } } } },
+            dosen: { include: { program_studi: true, user: { select: { email: true } } } },
           },
         },
         lampiran_bukti: {

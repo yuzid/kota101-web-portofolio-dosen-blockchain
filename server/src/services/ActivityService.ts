@@ -23,7 +23,17 @@ export class ActivityService {
     return date.toISOString().split('T')[0];
   }
 
-  private buildBlockchainPayload(activity: any, eventType: string) {
+  private getActorFromActivity(activity: any, actorDosenId?: string) {
+    if (!actorDosenId || activity.dosen_id === actorDosenId) return activity.dosen;
+    return activity.partisipasi
+      ?.find((participant: any) => participant.dosen_id === actorDosenId)
+      ?.dosen || activity.dosen;
+  }
+
+  private buildBlockchainPayload(activity: any, eventType: string, actorDosenId?: string) {
+    const actor = this.getActorFromActivity(activity, actorDosenId);
+    const actorProgramStudi = actor.program_studi || activity.dosen.program_studi;
+
     return {
       event_type: eventType,
       payload_version: 1,
@@ -40,14 +50,14 @@ export class ActivityService {
         semester: activity.semester,
       },
       pencatat: {
-        id: activity.dosen.id,
-        nip: activity.dosen.nip,
-        nidn: activity.dosen.nidn,
-        nama: activity.dosen.nama,
+        id: actor.id,
+        nip: actor.nip,
+        nidn: actor.nidn,
+        nama: actor.nama,
         program_studi: {
-          id: activity.dosen.program_studi.id,
-          kode: activity.dosen.program_studi.kode_prodi,
-          nama: activity.dosen.program_studi.nama_prodi,
+          id: actorProgramStudi.id,
+          kode: actorProgramStudi.kode_prodi,
+          nama: actorProgramStudi.nama_prodi,
         },
       },
       partisipasi: activity.partisipasi.map((participant: any) => ({
@@ -89,10 +99,10 @@ export class ActivityService {
     };
   }
 
-  private async publishActivitySnapshot(activity: any, eventType: string) {
+  private async publishActivitySnapshot(activity: any, eventType: string, actorDosenId?: string) {
     return await this.multiChainService.publishJson(
       activity.id,
-      this.buildBlockchainPayload(activity, eventType),
+      this.buildBlockchainPayload(activity, eventType, actorDosenId),
     );
   }
 
@@ -533,7 +543,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(id);
       if (!updatedActivity) throw new Error('Kegiatan gagal dimuat setelah diperbarui.');
-      txId = await this.publishActivitySnapshot(updatedActivity, 'KEGIATAN_UPDATED');
+      txId = await this.publishActivitySnapshot(updatedActivity, 'KEGIATAN_UPDATED', dosenId);
     } catch (error) {
       await this.activityRepository.update(id, {
         nama_kegiatan: activity.nama_kegiatan,
@@ -593,7 +603,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(id);
       if (!updatedActivity) throw new Error('Kegiatan gagal dimuat setelah dokumen ditambahkan.');
-      txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_ADDED');
+      txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_ADDED', dosenId);
     } catch (error) {
       await this.activityRepository.deleteLampiran(lampiran.id);
       throw error;
@@ -621,7 +631,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(kegiatanId);
       if (updatedActivity) {
-        txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_REMOVED');
+        txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_REMOVED', dosenId);
         await this.activityRepository.updateTransactionId(kegiatanId, txId);
       }
     } catch {
