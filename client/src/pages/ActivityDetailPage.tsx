@@ -227,7 +227,7 @@ export function ActivityDetailPage() {
   const partisipasiId = (location.state as Record<string, unknown>)?.partisipasiId as string | undefined;
 
   const handleConfirmAccept = async () => {
-    if (!id || !partisipasiId) return;
+    if (!id || !partisipasiId || isConfirming) return;
     setIsConfirming(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/partisipasi/${partisipasiId}/terima`, {
@@ -249,7 +249,7 @@ export function ActivityDetailPage() {
   };
 
   const handleConfirmReject = async () => {
-    if (!id || !partisipasiId) return;
+    if (!id || !partisipasiId || isConfirming) return;
     setIsConfirming(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan/${id}/partisipasi/${partisipasiId}/tolak`, {

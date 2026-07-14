@@ -137,7 +137,20 @@ export class DistributionRepository {
     });
   }
 
-  async updateStatus(id: string, status: string) {
+  async updateStatus(id: string, status: string, expectedCurrentStatus?: string) {
+    if (expectedCurrentStatus) {
+      const result = await prisma.kepemilikanDokumen.updateMany({
+        where: { id, status: expectedCurrentStatus },
+        data: {
+          status,
+          tanggal_keputusan: new Date(),
+        },
+      });
+      if (result.count === 0) {
+        throw new Error("Dokumen sudah diproses.");
+      }
+      return result;
+    }
     return await prisma.kepemilikanDokumen.update({
       where: { id },
       data: {

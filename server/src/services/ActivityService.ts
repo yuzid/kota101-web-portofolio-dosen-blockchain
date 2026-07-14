@@ -646,8 +646,11 @@ export class ActivityService {
     const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
     if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
     if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+    if (partisipasi.status !== 'MENUNGGU_KONFIRMASI') {
+      throw new Error('Undangan kegiatan sudah diproses.');
+    }
 
-    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA');
+    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA', 'MENUNGGU_KONFIRMASI');
 
     const activity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
     if (activity && activity.jenis_bukti === 'BERSAMA') {
@@ -676,8 +679,11 @@ export class ActivityService {
     const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
     if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
     if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+    if (partisipasi.status !== 'MENUNGGU_KONFIRMASI') {
+      throw new Error('Undangan kegiatan sudah diproses.');
+    }
 
-    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK');
+    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK', 'MENUNGGU_KONFIRMASI');
     await this.emailService.notifyActivityDecision(
       {
         nama: partisipasi.kegiatan_tridharma.dosen.nama,

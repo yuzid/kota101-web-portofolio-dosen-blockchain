@@ -385,7 +385,17 @@ export class ActivityRepository {
     });
   }
 
-  async updateParticipationStatus(id: string, status: string) {
+  async updateParticipationStatus(id: string, status: string, expectedCurrentStatus?: string) {
+    if (expectedCurrentStatus) {
+      const result = await prisma.partisipasiKegiatanTridharma.updateMany({
+        where: { id, status: expectedCurrentStatus as any },
+        data: { status: status as any },
+      });
+      if (result.count === 0) {
+        throw new Error('Undangan kegiatan sudah diproses.');
+      }
+      return result;
+    }
     return await prisma.partisipasiKegiatanTridharma.update({
       where: { id },
       data: { status: status as any },
