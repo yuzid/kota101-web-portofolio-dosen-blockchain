@@ -385,6 +385,13 @@ export class DocumentService {
         throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
     }
 
+    // Pengecekan keterikatan dokumen dengan kegiatan
+    if (targetDoc.lampiran_bukti && targetDoc.lampiran_bukti.length > 0) {
+      throw new Error(
+        "Dokumen tidak dapat dihapus karena masih digunakan sebagai bukti pada kegiatan Tridharma."
+      );
+    }
+
     return await this.documentRepository.softDelete(id);
   }
 

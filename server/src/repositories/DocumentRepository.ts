@@ -36,7 +36,10 @@ export class DocumentRepository {
   async findById(id: string) {
     return await prisma.dokumen.findUnique({
       where: { id },
-      include: { kepemilikan: { where: { status: 'DISETUJUI' } } }
+      include: { 
+        kepemilikan: { where: { status: 'DISETUJUI' } },
+        lampiran_bukti: true
+      }
     });
   }
 
