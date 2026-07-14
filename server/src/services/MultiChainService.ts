@@ -69,11 +69,11 @@ export class MultiChainService {
     return nodes;
   }
 
-  private getNextNode(): BlockchainNode {
+  private getNodesInRotation(): BlockchainNode[] {
     const nodes = this.getConfiguredNodes();
-    const node = nodes[this.nextNodeIndex % nodes.length];
+    const startIndex = this.nextNodeIndex % nodes.length;
     this.nextNodeIndex = (this.nextNodeIndex + 1) % nodes.length;
-    return node;
+    return [...nodes.slice(startIndex), ...nodes.slice(0, startIndex)];
   }
 
   private async callRpc<T>(node: BlockchainNode, method: string, params: unknown[]): Promise<T> {
@@ -119,6 +119,23 @@ export class MultiChainService {
     }
   }
 
+  private async callRpcWithFailover<T>(method: string, params: unknown[]): Promise<T> {
+    const nodes = this.getNodesInRotation();
+    const errors: string[] = [];
+
+    for (const node of nodes) {
+      try {
+        return await this.callRpc<T>(node, method, params);
+      } catch (error: any) {
+        errors.push(error?.message || String(error));
+        console.warn(`[blockchain] Node ${node} gagal untuk method ${method}. Mencoba node berikutnya.`, error);
+      }
+    }
+
+    console.error(`[blockchain] Semua node gagal untuk method ${method}: ${errors.join(' | ')}`);
+    throw new Error('Layanan blockchain sedang tidak dapat dihubungi. Coba beberapa saat lagi.');
+  }
+
   async publishJson(
     key: string,
     payload: Record<string, unknown>,
@@ -128,14 +145,13 @@ export class MultiChainService {
       throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
     }
 
-    const txId = await this.callRpc<string>(
-      this.getNextNode(),
+    const txId = await this.callRpcWithFailover<string>(
       'publish',
       [streamName, key, { json: payload }],
     );
 
     if (typeof txId !== 'string' || !txId) {
-      throw new Error('Response publish tidak berisi transaction ID.');
+      throw new Error('Layanan blockchain mengembalikan respons tidak valid.');
     }
 
     return txId;
@@ -150,8 +166,7 @@ export class MultiChainService {
       throw new Error('AUDIT_STREAM_NAME belum dikonfigurasi.');
     }
 
-    const items = await this.callRpc<MultiChainStreamItem[]>(
-      this.getNextNode(),
+    const items = await this.callRpcWithFailover<MultiChainStreamItem[]>(
       'liststreamkeyitems',
       [streamName, key, true, count, 0],
     );
