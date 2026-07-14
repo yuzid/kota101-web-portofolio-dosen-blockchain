@@ -311,6 +311,32 @@ export function ManageAccountsPage() {
     return true;
   };
 
+  const checkNipAvailability = (nip: string, excludeId?: string) => {
+    if (!nip.trim()) return true;
+    const exists = accounts.some(
+      (acc) => acc.nip === nip && acc.id !== excludeId
+    );
+    if (exists) {
+      setNipError("NIP ini sudah digunakan");
+      return false;
+    }
+    setNipError("");
+    return true;
+  };
+
+  const checkNidnAvailability = (nidn: string, excludeId?: string) => {
+    if (!nidn.trim()) return true;
+    const exists = accounts.some(
+      (acc) => acc.nidn === nidn && acc.id !== excludeId
+    );
+    if (exists) {
+      setNidnError("NIDN ini sudah digunakan");
+      return false;
+    }
+    setNidnError("");
+    return true;
+  };
+
   const handleSubmitAdd = () => {
     if (
       !formData.name ||
@@ -966,6 +992,9 @@ export function ManageAccountsPage() {
                     setFormData({ ...formData, nip: e.target.value });
                     setNipError("");
                   }}
+                  onBlur={() =>
+                    formData.nip && checkNipAvailability(formData.nip)
+                  }
                   placeholder="Masukkan NIP"
                   className={cn(nipError && "border-destructive")}
                 />
@@ -989,6 +1018,9 @@ export function ManageAccountsPage() {
                     setFormData({ ...formData, nidn: e.target.value });
                     setNidnError("");
                   }}
+                  onBlur={() =>
+                    formData.nidn && checkNidnAvailability(formData.nidn)
+                  }
                   placeholder="Masukkan NIDN"
                   className={cn(nidnError && "border-destructive")}
                 />
@@ -1190,6 +1222,10 @@ export function ManageAccountsPage() {
                     setFormData({ ...formData, nip: e.target.value });
                     setNipError("");
                   }}
+                  onBlur={() =>
+                    formData.nip &&
+                    checkNipAvailability(formData.nip, selectedAccount?.id)
+                  }
                   className={cn(nipError && "border-destructive")}
                 />
                 {nipError && (
@@ -1221,6 +1257,10 @@ export function ManageAccountsPage() {
                     setFormData({ ...formData, nidn: e.target.value });
                     setNidnError("");
                   }}
+                  onBlur={() =>
+                    formData.nidn &&
+                    checkNidnAvailability(formData.nidn, selectedAccount?.id)
+                  }
                   placeholder="Masukkan NIDN"
                   className={cn(nidnError && "border-destructive")}
                 />
