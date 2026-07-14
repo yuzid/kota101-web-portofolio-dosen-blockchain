@@ -89,12 +89,12 @@ export function HighlightMenu({
                 {highlight.highlighted_text}
               </p>
             )}
-            <button
+            {/* <button
               className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100"
               onClick={() => setEditing(true)}
             >
               Edit Teks
-            </button>
+            </button> */}
             <button
               className="w-full rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
               onClick={handleDelete}
