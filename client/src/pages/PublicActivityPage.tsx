@@ -1424,6 +1424,7 @@ function DocPreviewBlock({
 }) {
   const fileType = getFileType(doc.filePath);
   const fileUrl = doc.fileUrl || `${API_URL}/api/public/dokumen/${doc.id}/content`;
+  const verified = doc.hashFile && doc.hashFile !== "-";
 
   if (!doc.filePath) {
     return (
@@ -1438,6 +1439,27 @@ function DocPreviewBlock({
 
   return (
     <div className="border rounded-lg overflow-hidden">
+      {/* Penanda Integritas Dokumen */}
+      <div className={`px-3 py-2 flex items-center justify-between border-b text-xs font-semibold ${
+        verified 
+          ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900" 
+          : "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-100 dark:border-yellow-900"
+      }`}>
+        <div className="flex items-center gap-1.5">
+          {verified ? (
+            <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+          )}
+          <span>{verified ? "Integritas Terverifikasi di Blockchain" : "Belum Tercatat di Blockchain"}</span>
+        </div>
+        {verified && doc.hashFile && (
+          <span className="font-mono text-[9px] text-muted-foreground truncate max-w-[150px] md:max-w-xs" title={doc.hashFile}>
+            Hash: {doc.hashFile}
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center justify-between p-3 bg-muted/20 border-b">
         <p className="font-medium text-sm truncate flex-1">{label}</p>
         <Badge

@@ -177,11 +177,6 @@ export function PublicDocumentPage() {
                    ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
                    : "Dokumen ini belum dicatat pada jaringan blockchain."}
                </p>
-              <p className={`text-sm mt-1 ${verified ? "text-green-600" : "text-yellow-600"}`}>
-                {verified
-                  ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
-                  : "Dokumen ini belum dicatat pada jaringan blockchain."}
-              </p>
             </div>
           </div>
         </div>
