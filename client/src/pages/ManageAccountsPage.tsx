@@ -366,22 +366,19 @@ export function ManageAccountsPage() {
         fetchUsers();
         navigate("/manage-accounts");
       } else {
-        if (response.status === 409) {
-          const msg = result.error || "";
-          const lower = msg.toLowerCase();
-          const hasFieldError =
-            lower.includes("email") ||
-            lower.includes("nip") ||
-            lower.includes("nidn");
-          if (lower.includes("email")) setUsernameError(msg);
-          if (lower.includes("nip")) setNipError(msg);
-          if (lower.includes("nidn")) setNidnError(msg);
-          if (!hasFieldError) {
-            setGeneralError(msg);
-            toast.error(msg);
-          }
+        const msg = result.error || "";
+        const lower = msg.toLowerCase();
+        if (lower.includes("email")) {
+          setUsernameError(msg);
+        } else if (lower.includes("nidn")) {
+          setNidnError(msg);
+        } else if (lower.includes("nip")) {
+          setNipError(msg);
+        } else if (lower.includes("password")) {
+          setPasswordError(msg);
         } else {
-          toast.error(result.error || "Gagal membuat akun");
+          setGeneralError(msg);
+          toast.error(msg);
         }
       }
     } catch (error) {
@@ -456,18 +453,20 @@ export function ManageAccountsPage() {
         setShowEditDialog(false);
         fetchUsers();
       } else {
-        if (response.status === 409) {
-          const msg = result.error || "";
-          const lower = msg.toLowerCase();
-          const hasFieldError = lower.includes("nip") || lower.includes("nidn");
-          if (lower.includes("nip")) setNipError(msg);
-          if (lower.includes("nidn")) setNidnError(msg);
-          if (!hasFieldError) {
-            setGeneralError(msg);
-            toast.error(msg);
-          }
+        const msg = result.error || "";
+        const lower = msg.toLowerCase();
+        if (lower.includes("nidn")) {
+          setNidnError(msg);
+        } else if (lower.includes("nip")) {
+          setNipError(msg);
+        } else if (lower.includes("password")) {
+          setPasswordError(msg);
+        } else if (lower.includes("email")) {
+          setGeneralError(msg);
+          toast.error(msg);
         } else {
-          toast.error(result.error || "Gagal memperbarui akun");
+          setGeneralError(msg);
+          toast.error(msg);
         }
       }
     } catch (error) {
