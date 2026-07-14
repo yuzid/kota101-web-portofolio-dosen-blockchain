@@ -128,6 +128,11 @@ const UnauthorizedPage = lazy(() =>
     default: m.UnauthorizedPage,
   }))
 );
+const NotFoundPage = lazy(() =>
+  import("./pages/NotFoundPage").then((m) => ({
+    default: m.NotFoundPage,
+  }))
+);
 
 
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
@@ -488,7 +493,7 @@ function AppRoutes() {
 
         {/* Fallback */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );
