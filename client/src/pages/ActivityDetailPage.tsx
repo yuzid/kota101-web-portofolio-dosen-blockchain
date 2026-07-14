@@ -200,6 +200,11 @@ function formatAuditValue(value: unknown) {
   return value.replaceAll("_", " ");
 }
 
+function formatParticipantStatus(value: unknown) {
+  const key = String(value ?? "");
+  return statusBadge[key]?.label || formatAuditValue(value);
+}
+
 function getRecordId(record: Record<string, unknown>, key: string) {
   return typeof record[key] === "string" ? String(record[key]) : "";
 }
@@ -1055,6 +1060,7 @@ export function ActivityDetailPage() {
             const recorder = selectedLog.payload.pencatat ?? {};
             const participants = selectedLog.payload.partisipasi ?? [];
             const documents = selectedLog.payload.dokumen_pendukung ?? [];
+            const previousParticipants = getPreviousLog(selectedLog)?.payload.partisipasi ?? [];
             const previousDocuments = getPreviousLog(selectedLog)?.payload.dokumen_pendukung ?? [];
             const isDocumentEvent = isDocumentChangeAction(selectedLog.action);
             const documentEventChanges = documentChanges.changed.length > 0
@@ -1141,11 +1147,31 @@ export function ActivityDetailPage() {
                            Dosen dihapus: <strong>{String(p.nama ?? "-")}</strong>.
                          </div>
                        ))}
-                       {participantChanges.changed.map((p) => (
-                         <div key={`pc-${getRecordId(p, "dosen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
-                           Data partisipasi berubah: <strong>{String(p.nama ?? "-")}</strong>.
-                         </div>
-                       ))}
+                       {participantChanges.changed.map((p) => {
+                         const previousParticipant = previousParticipants.find(
+                           (item) => getRecordId(item, "dosen_id") === getRecordId(p, "dosen_id")
+                         );
+                         const statusChanged = previousParticipant?.status !== p.status;
+
+                         return (
+                           <div key={`pc-${getRecordId(p, "dosen_id")}`} className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-3 text-sm text-amber-900 dark:text-amber-300 rounded-lg">
+                             {statusChanged ? (
+                               <div className="space-y-1">
+                                 <p>Status partisipasi <strong>{String(p.nama ?? "-")}</strong> berubah.</p>
+                                 <div className="flex flex-wrap items-center gap-2">
+                                   <span className="line-through text-amber-800/70 dark:text-amber-200/70">
+                                     {formatParticipantStatus(previousParticipant?.status)}
+                                   </span>
+                                   <ChevronRight className="h-3.5 w-3.5 shrink-0 text-amber-700/70 dark:text-amber-200/70" />
+                                   <strong>{formatParticipantStatus(p.status)}</strong>
+                                 </div>
+                               </div>
+                             ) : (
+                               <>Data partisipasi berubah: <strong>{String(p.nama ?? "-")}</strong>.</>
+                             )}
+                           </div>
+                         );
+                       })}
  
                        {documentChanges.added.map((d) => (
                          <div key={`da-${getRecordId(d, "dokumen_id")}`} className="border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 px-4 py-3 text-sm text-green-900 dark:text-green-300 rounded-lg">

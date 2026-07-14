@@ -486,6 +486,18 @@ export class ActivityService {
           status: 'MENUNGGU_KONFIRMASI',
         });
       }
+
+      if (isCreator) {
+        const requestedIds = new Set(anggota_ids.filter((aid: string) => aid !== activity.dosen_id));
+        const removedIds = existingParticipations
+          .filter((participant: any) => participant.dosen_id !== activity.dosen_id)
+          .filter((participant: any) => !requestedIds.has(participant.dosen_id))
+          .map((participant: any) => participant.dosen_id);
+
+        for (const removedId of removedIds) {
+          await this.activityRepository.deleteParticipation(removedId, id);
+        }
+      }
     }
 
     // Hapus lampiran yang di-defer dari frontend (fix cancel button)
@@ -670,6 +682,12 @@ export class ActivityService {
       }
     }
 
+    const updatedActivity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'PARTISIPASI_DITERIMA', dosenId);
+      await this.activityRepository.updateTransactionId(updatedActivity.id, txId);
+    }
+
     await this.emailService.notifyActivityDecision(
       {
         nama: partisipasi.kegiatan_tridharma.dosen.nama,
@@ -694,6 +712,12 @@ export class ActivityService {
     }
 
     const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK', 'MENUNGGU_KONFIRMASI');
+    const updatedActivity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'PARTISIPASI_DITOLAK', dosenId);
+      await this.activityRepository.updateTransactionId(updatedActivity.id, txId);
+    }
+
     await this.emailService.notifyActivityDecision(
       {
         nama: partisipasi.kegiatan_tridharma.dosen.nama,
@@ -722,6 +746,11 @@ export class ActivityService {
       peran: 'ANGGOTA',
       status: 'MENUNGGU_KONFIRMASI',
     });
+    const updatedActivity = await this.activityRepository.findById(kegiatanId);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'ANGGOTA_DITAMBAHKAN', dosenId);
+      await this.activityRepository.updateTransactionId(kegiatanId, txId);
+    }
     await this.notifyInvitedMembers(kegiatanId, [anggotaId]);
     return participation;
   }
@@ -734,7 +763,13 @@ export class ActivityService {
     if (activity.dosen_id !== dosenId) throw new Error('Akses ditolak. Anda bukan pencatat kegiatan ini.');
     if (activity.dosen_id === anggotaId) throw new Error('Tidak dapat menghapus pembuat kegiatan.');
 
-    return await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
+    const result = await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
+    const updatedActivity = await this.activityRepository.findById(kegiatanId);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'ANGGOTA_DIHAPUS', dosenId);
+      await this.activityRepository.updateTransactionId(kegiatanId, txId);
+    }
+    return result;
   }
 
   // Public methods (no authentication required)
