@@ -3,8 +3,8 @@ import { KategoriTridharma, JenisKegiatan, KegiatanTridharma } from '@prisma/cli
 export interface KegiatanFilter {
   tanggalAwal?: string; 
   tanggalAkhir?: string;
-  jenis?: KategoriTridharma;
-  kategori?: JenisKegiatan;   
+  jenis?: KategoriTridharma | KategoriTridharma[];
+  kategori?: JenisKegiatan | JenisKegiatan[];      
   search?: string;
   prodiId?: string;
   dosenId?: string;
