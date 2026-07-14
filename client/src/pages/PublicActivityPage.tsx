@@ -44,6 +44,11 @@ import {
 } from "../components/ui/dialog";
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import {
   transformPublicActivity,
   getFileType,
   getOwnerDosenIds,
@@ -921,7 +926,7 @@ function renderFullMode(
                                   snapshotHighlights: doc.snapshotHighlights,
                                 })
                               }
-                              className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                             className="relative flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group/doc"
                             >
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <FileText className="w-4 h-4 text-blue-500 shrink-0" />
@@ -939,8 +944,30 @@ function renderFullMode(
                                     Belum Tercatat
                                   </Badge>
                                 )}
-                                <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover/doc:opacity-100 transition-opacity" />
                               </div>
+                              {/* Hover info panel */}
+                              {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                                <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                                  <p className="font-semibold text-xs flex items-center gap-1.5 text-green-700 dark:text-green-400 mb-1">
+                                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                                    Terdokumentasi di Blockchain
+                                  </p>
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                                  <p className="font-semibold text-xs flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400 mb-1">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    Belum Tercatat di Blockchain
+                                  </p>
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Dokumen ini belum dicatat pada jaringan blockchain.
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           ))
                         ) : (
@@ -980,7 +1007,7 @@ function renderFullMode(
                           snapshotHighlights: doc.snapshotHighlights,
                         })
                       }
-                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                      className="relative flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group/doc"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <FileText className="w-4 h-4 text-blue-500 shrink-0" />
@@ -998,8 +1025,30 @@ function renderFullMode(
                             Belum Tercatat
                           </Badge>
                         )}
-                        <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover/doc:opacity-100 transition-opacity" />
                       </div>
+                      {/* Hover info panel */}
+                      {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                        <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                          <p className="font-semibold text-xs flex items-center gap-1.5 text-green-700 dark:text-green-400 mb-1">
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                            Terdokumentasi di Blockchain
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                          <p className="font-semibold text-xs flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400 mb-1">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            Belum Tercatat di Blockchain
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Dokumen ini belum dicatat pada jaringan blockchain.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </CardContent>
