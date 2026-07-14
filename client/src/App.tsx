@@ -174,6 +174,35 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * RoleProtectedRoute — memastikan user sudah login DAN memiliki
+ * setidaknya satu dari role yang diizinkan. Jika tidak, redirect ke /dashboard.
+ */
+function RoleProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[];
+}) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <LoadingSpinner />;
+
+  if (isTokenExpired()) {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+
+  const hasAccess = user.roles?.some((r) => allowedRoles.includes(r));
+  if (!hasAccess) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 function AppRoutes() {
@@ -224,9 +253,9 @@ function AppRoutes() {
         <Route
           path="/manage-accounts"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <ManageAccountsPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -234,17 +263,17 @@ function AppRoutes() {
         <Route
           path="/admin/akademik/jurusan"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <AkademikJurusanPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/admin/akademik/prodi"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <AkademikProdiPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -252,17 +281,17 @@ function AppRoutes() {
         <Route
           path="/admin/jabatan/kajur"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <JabatanKajurPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/admin/jabatan/kaprodi"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <JabatanKaprodiPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -270,33 +299,33 @@ function AppRoutes() {
         <Route
           path="/activities"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <ActivitiesPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/activities/new"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <ActivityFormPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/activities/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <ActivityDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/activities/:id/edit"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <ActivityFormPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -304,41 +333,41 @@ function AppRoutes() {
         <Route
           path="/documents"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <DocumentsPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/documents/:id/preview"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen", "staf_tu"]}>
               <DocumentPreviewPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/document-distribution"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["staf_tu"]}>
               <DocumentDistributionPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/document-distribution/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["staf_tu"]}>
               <DocumentDistributionDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/document-distribution/:id/edit"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["staf_tu"]}>
               <DocumentDistributionEditPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -346,9 +375,9 @@ function AppRoutes() {
         <Route
           path="/file-management"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["dosen"]}>
               <FileManagementPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -356,17 +385,17 @@ function AppRoutes() {
         <Route
           path="/ami-recap"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
               <AMIRecapPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/ami-recap/activity/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
               <AMIActivityDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
@@ -374,81 +403,81 @@ function AppRoutes() {
         <Route
           path="/monitoring/jurusan"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kajur"]}>
               <AcademicRoleActivitiesPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/jurusan/kegiatan/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kajur"]}>
               <MonitoringActivityDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/jurusan/rekap"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kajur"]}>
               <LaporanRekapitulasiPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/jurusan/rekap/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kajur"]}>
               <RekapLaporanDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/jurusan/rekap/:id/edit"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kajur"]}>
               <RekapLaporanEditPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/prodi"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kaprodi"]}>
               <AcademicRoleActivitiesPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/prodi/kegiatan/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kaprodi"]}>
               <MonitoringActivityDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/prodi/rekap"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kaprodi"]}>
               <LaporanRekapitulasiPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/prodi/rekap/:id"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kaprodi"]}>
               <RekapLaporanDetailPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
         <Route
           path="/monitoring/prodi/rekap/:id/edit"
           element={
-            <ProtectedRoute>
+            <RoleProtectedRoute allowedRoles={["kaprodi"]}>
               <RekapLaporanEditPage />
-            </ProtectedRoute>
+            </RoleProtectedRoute>
           }
         />
 
