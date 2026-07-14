@@ -123,6 +123,11 @@ const PublicDocumentPage = lazy(() =>
     default: m.PublicDocumentPage,
   }))
 );
+const UnauthorizedPage = lazy(() =>
+  import("./pages/UnauthorizedPage").then((m) => ({
+    default: m.UnauthorizedPage,
+  }))
+);
 
 
 // ─── Loading Spinner ──────────────────────────────────────────────────────────
@@ -198,7 +203,7 @@ function RoleProtectedRoute({
   if (!user) return <Navigate to="/login" replace />;
 
   const hasAccess = user.roles?.some((r) => allowedRoles.includes(r));
-  if (!hasAccess) return <Navigate to="/dashboard" replace />;
+  if (!hasAccess) return <UnauthorizedPage />;
 
   return <>{children}</>;
 }
