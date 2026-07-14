@@ -22,6 +22,7 @@ import {
   ExternalLink,
   FileType,
   FolderOpen,
+  Eye,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -177,11 +178,6 @@ export function PublicDocumentPage() {
                    ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
                    : "Dokumen ini belum dicatat pada jaringan blockchain."}
                </p>
-              <p className={`text-sm mt-1 ${verified ? "text-green-600" : "text-yellow-600"}`}>
-                {verified
-                  ? "Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain."
-                  : "Dokumen ini belum dicatat pada jaringan blockchain."}
-              </p>
             </div>
           </div>
         </div>
@@ -230,10 +226,11 @@ export function PublicDocumentPage() {
               {kegiatanList.map((k: any) => (
                 <div
                   key={k.id}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 border text-sm"
+                  onClick={() => navigate(`/public/kegiatan/${k.id}`)}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 border text-sm cursor-pointer hover:bg-muted/40 transition-colors group"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">{k.nama_kegiatan}</p>
+                    <p className="font-medium group-hover:text-primary transition-colors">{k.nama_kegiatan}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-muted-foreground">
                       {k.kategori_tridharma && (
                         <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
@@ -251,6 +248,7 @@ export function PublicDocumentPage() {
                       )}
                     </div>
                   </div>
+                  <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity self-center shrink-0" />
                 </div>
               ))}
             </div>

@@ -44,6 +44,11 @@ import {
 } from "../components/ui/dialog";
 import { ScrollArea } from "../components/ui/scroll-area";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import {
   transformPublicActivity,
   getFileType,
   getOwnerDosenIds,
@@ -921,11 +926,48 @@ function renderFullMode(
                                   snapshotHighlights: doc.snapshotHighlights,
                                 })
                               }
-                              className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                             className="relative flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group/doc"
                             >
-                              <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                              <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
-                              <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="text-sm font-medium truncate">{doc.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                                  <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                                    Terverifikasi
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
+                                    Belum Tercatat
+                                  </Badge>
+                                )}
+                                <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+                              </div>
+                              {/* Hover info panel */}
+                              {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                                <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                                  <p className="font-semibold text-xs flex items-center gap-1.5 text-green-700 dark:text-green-400 mb-1">
+                                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                                    Terdokumentasi di Blockchain
+                                  </p>
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain.
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                                  <p className="font-semibold text-xs flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400 mb-1">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    Belum Tercatat di Blockchain
+                                  </p>
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Dokumen ini belum dicatat pada jaringan blockchain.
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           ))
                         ) : (
@@ -965,11 +1007,48 @@ function renderFullMode(
                           snapshotHighlights: doc.snapshotHighlights,
                         })
                       }
-                      className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                      className="relative flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group/doc"
                     >
-                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
-                      <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                        <span className="text-sm font-medium truncate">{doc.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                          <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                            <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                            Terverifikasi
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                            <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
+                            Belum Tercatat
+                          </Badge>
+                        )}
+                        <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover/doc:opacity-100 transition-opacity" />
+                      </div>
+                      {/* Hover info panel */}
+                      {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                        <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                          <p className="font-semibold text-xs flex items-center gap-1.5 text-green-700 dark:text-green-400 mb-1">
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                            Terdokumentasi di Blockchain
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Dokumen ini telah diverifikasi dan dicatat pada jaringan blockchain.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 w-64 rounded-lg border bg-popover shadow-lg p-3 opacity-0 group-hover/doc:opacity-100 transition-opacity duration-150">
+                          <p className="font-semibold text-xs flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400 mb-1">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            Belum Tercatat di Blockchain
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Dokumen ini belum dicatat pada jaringan blockchain.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </CardContent>
@@ -1424,6 +1503,7 @@ function DocPreviewBlock({
 }) {
   const fileType = getFileType(doc.filePath);
   const fileUrl = doc.fileUrl || `${API_URL}/api/public/dokumen/${doc.id}/content`;
+  const verified = doc.hashFile && doc.hashFile !== "-";
 
   if (!doc.filePath) {
     return (
@@ -1438,6 +1518,27 @@ function DocPreviewBlock({
 
   return (
     <div className="border rounded-lg overflow-hidden">
+      {/* Penanda Integritas Dokumen */}
+      <div className={`px-3 py-2 flex items-center justify-between border-b text-xs font-semibold ${
+        verified 
+          ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900" 
+          : "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-100 dark:border-yellow-900"
+      }`}>
+        <div className="flex items-center gap-1.5">
+          {verified ? (
+            <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+          )}
+          <span>{verified ? "Integritas Terverifikasi di Blockchain" : "Belum Tercatat di Blockchain"}</span>
+        </div>
+        {verified && doc.hashFile && (
+          <span className="font-mono text-[9px] text-muted-foreground truncate max-w-[150px] md:max-w-xs" title={doc.hashFile}>
+            Hash: {doc.hashFile}
+          </span>
+        )}
+      </div>
+
       <div className="flex items-center justify-between p-3 bg-muted/20 border-b">
         <p className="font-medium text-sm truncate flex-1">{label}</p>
         <Badge

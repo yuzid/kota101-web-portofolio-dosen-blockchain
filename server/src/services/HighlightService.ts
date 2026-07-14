@@ -96,6 +96,15 @@ export class HighlightService {
       }
     }
 
+    // Validate highlight_rect: wajib ada, berupa array, dan tidak kosong
+    if (
+      !highlightData.highlight_rect ||
+      !Array.isArray(highlightData.highlight_rect) ||
+      highlightData.highlight_rect.length === 0
+    ) {
+      throw new Error('highlight_rect wajib diisi dan tidak boleh kosong.');
+    }
+
     const created = await this.highlightRepository.create({
       kepemilikan_id: kepemilikanId,
       ...highlightData

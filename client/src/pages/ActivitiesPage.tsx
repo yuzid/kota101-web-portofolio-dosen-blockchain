@@ -214,12 +214,23 @@ export function ActivitiesPage() {
 
   const copyShareLink = async () => {
     try {
-      await navigator.clipboard.writeText(shareLink);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareLink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = shareLink;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
       setCopied(true);
       toast.success('Link berhasil disalin!');
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      toast.info(`Link: ${shareLink}`);
+      toast.error('Gagal menyalin link');
     }
   };
 
