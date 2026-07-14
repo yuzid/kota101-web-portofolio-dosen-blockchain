@@ -35,8 +35,12 @@ export class ActivityRepository {
 
     if (prodiId) where.dosen.program_studi_id = prodiId;
     if (dosenId) where.dosen_id = dosenId;
-    if (jenis) where.kategori_tridharma = jenis;
-    if (kategori) where.jenis_kegiatan = kategori;
+    if (jenis) {
+      where.kategori_tridharma = Array.isArray(jenis) ? { in: jenis } : jenis;
+    }
+    if (kategori) {
+      where.jenis_kegiatan = Array.isArray(kategori) ? { in: kategori } : kategori;
+    }
 
     if (status) {
       if (status === 'lengkap') {
@@ -99,8 +103,12 @@ export class ActivityRepository {
     };
 
     if (dosenId) where.dosen_id = dosenId;
-    if (jenis) where.kategori_tridharma = jenis;
-    if (kategori) where.jenis_kegiatan = kategori;
+    if (jenis) {
+      where.kategori_tridharma = Array.isArray(jenis) ? { in: jenis } : jenis;
+    }
+    if (kategori) {
+      where.jenis_kegiatan = Array.isArray(kategori) ? { in: kategori } : kategori;
+    }
 
     if (status) {
       if (status === 'lengkap') {
