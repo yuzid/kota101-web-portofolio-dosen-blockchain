@@ -612,7 +612,7 @@ export function DocumentPreviewPage() {
         body: JSON.stringify({
           nama: editForm.name,
           jenis_dokumen: editForm.jenis,
-          tanggal_upload: editForm.tanggal.toISOString(),
+          tanggal_upload: format(editForm.tanggal, "yyyy-MM-dd"),
         }),
       });
       const metadataResult = await metadataRes.json();
@@ -620,7 +620,7 @@ export function DocumentPreviewPage() {
         throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
       }
 
-      setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: editForm.tanggal.toISOString() });
+      setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: format(editForm.tanggal, "yyyy-MM-dd") });
 
       setShowEditDialog(false);
       toast.success("Dokumen berhasil diperbarui.");

@@ -287,7 +287,7 @@ export function DocumentsPage() {
     const formData = new FormData();
     formData.append("nama", uploadForm.name);
     formData.append("jenis_dokumen", uploadForm.jenis);
-    formData.append("tanggal_dokumen", uploadForm.tanggal.toISOString());
+    formData.append("tanggal_dokumen", format(uploadForm.tanggal, "yyyy-MM-dd"));
     formData.append("file", selectedFile);
 
     try {
