@@ -32,6 +32,7 @@ import {
   RefreshCw,
   UserMinus,
   PieChart,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
@@ -223,17 +224,38 @@ export function DocumentDistributionDetailPage() {
              <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
            </Button>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate(`/document-distribution/${id}/edit`)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/document-distribution/${id}/edit`)}
+              disabled={disetujui > 0}
+            >
               <Edit className="w-4 h-4 mr-1.5" /> Edit Dokumen
             </Button>
             <Button variant="outline" size="sm" onClick={handleDownload} disabled={!fileUrl}>
               <Download className="w-4 h-4 mr-1.5" /> Unduh
             </Button>
-            <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={disetujui > 0}
+            >
               <Trash2 className="w-4 h-4 mr-1.5" /> Hapus
             </Button>
           </div>
         </div>
+
+        {/* ── Read-only warning banner if any recipient accepted ── */}
+        {disetujui > 0 && (
+          <div className="flex items-start gap-2.5 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 rounded-xl text-sm leading-relaxed mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-semibold mb-0.5">Dokumen Distribusi Dikunci</p>
+              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima.</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Two Column Layout ── */}
         <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-6 space-y-4 lg:space-y-0">

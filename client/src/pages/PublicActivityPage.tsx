@@ -232,7 +232,7 @@ function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocume
   }).filter((doc) => doc.id);
 }
 
-function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActivity {
+function transformSnapshotLog(log: ActivityLog, activityId: string, liveActivity?: any): PublicActivity {
   const payload = log.payload || {};
   const kegiatan = toRecord(payload.kegiatan);
   const pencatat = toRecord(payload.pencatat);
@@ -241,6 +241,14 @@ function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActiv
   const participants = Array.isArray(payload.partisipasi)
     ? payload.partisipasi.map((item) => toRecord(item))
     : [];
+
+  const jenisBukti = String(
+    kegiatan.jenis_bukti ??
+    liveActivity?.jenis_bukti ??
+    "BERSAMA"
+  );
+
+  const isBuktiBersama = jenisBukti === "BERSAMA";
 
   return {
     id: activityId,
@@ -253,7 +261,7 @@ function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActiv
     semester: String(kegiatan.semester ?? "").toLowerCase(),
     programStudi: String(programStudi.nama ?? "Umum"),
     statusKelengkapan: documents.length > 0 ? "lengkap" : "tidak_lengkap",
-    jenisBukti: "BERSAMA",
+    jenisBukti,
     dosenTerlibat: participants.map((participant) => ({
       id: String(participant.dosen_id ?? participant.nama ?? crypto.randomUUID()),
       name: String(participant.nama ?? "Unknown"),
@@ -262,16 +270,18 @@ function transformSnapshotLog(log: ActivityLog, activityId: string): PublicActiv
       status: String(participant.status ?? "DITERIMA"),
       dokumen: [],
     })),
-    dokumenBersama: documents.map((doc) => ({
-      id: doc.id,
-      name: doc.name,
-      jenis: doc.jenis,
-      tanggalUpload: doc.tanggalUpload,
-      hashFile: doc.hashFile,
-      filePath: doc.filePath,
-      fileUrl: `${API_URL}/api/public/kegiatan/${activityId}/audit-trail/${log.id}/dokumen/${doc.id}/content`,
-      snapshotHighlights: doc.highlights,
-    })),
+    dokumenBersama: isBuktiBersama
+      ? documents.map((doc) => ({
+          id: doc.id,
+          name: doc.name,
+          jenis: doc.jenis,
+          tanggalUpload: doc.tanggalUpload,
+          hashFile: doc.hashFile,
+          filePath: doc.filePath,
+          fileUrl: `${API_URL}/api/public/kegiatan/${activityId}/audit-trail/${log.id}/dokumen/${doc.id}/content`,
+          snapshotHighlights: doc.highlights,
+        }))
+      : [],
   };
 }
 
@@ -464,6 +474,17 @@ export function PublicActivityPage() {
     }
   };
 
+  const fetchLiveActivity = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/public/kegiatan/${id}`);
+      if (!response.ok) return null;
+      const result = await response.json();
+      return result.status === "success" ? result.data : null;
+    } catch {
+      return null;
+    }
+  };
+
   const fetchAuditTrail = async (): Promise<ActivityLog[]> => {
     try {
       const response = await fetch(`${API_URL}/api/public/kegiatan/${id}/audit-trail`);
@@ -637,9 +658,65 @@ export function PublicActivityPage() {
         setIsLoading(false);
         return;
       }
-      const snapshotActivity = transformSnapshotLog(selected, id!);
+      const liveActivity = await fetchLiveActivity();
+      const snapshotActivity = transformSnapshotLog(selected, id!, liveActivity);
+      const snapshotDocs = getSnapshotDocuments(selected.payload);
+
+      if (snapshotDocs.length > 0) {
+        const docResults = await Promise.allSettled(
+          snapshotDocs.map((doc) =>
+            fetch(`${API_URL}/api/public/dokumen/${doc.id}`)
+              .then((r) => r.json())
+              .then((r) => (r.status === "success" ? r.data : null))
+          )
+        );
+
+        if (snapshotActivity.jenisBukti === "BERSAMA") {
+          docResults.forEach((result) => {
+            if (result.status !== "fulfilled" || !result.value) return;
+            const detail = result.value;
+            const sharedDoc = snapshotActivity.dokumenBersama.find(
+              (d) => d.id === detail.id
+            );
+            if (sharedDoc) {
+              if (detail.file_path) sharedDoc.filePath = detail.file_path;
+              if (detail.hash_file) sharedDoc.hashFile = detail.hash_file;
+              sharedDoc.kepemilikanId = detail.kepemilikan?.[0]?.id || undefined;
+            }
+          });
+        } else {
+          docResults.forEach((result) => {
+            if (result.status !== "fulfilled" || !result.value) return;
+            const detail = result.value;
+            const ownerIds = getOwnerDosenIds(detail);
+            const snapDoc = snapshotDocs.find((d) => d.id === detail.id);
+
+            snapshotActivity.dosenTerlibat.forEach((dosen) => {
+              if (ownerIds.includes(dosen.id)) {
+                const existing = dosen.dokumen.find(
+                  (d) => d.id === detail.id
+                );
+                if (!existing) {
+                  dosen.dokumen.push({
+                    id: detail.id,
+                    name: detail.nama || "Tanpa Nama",
+                    jenis: detail.jenis_dokumen || "-",
+                    tanggalUpload: detail.tanggal_upload || "",
+                    hashFile: snapDoc?.hashFile || detail.hash_file || "",
+                    filePath: detail.file_path || "",
+                    fileUrl: `${API_URL}/api/public/kegiatan/${id}/audit-trail/${selected.id}/dokumen/${detail.id}/content`,
+                    kepemilikanId: detail.kepemilikan?.find((k: any) => k.dosen?.id === dosen.id)?.id || undefined,
+                    snapshotHighlights: snapDoc?.highlights,
+                  });
+                }
+              }
+            });
+          });
+        }
+      }
+
       if (isDokumenMode) {
-        const latestName = latestActivityName || await fetchLatestActivityName();
+        const latestName = latestActivityName || (liveActivity?.nama_kegiatan || "");
         if (latestName) setLatestActivityName(latestName);
         setActivity({
           ...snapshotActivity,

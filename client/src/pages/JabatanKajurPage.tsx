@@ -145,7 +145,7 @@ export function JabatanKajurPage() {
   const fetchDosens = async () => {
     try {
       const [dosenRes, kaprodiRes] = await Promise.all([
-        fetch(`${usersUrl}?role=DOSEN`, {
+        fetch(`${usersUrl}?role=DOSEN&status=active`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(apiUrl.replace("/kajur", "/kaprodi"), {
@@ -160,7 +160,7 @@ export function JabatanKajurPage() {
       if (dosenResult.status === "success") {
         setDosens(
           dosenResult.data
-            .filter((u: any) => !kaprodiDosenIds.has(u.id))
+            .filter((u: any) => !kaprodiDosenIds.has(u.id) && u.status === "active")
             .map((u: any) => ({
               id: u.id,
               nama: u.dosen?.nama || u.email,

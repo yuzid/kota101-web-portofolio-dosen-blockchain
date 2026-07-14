@@ -11,7 +11,7 @@ export class AdminUserController {
 
   getAllUsers = async (req: AuthRequest, res: Response) => {
     try {
-      const { role } = req.query;
+      const { role, status } = req.query;
       const currentUser = req.user;
 
       if (!currentUser) {
@@ -19,7 +19,7 @@ export class AdminUserController {
         return;
       }
 
-      const users = await this.adminUserService.getAllUsers(currentUser, role as string);
+      const users = await this.adminUserService.getAllUsers(currentUser, role as string, status as string);
       res.json({ status: 'success', data: users });
     } catch (error: any) {
       res.status(403).json({ status: 'error', error: error.message });

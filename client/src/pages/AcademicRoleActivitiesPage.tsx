@@ -175,15 +175,17 @@ export function AcademicRoleActivitiesPage() {
   const fetchFilterOptions = async () => {
     try {
       // Fetch Dosen
-      const dResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=dosen`, {
+      const dResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=dosen&status=active`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const dResult = await dResponse.json();
       if (dResult.status === 'success') {
-        setDosenList(dResult.data.map((u: any) => ({ 
-          id: u.id, 
-          nama: u.dosen?.nama || u.admin?.nama || u.tata_usaha?.nama || u.email 
-        })));
+        setDosenList(dResult.data
+          .filter((u: any) => u.status === "active")
+          .map((u: any) => ({ 
+            id: u.id, 
+            nama: u.dosen?.nama || u.admin?.nama || u.tata_usaha?.nama || u.email 
+          })));
       }
 
       // Fetch Prodi

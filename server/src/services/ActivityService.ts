@@ -48,6 +48,7 @@ export class ActivityService {
         tanggal_selesai: activity.tanggal_selesai.toISOString(),
         periode: activity.periode,
         semester: activity.semester,
+        jenis_bukti: activity.jenis_bukti,
       },
       pencatat: {
         id: actor.id,
