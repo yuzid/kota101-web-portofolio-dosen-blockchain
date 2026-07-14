@@ -178,7 +178,11 @@ export function DocumentsPage() {
     }
   };
 
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+
   const handleAccept = async (dokumenId: string) => {
+    if (actionLoading[dokumenId]) return;
+    setActionLoading(prev => ({ ...prev, [dokumenId]: true }));
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${dokumenId}/terima`, {
         method: "PATCH",
@@ -194,10 +198,14 @@ export function DocumentsPage() {
       }
     } catch {
       toast.error("Gagal menerima dokumen.");
+    } finally {
+      setActionLoading(prev => ({ ...prev, [dokumenId]: false }));
     }
   };
 
   const handleReject = async (dokumenId: string) => {
+    if (actionLoading[dokumenId]) return;
+    setActionLoading(prev => ({ ...prev, [dokumenId]: true }));
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/dokumen/${dokumenId}/tolak`, {
         method: "PATCH",
@@ -212,6 +220,8 @@ export function DocumentsPage() {
       }
     } catch {
       toast.error("Gagal menolak dokumen.");
+    } finally {
+      setActionLoading(prev => ({ ...prev, [dokumenId]: false }));
     }
   };
 
@@ -427,12 +437,14 @@ export function DocumentsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => navigate(`/documents/${req.dokumenId}/preview`, { state: { fromPendingRequest: true } })}
+                        disabled={actionLoading[req.dokumenId]}
                       >
                         <Eye className="w-4 h-4 mr-1" /> Detail
                       </Button>
                       <Button
                         size="sm"
                         onClick={() => handleAccept(req.dokumenId)}
+                        disabled={actionLoading[req.dokumenId]}
                       >
                         <Check className="w-4 h-4 mr-1" /> Terima
                       </Button>
@@ -441,6 +453,7 @@ export function DocumentsPage() {
                         variant="outline"
                         onClick={() => handleReject(req.dokumenId)}
                         className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                        disabled={actionLoading[req.dokumenId]}
                       >
                         <X className="w-4 h-4 mr-1" /> Tolak
                       </Button>

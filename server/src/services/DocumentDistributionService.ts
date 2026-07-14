@@ -211,7 +211,7 @@ export class DocumentDistributionService {
     if (distribusi.status !== "MENUNGGU_KONFIRMASI")
       throw new Error("Dokumen sudah diproses.");
 
-    await this.distributionRepository.updateStatus(distribusi.id, "DISETUJUI");
+    await this.distributionRepository.updateStatus(distribusi.id, "DISETUJUI", "MENUNGGU_KONFIRMASI");
 
     const sender = distribusi.didistribusikan_oleh;
     const dosenNama = (distribusi.dosen as any)?.nama || "Dosen";
@@ -238,7 +238,7 @@ export class DocumentDistributionService {
     if (distribusi.status !== "MENUNGGU_KONFIRMASI")
       throw new Error("Dokumen sudah diproses.");
 
-    await this.distributionRepository.updateStatus(distribusi.id, "DITOLAK");
+    await this.distributionRepository.updateStatus(distribusi.id, "DITOLAK", "MENUNGGU_KONFIRMASI");
 
     const sender = distribusi.didistribusikan_oleh;
     const dosenNama = (distribusi.dosen as any)?.nama || "Dosen";

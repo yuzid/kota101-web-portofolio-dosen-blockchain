@@ -491,11 +491,15 @@ export function PublicActivityPage() {
           const prevPart = prev.partisipasi || [];
           const addedPart = curPart.filter((p: any) => !prevPart.some((op: any) => op.dosen_id === p.dosen_id));
           const removedPart = prevPart.filter((op: any) => !curPart.some((p: any) => p.dosen_id === op.dosen_id));
-          if (addedPart.length > 0 || removedPart.length > 0) {
+          const modifiedPart = curPart.filter((p: any) => {
+            const oldPart = prevPart.find((op: any) => op.dosen_id === p.dosen_id);
+            return oldPart && JSON.stringify(oldPart) !== JSON.stringify(p);
+          });
+          if (addedPart.length > 0 || removedPart.length > 0 || modifiedPart.length > 0) {
             collectionChanges['anggota_kegiatan'] = {
               added: addedPart,
               removed: removedPart,
-              modified: []
+              modified: modifiedPart
             };
           }
 
@@ -540,6 +544,9 @@ export function PublicActivityPage() {
             }
             if (partChange.removed.length > 0) {
               descParts.push(`Mengeluarkan anggota: ${partChange.removed.map((p: any) => p.nama).join(', ')}.`);
+            }
+            if (partChange.modified.length > 0) {
+              descParts.push(`Mengubah status anggota: ${partChange.modified.map((p: any) => `${p.nama} menjadi ${formatAuditValue(p.status)}`).join(', ')}.`);
             }
           }
 

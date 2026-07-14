@@ -23,7 +23,17 @@ export class ActivityService {
     return date.toISOString().split('T')[0];
   }
 
-  private buildBlockchainPayload(activity: any, eventType: string) {
+  private getActorFromActivity(activity: any, actorDosenId?: string) {
+    if (!actorDosenId || activity.dosen_id === actorDosenId) return activity.dosen;
+    return activity.partisipasi
+      ?.find((participant: any) => participant.dosen_id === actorDosenId)
+      ?.dosen || activity.dosen;
+  }
+
+  private buildBlockchainPayload(activity: any, eventType: string, actorDosenId?: string) {
+    const actor = this.getActorFromActivity(activity, actorDosenId);
+    const actorProgramStudi = actor.program_studi || activity.dosen.program_studi;
+
     return {
       event_type: eventType,
       payload_version: 1,
@@ -40,14 +50,14 @@ export class ActivityService {
         semester: activity.semester,
       },
       pencatat: {
-        id: activity.dosen.id,
-        nip: activity.dosen.nip,
-        nidn: activity.dosen.nidn,
-        nama: activity.dosen.nama,
+        id: actor.id,
+        nip: actor.nip,
+        nidn: actor.nidn,
+        nama: actor.nama,
         program_studi: {
-          id: activity.dosen.program_studi.id,
-          kode: activity.dosen.program_studi.kode_prodi,
-          nama: activity.dosen.program_studi.nama_prodi,
+          id: actorProgramStudi.id,
+          kode: actorProgramStudi.kode_prodi,
+          nama: actorProgramStudi.nama_prodi,
         },
       },
       partisipasi: activity.partisipasi.map((participant: any) => ({
@@ -89,10 +99,10 @@ export class ActivityService {
     };
   }
 
-  private async publishActivitySnapshot(activity: any, eventType: string) {
+  private async publishActivitySnapshot(activity: any, eventType: string, actorDosenId?: string) {
     return await this.multiChainService.publishJson(
       activity.id,
-      this.buildBlockchainPayload(activity, eventType),
+      this.buildBlockchainPayload(activity, eventType, actorDosenId),
     );
   }
 
@@ -476,6 +486,18 @@ export class ActivityService {
           status: 'MENUNGGU_KONFIRMASI',
         });
       }
+
+      if (isCreator) {
+        const requestedIds = new Set(anggota_ids.filter((aid: string) => aid !== activity.dosen_id));
+        const removedIds = existingParticipations
+          .filter((participant: any) => participant.dosen_id !== activity.dosen_id)
+          .filter((participant: any) => !requestedIds.has(participant.dosen_id))
+          .map((participant: any) => participant.dosen_id);
+
+        for (const removedId of removedIds) {
+          await this.activityRepository.deleteParticipation(removedId, id);
+        }
+      }
     }
 
     // Hapus lampiran yang di-defer dari frontend (fix cancel button)
@@ -533,7 +555,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(id);
       if (!updatedActivity) throw new Error('Kegiatan gagal dimuat setelah diperbarui.');
-      txId = await this.publishActivitySnapshot(updatedActivity, 'KEGIATAN_UPDATED');
+      txId = await this.publishActivitySnapshot(updatedActivity, 'KEGIATAN_UPDATED', dosenId);
     } catch (error) {
       await this.activityRepository.update(id, {
         nama_kegiatan: activity.nama_kegiatan,
@@ -593,7 +615,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(id);
       if (!updatedActivity) throw new Error('Kegiatan gagal dimuat setelah dokumen ditambahkan.');
-      txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_ADDED');
+      txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_ADDED', dosenId);
     } catch (error) {
       await this.activityRepository.deleteLampiran(lampiran.id);
       throw error;
@@ -621,7 +643,7 @@ export class ActivityService {
     try {
       const updatedActivity = await this.activityRepository.findById(kegiatanId);
       if (updatedActivity) {
-        txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_REMOVED');
+        txId = await this.publishActivitySnapshot(updatedActivity, 'DOKUMEN_REMOVED', dosenId);
         await this.activityRepository.updateTransactionId(kegiatanId, txId);
       }
     } catch {
@@ -646,8 +668,11 @@ export class ActivityService {
     const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
     if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
     if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+    if (partisipasi.status !== 'MENUNGGU_KONFIRMASI') {
+      throw new Error('Undangan kegiatan sudah diproses.');
+    }
 
-    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA');
+    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITERIMA', 'MENUNGGU_KONFIRMASI');
 
     const activity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
     if (activity && activity.jenis_bukti === 'BERSAMA') {
@@ -655,6 +680,12 @@ export class ActivityService {
       if (docIds.length > 0) {
         await this.activityRepository.createKepemilikanIfNotExists(dosenId, docIds);
       }
+    }
+
+    const updatedActivity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'PARTISIPASI_DITERIMA', dosenId);
+      await this.activityRepository.updateTransactionId(updatedActivity.id, txId);
     }
 
     await this.emailService.notifyActivityDecision(
@@ -676,8 +707,17 @@ export class ActivityService {
     const partisipasi = await this.activityRepository.findParticipationById(partisipasiId);
     if (!partisipasi) throw new Error('Partisipasi tidak ditemukan.');
     if (partisipasi.dosen_id !== dosenId) throw new Error('Akses ditolak. Partisipasi bukan milik Anda.');
+    if (partisipasi.status !== 'MENUNGGU_KONFIRMASI') {
+      throw new Error('Undangan kegiatan sudah diproses.');
+    }
 
-    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK');
+    const updated = await this.activityRepository.updateParticipationStatus(partisipasiId, 'DITOLAK', 'MENUNGGU_KONFIRMASI');
+    const updatedActivity = await this.activityRepository.findById(partisipasi.kegiatan_tridharma_id);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'PARTISIPASI_DITOLAK', dosenId);
+      await this.activityRepository.updateTransactionId(updatedActivity.id, txId);
+    }
+
     await this.emailService.notifyActivityDecision(
       {
         nama: partisipasi.kegiatan_tridharma.dosen.nama,
@@ -706,6 +746,11 @@ export class ActivityService {
       peran: 'ANGGOTA',
       status: 'MENUNGGU_KONFIRMASI',
     });
+    const updatedActivity = await this.activityRepository.findById(kegiatanId);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'ANGGOTA_DITAMBAHKAN', dosenId);
+      await this.activityRepository.updateTransactionId(kegiatanId, txId);
+    }
     await this.notifyInvitedMembers(kegiatanId, [anggotaId]);
     return participation;
   }
@@ -718,7 +763,13 @@ export class ActivityService {
     if (activity.dosen_id !== dosenId) throw new Error('Akses ditolak. Anda bukan pencatat kegiatan ini.');
     if (activity.dosen_id === anggotaId) throw new Error('Tidak dapat menghapus pembuat kegiatan.');
 
-    return await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
+    const result = await this.activityRepository.deleteParticipation(anggotaId, kegiatanId);
+    const updatedActivity = await this.activityRepository.findById(kegiatanId);
+    if (updatedActivity) {
+      const txId = await this.publishActivitySnapshot(updatedActivity, 'ANGGOTA_DIHAPUS', dosenId);
+      await this.activityRepository.updateTransactionId(kegiatanId, txId);
+    }
+    return result;
   }
 
   // Public methods (no authentication required)
