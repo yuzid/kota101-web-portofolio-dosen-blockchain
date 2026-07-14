@@ -9,10 +9,13 @@ export class AdminUserService {
     this.userRepository = userRepository;
   }
 
-  async getAllUsers(currentUser: any, roleQuery?: string) {
+  async getAllUsers(currentUser: any, roleQuery?: string, statusQuery?: string) {
     let whereClause: any = {};
     if (roleQuery) {
       whereClause.role = String(roleQuery).toUpperCase();
+    }
+    if (statusQuery) {
+      whereClause.status = String(statusQuery).toLowerCase();
     }
 
     if (currentUser.role.toUpperCase() === 'TATA_USAHA') {

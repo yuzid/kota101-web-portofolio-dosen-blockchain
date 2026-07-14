@@ -352,6 +352,14 @@ export class DocumentService {
       if (!isOwner) {
         throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
       }
+    } else if (currentUser.role.toUpperCase() === "TATA_USAHA" || existing.sumber_dokumen === "TATA_USAHA") {
+      // Guard: Dokumen TU tidak bisa diedit jika ada dosen yang sudah menyetujui
+      const hasAccepted = existing.kepemilikan.some((k: any) => k.status === "DISETUJUI");
+      if (hasAccepted) {
+        throw new Error(
+          "Dokumen tidak dapat diubah karena sudah disetujui/diterima oleh salah satu dosen penerima."
+        );
+      }
     }
 
     const { nama, jenis_dokumen, tanggal_upload } = data;
@@ -383,6 +391,14 @@ export class DocumentService {
       );
       if (!isOwner)
         throw new Error("Akses ilegal. Anda bukan pemilik dokumen ini.");
+    } else if (currentUser.role.toUpperCase() === "TATA_USAHA" || targetDoc.sumber_dokumen === "TATA_USAHA") {
+      // Guard: Dokumen TU tidak bisa dihapus jika ada dosen yang sudah menyetujui
+      const hasAccepted = targetDoc.kepemilikan.some((k: any) => k.status === "DISETUJUI");
+      if (hasAccepted) {
+        throw new Error(
+          "Dokumen tidak dapat dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima."
+        );
+      }
     }
 
     // Pengecekan keterikatan dokumen dengan kegiatan

@@ -144,13 +144,13 @@ export function DocumentDistributionPage() {
 
   const fetchData = async () => {
     try {
-      const resDosen = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+      const resDosen = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?status=active`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const dataDosen = await resDosen.json();
       if (dataDosen.status === "success") {
         const listDosen = dataDosen.data
-          .filter((u: any) => u.dosen !== null)
+          .filter((u: any) => u.dosen !== null && u.status === "active")
           .map((u: any) => ({
             id: u.id,
             nama: u.dosen.nama,

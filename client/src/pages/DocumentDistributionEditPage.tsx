@@ -38,6 +38,7 @@ import {
   Search,
   ListFilter,
   UserPlus,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAllJenisDokumen } from "@/lib/utils";
@@ -69,6 +70,7 @@ export function DocumentDistributionEditPage() {
   const [allDosen, setAllDosen] = useState<Dosen[]>([]);
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
   const [initialRecipientIds, setInitialRecipientIds] = useState<string[]>([]);
+  const [acceptedRecipientIds, setAcceptedRecipientIds] = useState<string[]>([]);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
   const [showNewJenisInput, setShowNewJenisInput] = useState(false);
@@ -92,6 +94,10 @@ export function DocumentDistributionEditPage() {
   }, [allDosen, selectedProdiId, recipientSearch]);
 
   const toggleRecipient = (dosenId: string) => {
+    if (acceptedRecipientIds.includes(dosenId)) {
+      toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+      return;
+    }
     setSelectedRecipientIds(prev =>
       prev.includes(dosenId) ? prev.filter(id => id !== dosenId) : [...prev, dosenId]
     );
@@ -116,7 +122,7 @@ export function DocumentDistributionEditPage() {
   const fetchDokumen = async () => {
     try {
       const [resDosen, resDoc] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
+        fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?status=active`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(
@@ -127,7 +133,7 @@ export function DocumentDistributionEditPage() {
       const dataDosen = await resDosen.json();
       if (dataDosen.status === "success") {
         const listDosen = dataDosen.data
-          .filter((u: any) => u.dosen !== null)
+          .filter((u: any) => u.dosen !== null && u.status === "active")
           .map((u: any) => ({
             id: u.id,
             nama: u.dosen.nama,
@@ -148,6 +154,10 @@ export function DocumentDistributionEditPage() {
         const existing = (d.distribusi || []).map((item: any) => item.dosen_id);
         setSelectedRecipientIds(existing);
         setInitialRecipientIds(existing);
+        const accepted = (d.distribusi || [])
+          .filter((item: any) => item.status === "DISETUJUI")
+          .map((item: any) => item.dosen_id);
+        setAcceptedRecipientIds(accepted);
       } else {
         toast.error("Gagal memuat data dokumen");
         navigate("/document-distribution");
@@ -178,6 +188,10 @@ export function DocumentDistributionEditPage() {
 
   const confirmSubmit = async () => {
     setShowSubmitConfirm(false);
+    if (acceptedRecipientIds.length > 0) {
+      toast.error("Dokumen tidak dapat diubah karena sudah disetujui/diterima oleh salah satu dosen penerima.");
+      return;
+    }
     setSaving(true);
     try {
       // 1. Save metadata
@@ -266,6 +280,17 @@ export function DocumentDistributionEditPage() {
           <ArrowLeft className="w-4 h-4 mr-2" /> Kembali
         </Button>
 
+        {/* ── Read-only warning banner if any recipient accepted ── */}
+        {acceptedRecipientIds.length > 0 && (
+          <div className="flex items-start gap-2.5 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 rounded-xl text-sm leading-relaxed">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="font-semibold mb-0.5">Dokumen Distribusi Dikunci</p>
+              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima.</p>
+            </div>
+          </div>
+        )}
+
         {/* ── Form Card ── */}
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
@@ -287,6 +312,7 @@ export function DocumentDistributionEditPage() {
                   onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
                   placeholder="Masukkan nama dokumen"
                   maxLength={100}
+                  disabled={acceptedRecipientIds.length > 0}
                   className="border-gray-300 focus-visible:ring-primary/50 pr-14"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">
@@ -302,6 +328,7 @@ export function DocumentDistributionEditPage() {
               </Label>
               <Select
                 value={formData.jenis_dokumen}
+                disabled={acceptedRecipientIds.length > 0}
                 onValueChange={(val) => {
                   if (val === '__TAMBAH__') {
                     setShowNewJenisInput(true);
@@ -363,7 +390,7 @@ export function DocumentDistributionEditPage() {
               )}
               <p className="text-xs text-muted-foreground">Pilih kategori yang sesuai dengan jenis dokumen.</p>
             </div>
-
+ 
             {/* ── Tanggal Upload ── */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">
@@ -372,6 +399,7 @@ export function DocumentDistributionEditPage() {
               <Input
                 type="date"
                 value={formData.tanggal_upload}
+                disabled={acceptedRecipientIds.length > 0}
                 onChange={(e) => setFormData({ ...formData, tanggal_upload: e.target.value })}
                 className="border-gray-300 focus-visible:ring-primary/50 w-full sm:w-64"
               />
@@ -487,14 +515,39 @@ export function DocumentDistributionEditPage() {
                 <div className="px-4 py-2 border-b bg-blue-50/30 dark:bg-blue-950/30">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium text-blue-700">{selectedRecipientIds.length} dosen dipilih</span>
-                    <button onClick={() => setSelectedRecipientIds([])} className="text-[11px] text-blue-600 hover:underline">Hapus semua</button>
+                    <button
+                      onClick={() => {
+                        setSelectedRecipientIds(acceptedRecipientIds);
+                        if (acceptedRecipientIds.length > 0) {
+                          toast.info("Penerima yang sudah menyetujui dokumen tetap dipertahankan.");
+                        }
+                      }}
+                      className="text-[11px] text-blue-600 hover:underline"
+                    >
+                      Hapus semua
+                    </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {selectedRecipientIds.map((id) => {
                       const d = allDosen.find(d => d.id === id);
+                      const isAccepted = acceptedRecipientIds.includes(id);
                       return d ? (
-                        <Badge key={id} variant="secondary" className="cursor-pointer gap-1 text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200" onClick={() => toggleRecipient(id)}>
-                          {d.nama}<X className="w-3 h-3" />
+                        <Badge
+                          key={id}
+                          variant="secondary"
+                          className={`cursor-pointer gap-1 text-xs bg-blue-100 text-blue-800 border-blue-200 ${
+                            isAccepted ? "opacity-80 cursor-not-allowed hover:bg-blue-100" : "hover:bg-blue-200"
+                          }`}
+                          onClick={() => {
+                            if (isAccepted) {
+                              toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+                              return;
+                            }
+                            toggleRecipient(id);
+                          }}
+                        >
+                          {d.nama}
+                          {!isAccepted && <X className="w-3 h-3" />}
                         </Badge>
                       ) : null;
                     })}
@@ -510,13 +563,22 @@ export function DocumentDistributionEditPage() {
                   </p>
                 ) : filteredDosen.map((dosen) => {
                   const isSelected = selectedRecipientIds.includes(dosen.id);
+                  const isAccepted = acceptedRecipientIds.includes(dosen.id);
                   return (
                     <div
                       key={dosen.id}
-                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-border last:border-b-0 transition-colors ${isSelected ? "bg-primary/5 border-l-2 border-l-primary" : "hover:bg-muted/50"}`}
-                      onClick={() => toggleRecipient(dosen.id)}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b border-border last:border-b-0 transition-colors ${
+                        isSelected ? "bg-primary/5 border-l-2 border-l-primary" : "hover:bg-muted/50"
+                      } ${isAccepted ? "opacity-75 cursor-not-allowed" : ""}`}
+                      onClick={() => {
+                        if (isAccepted) {
+                          toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+                          return;
+                        }
+                        toggleRecipient(dosen.id);
+                      }}
                     >
-                      <Checkbox checked={isSelected} />
+                      <Checkbox checked={isSelected} disabled={isAccepted} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{dosen.nama}</p>
                         <p className="text-[11px] text-muted-foreground">
@@ -537,7 +599,7 @@ export function DocumentDistributionEditPage() {
           <Button variant="outline" onClick={() => navigate(id ? `/document-distribution/${id}` : "/document-distribution")}>
             Batal
           </Button>
-          <RippleButton onClick={handleSubmit} disabled={saving} className="min-w-[150px]">
+          <RippleButton onClick={handleSubmit} disabled={saving || acceptedRecipientIds.length > 0} className="min-w-[150px]">
             {saving ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
             ) : (

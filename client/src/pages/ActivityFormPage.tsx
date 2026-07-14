@@ -165,17 +165,19 @@ export function ActivityFormPage() {
 
   const fetchDosenList = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=DOSEN`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=DOSEN&status=active`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
-        const mapped = result.data.map((u: any) => ({
-          id: u.id,
-          name: u.dosen?.nama || u.email,
-          nidn: u.dosen?.nidn || u.dosen?.nip,
-          programStudi: u.dosen?.program_studi?.nama_prodi || 'Tidak ada prodi'
-        }));
+        const mapped = result.data
+          .filter((u: any) => u.status === "active")
+          .map((u: any) => ({
+            id: u.id,
+            name: u.dosen?.nama || u.email,
+            nidn: u.dosen?.nidn || u.dosen?.nip,
+            programStudi: u.dosen?.program_studi?.nama_prodi || 'Tidak ada prodi'
+          }));
         setAvailableDosen(mapped);
       }
     } catch (error) {
