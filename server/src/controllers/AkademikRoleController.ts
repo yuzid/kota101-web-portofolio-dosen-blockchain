@@ -53,6 +53,8 @@ export class AkademikRoleController {
         prodiId: req.query.prodiId as string,
         dosenId: req.query.dosenId as string,
         status: req.query.status as any,
+        periode: req.query.periode as string,
+        semester: req.query.semester as string,
       };
 
       const pageRequest: PageRequest = {
@@ -96,6 +98,10 @@ export class AkademikRoleController {
         jenis: req.query.jenis as any,
         kategori: req.query.kategori as any,
         search: req.query.search as string,
+        dosenId: req.query.dosenId as string,
+        status: req.query.status as any,
+        periode: req.query.periode as string,
+        semester: req.query.semester as string,
       };
 
       const pageRequest: PageRequest = {
@@ -140,6 +146,8 @@ export class AkademikRoleController {
         prodiId: req.query.prodiId as string,
         dosenId: req.query.dosenId as string,
         status: req.query.status as any,
+        periode: req.query.periode as string,
+        semester: req.query.semester as string,
       };
 
       const result = await this.activityRepository.findJurusanSummaryStats(jabatan.jurusan_id, filter);
@@ -176,6 +184,8 @@ export class AkademikRoleController {
         search: req.query.search as string,
         dosenId: req.query.dosenId as string,
         status: req.query.status as any,
+        periode: req.query.periode as string,
+        semester: req.query.semester as string,
       };
 
       const result = await this.activityRepository.findProdiSummaryStats(jabatan.program_studi_id, filter);

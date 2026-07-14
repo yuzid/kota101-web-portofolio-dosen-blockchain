@@ -9,6 +9,8 @@ export interface KegiatanFilter {
   prodiId?: string;
   dosenId?: string;
   status?: 'lengkap' | 'tidak_lengkap';
+  periode?: string;
+  semester?: string;
 }
 
 export interface PageRequest {

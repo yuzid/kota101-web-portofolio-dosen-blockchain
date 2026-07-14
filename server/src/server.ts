@@ -123,9 +123,27 @@ const clientBuildPath = (() => {
   if (fs.existsSync(dockerPath)) return dockerPath;
   return path.join(__dirname, "../../client/dist");
 })();
-app.use(express.static(clientBuildPath));
-app.all(/^\/(?!api).*/, (req: Request, res: Response) => {
-  res.sendFile(path.join(clientBuildPath, "index.html"));
+
+if (!fs.existsSync(clientBuildPath)) {
+  console.warn(`⚠️  Client build tidak ditemukan di: ${clientBuildPath}`);
+}
+
+// Assets Vite sudah punya content hash di nama file → aman di-cache 1 tahun
+app.use(
+  express.static(clientBuildPath, {
+    maxAge: process.env.NODE_ENV === "production" ? "1y" : 0,
+    immutable: process.env.NODE_ENV === "production",
+  })
+);
+
+// SPA fallback: hanya GET, exclude semua route /api/*
+app.get(/^\/(?!api\/).*/, (req: Request, res: Response) => {
+  const indexPath = path.join(clientBuildPath, "index.html");
+  if (!fs.existsSync(indexPath)) {
+    res.status(503).json({ status: "error", error: "Client build tidak tersedia." });
+    return;
+  }
+  res.sendFile(indexPath);
 });
 
 // ── Global error handler (harus paling bawah) ──

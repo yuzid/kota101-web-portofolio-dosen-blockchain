@@ -114,6 +114,8 @@ export function AcademicRoleActivitiesPage() {
   const [filterKelengkapan, setFilterKelengkapan] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
+  const [filterSemester, setFilterSemester] = useState("all");
+  const [filterTahunAkademik, setFilterTahunAkademik] = useState("all");
 
   // Pagination and data state
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -168,7 +170,7 @@ export function AcademicRoleActivitiesPage() {
 
   useEffect(() => {
     fetchActivities();
-  }, [page, size, activeTab, filterProdi, filterDosen, filterKategori, filterKelengkapan, filterDateFrom, filterDateTo]);
+  }, [page, size, activeTab, filterProdi, filterDosen, filterKategori, filterKelengkapan, filterDateFrom, filterDateTo, filterSemester, filterTahunAkademik]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -220,6 +222,8 @@ export function AcademicRoleActivitiesPage() {
       if (filterKelengkapan !== 'all') params.append('status', filterKelengkapan);
       if (filterDateFrom) params.append('tanggalAwal', filterDateFrom.toISOString());
       if (filterDateTo) params.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterSemester !== 'all') params.append('semester', filterSemester);
+      if (filterTahunAkademik !== 'all') params.append('periode', filterTahunAkademik);
 
       // Fetch data
       const response = await fetch(
@@ -245,6 +249,8 @@ export function AcademicRoleActivitiesPage() {
       if (filterKelengkapan !== 'all') statsParams.append('status', filterKelengkapan);
       if (filterDateFrom) statsParams.append('tanggalAwal', filterDateFrom.toISOString());
       if (filterDateTo) statsParams.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterSemester !== 'all') statsParams.append('semester', filterSemester);
+      if (filterTahunAkademik !== 'all') statsParams.append('periode', filterTahunAkademik);
 
       const sResponse = await fetch(
         `${import.meta.env.VITE_API_URL}/api/dosen/akademik-role/${endpoint}/stats?${statsParams.toString()}`,
@@ -302,7 +308,9 @@ export function AcademicRoleActivitiesPage() {
     filterKategori !== "all" ||
     filterKelengkapan !== "all" ||
     filterDateFrom ||
-    filterDateTo;
+    filterDateTo ||
+    filterSemester !== "all" ||
+    filterTahunAkademik !== "all";
 
   const handleViewDetail = async (activityId: string) => {
     try {
@@ -333,6 +341,8 @@ export function AcademicRoleActivitiesPage() {
     setFilterKelengkapan("all");
     setFilterDateFrom(undefined);
     setFilterDateTo(undefined);
+    setFilterSemester("all");
+    setFilterTahunAkademik("all");
     setPage(1);
   };
 
@@ -702,6 +712,35 @@ export function AcademicRoleActivitiesPage() {
                     <SelectItem value="all">Semua Status</SelectItem>
                     <SelectItem value="lengkap">Lengkap</SelectItem>
                     <SelectItem value="tidak_lengkap">Tidak Lengkap</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filterSemester}
+                  onValueChange={setFilterSemester}
+                >
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Semester" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Semester</SelectItem>
+                    <SelectItem value="GANJIL">Ganjil</SelectItem>
+                    <SelectItem value="GENAP">Genap</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={filterTahunAkademik}
+                  onValueChange={setFilterTahunAkademik}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Tahun Akademik" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Tahun</SelectItem>
+                    <SelectItem value="2025/2026">2025/2026</SelectItem>
+                    <SelectItem value="2024/2025">2024/2025</SelectItem>
+                    <SelectItem value="2023/2024">2023/2024</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
