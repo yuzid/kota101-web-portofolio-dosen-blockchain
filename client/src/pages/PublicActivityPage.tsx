@@ -921,11 +921,26 @@ function renderFullMode(
                                   snapshotHighlights: doc.snapshotHighlights,
                                 })
                               }
-                              className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                              className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                             >
-                              <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                              <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
-                              <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="text-sm font-medium truncate">{doc.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                                  <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                                    Terverifikasi
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
+                                    Belum Tercatat
+                                  </Badge>
+                                )}
+                                <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
                             </div>
                           ))
                         ) : (
@@ -965,11 +980,26 @@ function renderFullMode(
                           snapshotHighlights: doc.snapshotHighlights,
                         })
                       }
-                      className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                     >
-                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className="text-sm font-medium truncate flex-1">{doc.name}</span>
-                      <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                        <span className="text-sm font-medium truncate">{doc.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {!!(doc.hashFile && doc.hashFile !== "-") ? (
+                          <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                            <ShieldCheck className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                            Terverifikasi
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 text-[10px] h-5 flex items-center gap-1 shrink-0">
+                            <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
+                            Belum Tercatat
+                          </Badge>
+                        )}
+                        <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
                     </div>
                   ))}
                 </CardContent>
