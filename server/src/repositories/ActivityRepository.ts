@@ -21,7 +21,7 @@ export class ActivityRepository {
   }
 
   async findByJurusan(jurusanId: string, filter: KegiatanFilter, pageRequest: PageRequest): Promise<PageResponse<KegiatanTridharma>> {
-    const { jenis, kategori, tanggalAwal, tanggalAkhir, search, prodiId, dosenId, status } = filter;
+    const { jenis, kategori, tanggalAwal, tanggalAkhir, search, prodiId, dosenId, status, periode, semester } = filter;
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
@@ -56,6 +56,9 @@ export class ActivityRepository {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };
     }
 
+    if (periode) where.periode = periode;
+    if (semester) where.semester = semester;
+
     const [total, data] = await Promise.all([
       prisma.kegiatanTridharma.count({ where }),
       prisma.kegiatanTridharma.findMany({
@@ -85,7 +88,7 @@ export class ActivityRepository {
   }
 
   async findByProdi(prodiId: string, filter: KegiatanFilter, pageRequest: PageRequest): Promise<PageResponse<KegiatanTridharma>> {
-    const { jenis, kategori, tanggalAwal, tanggalAkhir, search } = filter;
+    const { jenis, kategori, tanggalAwal, tanggalAkhir, search, dosenId, status, periode, semester } = filter;
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
@@ -95,8 +98,17 @@ export class ActivityRepository {
       }
     };
 
+    if (dosenId) where.dosen_id = dosenId;
     if (jenis) where.kategori_tridharma = jenis;
     if (kategori) where.jenis_kegiatan = kategori;
+
+    if (status) {
+      if (status === 'lengkap') {
+        where.lampiran_bukti = { some: {} };
+      } else {
+        where.lampiran_bukti = { none: {} };
+      }
+    }
 
     if (tanggalAwal || tanggalAkhir) {
       where.tanggal_mulai = {};
@@ -107,6 +119,9 @@ export class ActivityRepository {
     if (search) {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };
     }
+
+    if (periode) where.periode = periode;
+    if (semester) where.semester = semester;
 
     const [total, data] = await Promise.all([
       prisma.kegiatanTridharma.count({ where }),
@@ -155,7 +170,7 @@ export class ActivityRepository {
   }
 
   async findJurusanSummaryStats(jurusanId: string, filter: KegiatanFilter) {
-    const { prodiId, dosenId, tanggalAwal, tanggalAkhir, search, status } = filter;
+    const { prodiId, dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
     const where: any = {
       dosen: {
@@ -182,6 +197,8 @@ export class ActivityRepository {
     if (search) {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };
     }
+    if (periode) where.periode = periode;
+    if (semester) where.semester = semester;
 
     const stats = await prisma.kegiatanTridharma.groupBy({
       by: ['kategori_tridharma'],
@@ -201,7 +218,7 @@ export class ActivityRepository {
   }
 
   async findProdiSummaryStats(prodiId: string, filter: KegiatanFilter) {
-    const { dosenId, tanggalAwal, tanggalAkhir, search, status } = filter;
+    const { dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
     const where: any = {
       dosen: {
@@ -225,6 +242,8 @@ export class ActivityRepository {
     if (search) {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };
     }
+    if (periode) where.periode = periode;
+    if (semester) where.semester = semester;
 
     const stats = await prisma.kegiatanTridharma.groupBy({
       by: ['kategori_tridharma'],
