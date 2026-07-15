@@ -81,6 +81,7 @@ interface DocumentPreview {
   name: string;
   jenis: string;
   sumber: string;
+  ownershipStatus?: string | null;
   tanggalUpload: string;
   contentType: string;
   size: number;
@@ -360,6 +361,10 @@ export function DocumentPreviewPage() {
 
     return { ...document.blockchainIntegrity, status, exactServedHash };
   }, [document, servedHash]);
+
+  const isAcceptedTU = document
+    ? document.sumber !== "TATA_USAHA" || document.ownershipStatus === "DISETUJUI"
+    : false;
 
 
   const breadcrumbs = location.state?.breadcrumbs || [
@@ -682,7 +687,7 @@ export function DocumentPreviewPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isDocumentOwner && (
+            {isDocumentOwner && (document.sumber !== "TATA_USAHA" || document.ownershipStatus === "DISETUJUI") && (
               <RippleButton
                 variant={addMode ? "default" : "outline"}
                 size="sm"
@@ -708,19 +713,19 @@ export function DocumentPreviewPage() {
                 {addMode ? "Simpan Highlight" : "Tambah Highlight"}
               </RippleButton>
             )}
-            {isDocumentOwner && (
+            {isDocumentOwner && document.sumber !== "TATA_USAHA" && (
               <Button variant="outline" size="sm" onClick={handleEdit}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </Button>
             )}
-            {isDocumentOwner && (
+            {isDocumentOwner && document.sumber !== "TATA_USAHA" && (
               <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Hapus
               </Button>
             )}
-            {isDocumentOwner && (
+            {isDocumentOwner && document.sumber !== "TATA_USAHA" && (
               <Button variant="outline" size="sm" onClick={() => setShowShareDialog(true)}>
                 <Share2 className="mr-2 h-4 w-4" />
                 Bagikan
@@ -1048,6 +1053,7 @@ export function DocumentPreviewPage() {
                 onEdit={handleUpdateHighlight}
                 onDelete={handleDeleteHighlight}
                 onClose={() => setMenuHighlight(null)}
+                readOnly={!isAcceptedTU}
               />
             )}
 
