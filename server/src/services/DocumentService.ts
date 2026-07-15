@@ -167,11 +167,16 @@ export class DocumentService {
     );
     const blockchainHash = blockchainRecord?.hash || null;
 
+    const userOwnership = document.kepemilikan.find(
+      (item: any) => item.dosen_id === currentUser.id
+    );
+
     return {
       id: document.id,
       name: document.nama,
       jenis: document.jenis_dokumen,
       sumber: document.sumber_dokumen,
+      ownershipStatus: userOwnership ? userOwnership.status : null,
       tanggalUpload: document.tanggal_upload.toISOString(),
       contentType: this.getMimeType(file.contentType, document.file_path),
       size: file.contentLength,

@@ -61,7 +61,7 @@ export class DocumentRepository {
     return await prisma.dokumen.findUnique({
       where: { id },
       include: {
-        kepemilikan: { where: { status: 'DISETUJUI' } },
+        kepemilikan: true,
         lampiran_bukti: {
           include: {
             kegiatan: {

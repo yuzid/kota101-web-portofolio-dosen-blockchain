@@ -7,6 +7,7 @@ interface HighlightMenuProps {
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
 export function HighlightMenu({
@@ -15,6 +16,7 @@ export function HighlightMenu({
   onEdit,
   onDelete,
   onClose,
+  readOnly = false,
 }: HighlightMenuProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(highlight.highlighted_text);
@@ -89,18 +91,14 @@ export function HighlightMenu({
                 {highlight.highlighted_text}
               </p>
             )}
-            {/* <button
-              className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100"
-              onClick={() => setEditing(true)}
-            >
-              Edit Teks
-            </button> */}
-            <button
-              className="w-full rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-              onClick={handleDelete}
-            >
-              Hapus Highlight
-            </button>
+            {!readOnly && (
+              <button
+                className="w-full rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={handleDelete}
+              >
+                Hapus Highlight
+              </button>
+            )}
           </div>
         )}
       </div>
