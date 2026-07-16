@@ -142,9 +142,9 @@ interface ActivityLog {
   };
 }
 
+// Field definitions untuk payload v2 (key canonical) — v1 'nama_kegiatan' di-normalize ke 'nama'
 const activityFieldLabels: Record<string, string> = {
   nama: "Nama kegiatan",
-  nama_kegiatan: "Nama kegiatan",
   kategori_tridharma: "Kategori Tridharma",
   jenis_kegiatan: "Jenis kegiatan",
   tanggal_mulai: "Tanggal mulai",
@@ -365,9 +365,20 @@ export function ActivityDetailPage() {
     return selectedIndex >= 0 ? logs[selectedIndex + 1] ?? null : null;
   };
 
+  // Normalisasi payload kegiatan: rename v1 key 'nama_kegiatan' → 'nama' agar
+  // perbandingan lintas-versi (v1 vs v2) konsisten
+  const normalizeKegiatanPayload = (kegiatan: Record<string, unknown>) => {
+    const normalized = { ...kegiatan };
+    if (!normalized.nama && normalized.nama_kegiatan) {
+      normalized.nama = normalized.nama_kegiatan;
+    }
+    return normalized;
+  };
+
   const getActivityChanges = (log: ActivityLog) => {
-    const current = log.payload.kegiatan ?? {};
-    const previous = getPreviousLog(log)?.payload.kegiatan ?? null;
+    const current = normalizeKegiatanPayload(log.payload.kegiatan ?? {});
+    const previousRaw = getPreviousLog(log)?.payload.kegiatan ?? null;
+    const previous = previousRaw ? normalizeKegiatanPayload(previousRaw) : null;
     return Object.entries(activityFieldLabels)
       .filter(([field]) => !previous || current[field] !== previous[field])
       .map(([field, label]) => ({

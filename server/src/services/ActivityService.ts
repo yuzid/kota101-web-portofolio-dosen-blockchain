@@ -74,9 +74,12 @@ export class ActivityService {
       })),
       dokumen: activity.lampiran_bukti.map((lampiran: any) => {
         const kepemilikan = lampiran.dokumen.kepemilikan || [];
-        const owner =
-          kepemilikan.find((item: any) => item.dosen_id && participantIds.has(item.dosen_id)) ||
-          kepemilikan[0];
+        // Gunakan lb.dosen_id langsung (akurat) jika tersedia, fallback ke kepemilikan
+        const dosenIdFromLampiran = lampiran.dosen_id;
+        const owner = dosenIdFromLampiran
+          ? { dosen_id: dosenIdFromLampiran }
+          : kepemilikan.find((item: any) => item.dosen_id && participantIds.has(item.dosen_id)) ||
+            kepemilikan[0];
 
         return {
         id: lampiran.dokumen.id,
@@ -274,12 +277,13 @@ export class ActivityService {
     const dokumenBersama: any[] = [];
 
     activity.lampiran_bukti.forEach((lb: any) => {
-      const firstKepemilikan = lb.dokumen.kepemilikan[0];
-      const uploaderId = firstKepemilikan?.dosen_id;
-      const uploaderMember = dosenTerlibatMap.get(uploaderId);
-      const uploaderName = uploaderMember?.name || 'Unknown';
-
       if (isBuktiBersama) {
+        // Mode BERSAMA: pakai kepemilikan untuk cek highlight per user
+        const firstKepemilikan = lb.dokumen.kepemilikan[0];
+        const uploaderId = lb.dosen_id || firstKepemilikan?.dosen_id;
+        const uploaderMember = dosenTerlibatMap.get(uploaderId);
+        const uploaderName = uploaderMember?.name || 'Unknown';
+
         const currentUserHasHighlight = lb.dokumen.kepemilikan
           .find((k: any) => k.dosen_id === dosenId)?.highlights?.length > 0;
 
@@ -294,21 +298,40 @@ export class ActivityService {
           lampiranId: lb.id,
         });
       } else {
-        lb.dokumen.kepemilikan.forEach((k: any) => {
-          const ownerInActivity = dosenTerlibatMap.get(k.dosen_id);
-          if (ownerInActivity) {
-            ownerInActivity.dokumen.push({
-              id: lb.dokumen.id,
-              name: lb.dokumen.nama,
-              jenis: lb.dokumen.jenis_dokumen,
-              tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
-              hasHighlight: k.highlights.length > 0,
-              isOwner: true,
-              uploadedBy: { id: uploaderId, name: uploaderName },
-              lampiranId: lb.id,
-            });
-          }
-        });
+        // Mode MASING_MASING: gunakan lb.dosen_id langsung (akurat, tanpa ambiguitas)
+        const ownerId = lb.dosen_id;
+        const ownerInActivity = ownerId ? dosenTerlibatMap.get(ownerId) : null;
+
+        if (ownerInActivity) {
+          const kepemilikan = lb.dokumen.kepemilikan.find((k: any) => k.dosen_id === ownerId);
+          ownerInActivity.dokumen.push({
+            id: lb.dokumen.id,
+            name: lb.dokumen.nama,
+            jenis: lb.dokumen.jenis_dokumen,
+            tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
+            hasHighlight: (kepemilikan?.highlights?.length || 0) > 0,
+            isOwner: true,
+            uploadedBy: { id: ownerId, name: ownerInActivity.name },
+            lampiranId: lb.id,
+          });
+        } else {
+          // Fallback: dosen_id null (data lama sebelum migrasi), pakai kepemilikan
+          lb.dokumen.kepemilikan.forEach((k: any) => {
+            const fallbackOwner = dosenTerlibatMap.get(k.dosen_id);
+            if (fallbackOwner) {
+              fallbackOwner.dokumen.push({
+                id: lb.dokumen.id,
+                name: lb.dokumen.nama,
+                jenis: lb.dokumen.jenis_dokumen,
+                tanggalUpload: lb.dokumen.tanggal_upload.toISOString(),
+                hasHighlight: (k.highlights?.length || 0) > 0,
+                isOwner: true,
+                uploadedBy: { id: k.dosen_id, name: fallbackOwner.name },
+                lampiranId: lb.id,
+              });
+            }
+          });
+        }
       }
     });
 
@@ -423,7 +446,7 @@ export class ActivityService {
     }
 
     const lampiranData = (lampiran_ids && Array.isArray(lampiran_ids))
-      ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId }))
+      ? lampiran_ids.map((docId: string) => ({ dokumen_id: docId, dosen_id: dosenId }))
       : [];
 
     const createdActivity = await this.activityRepository.create(activityData, partisipasiData, lampiranData);
@@ -555,6 +578,7 @@ export class ActivityService {
         await this.activityRepository.createLampiran({
           kegiatan_id: id,
           dokumen_id: docId,
+          dosen_id: dosenId,
         });
       }
     }
@@ -609,7 +633,8 @@ export class ActivityService {
 
     const lampiran = await this.activityRepository.createLampiran({
       kegiatan_id: id,
-      dokumen_id: String(dokumen_id)
+      dokumen_id: String(dokumen_id),
+      dosen_id: dosenId,
     });
 
     if (activity.jenis_bukti === 'BERSAMA') {
@@ -642,7 +667,10 @@ export class ActivityService {
     const lampiran = activity.lampiran_bukti.find((lb: any) => lb.id === lampiranId);
     if (!lampiran) throw new Error('Lampiran tidak ditemukan.');
 
-    const isUploader = lampiran.dokumen.kepemilikan.some((k: any) => k.dosen_id === dosenId);
+    // Cek uploader: prioritaskan lb.dosen_id, fallback ke kepemilikan
+    const isUploader =
+      lampiran.dosen_id === dosenId ||
+      lampiran.dokumen.kepemilikan.some((k: any) => k.dosen_id === dosenId);
     if (!isUploader) throw new Error('Akses ditolak. Hanya uploader yang dapat menghapus dokumen.');
 
     await this.activityRepository.deleteLampiran(lampiranId);

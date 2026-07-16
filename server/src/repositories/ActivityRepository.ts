@@ -300,7 +300,8 @@ export class ActivityRepository {
                   include: { highlights: { include: { highlight_rect: true } } }
                 }
               }
-            }
+            },
+            dosen: true,
           }
         }
       }
@@ -354,7 +355,7 @@ export class ActivityRepository {
     ]);
   }
 
-  async createLampiran(data: any) {
+  async createLampiran(data: { kegiatan_id: string; dokumen_id: string; dosen_id?: string | null }) {
     return await prisma.lampiranBukti.create({ data });
   }
 
