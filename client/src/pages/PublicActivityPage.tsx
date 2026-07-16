@@ -200,21 +200,22 @@ function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocume
       ? payload.dokumen_pendukung
     : [];
 
-  return documents.map((doc: unknown) => {
+  return documents.map((doc: unknown, docIndex: number) => {
     const d = toRecord(doc);
+    const documentId = String(d.id ?? d.dokumen_id ?? `snapshot-doc-${docIndex}`);
     const rawHighlights = Array.isArray(d.highlights) ? d.highlights : [];
-    const highlights: Highlight[] = rawHighlights.map((highlight: unknown) => {
+    const highlights: Highlight[] = rawHighlights.map((highlight: unknown, highlightIndex: number) => {
       const h = toRecord(highlight);
       const rects = Array.isArray(h.rects) ? h.rects : [];
       return {
-        id: String(h.highlight_id ?? crypto.randomUUID()),
+        id: String(h.highlight_id ?? `${documentId}-highlight-${highlightIndex}`),
         kepemilikan_id: String(h.kepemilikan_id ?? ""),
         page_number: Number(h.page ?? h.page_number ?? 1),
         highlighted_text: String(h.highlighted_text ?? ""),
-        highlight_rect: rects.map((rect: unknown) => {
+        highlight_rect: rects.map((rect: unknown, rectIndex: number) => {
           const r = toRecord(rect);
           return {
-            id: String(r.id ?? crypto.randomUUID()),
+            id: String(r.id ?? `${documentId}-highlight-${highlightIndex}-rect-${rectIndex}`),
             x1: Number(r.x1 ?? 0),
             x2: Number(r.x2 ?? 0),
             y1: Number(r.y1 ?? 0),
@@ -300,8 +301,8 @@ function transformSnapshotLog(log: ActivityLog, activityId: string, liveActivity
   const isBuktiBersama = jenisBukti === "BERSAMA";
 
   const dosenTerlibatMap = new Map<string, PublicActivity["dosenTerlibat"][number]>();
-  participants.forEach((participant) => {
-    const participantId = String(participant.dosen_id ?? participant.id ?? participant.nama ?? crypto.randomUUID());
+  participants.forEach((participant, participantIndex) => {
+    const participantId = String(participant.dosen_id ?? participant.id ?? participant.nama ?? `snapshot-participant-${participantIndex}`);
     const existing = dosenTerlibatMap.get(participantId);
     const isKetua = String(participantId) === String(pencatat.id);
     dosenTerlibatMap.set(participantId, {
