@@ -858,10 +858,14 @@ export function PublicActivityPage() {
             }
           });
         } else {
-          docResults.forEach((result) => {
-            if (result.status !== "fulfilled" || !result.value) return;
-            const detail = result.value;
-            const ownerIds = getOwnerDosenIds(detail);
+          docResults.forEach((resultItem) => {
+            if (resultItem.status !== "fulfilled" || !resultItem.value) return;
+            const detail = resultItem.value;
+            const lampiran = result.data.lampiran_bukti?.find(
+              (lb: any) => lb.dokumen_id === detail.id || lb.dokumen?.id === detail.id
+            );
+            const targetDosenId = lampiran?.dosen_id || null;
+            const ownerIds = targetDosenId ? [targetDosenId] : getOwnerDosenIds(detail);
             transformed.dosenTerlibat.forEach((dosen) => {
               if (ownerIds.includes(dosen.id)) {
                 const existing = dosen.dokumen.find(

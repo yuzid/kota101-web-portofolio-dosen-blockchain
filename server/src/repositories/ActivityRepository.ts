@@ -568,7 +568,9 @@ export class ActivityRepository {
           }
         },
         lampiran_bukti: {
-          include: {
+          select: {
+            id: true,
+            dosen_id: true,
             dokumen: {
               select: {
                 id: true,
@@ -576,7 +578,8 @@ export class ActivityRepository {
                 jenis_dokumen: true,
                 sumber_dokumen: true,
                 tanggal_upload: true,
-                hash_file: true
+                hash_file: true,
+                file_path: true
               }
             }
           }
