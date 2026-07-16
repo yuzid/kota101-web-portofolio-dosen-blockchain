@@ -107,9 +107,26 @@ export function transformPublicActivity(raw: any): {
         name: doc.nama || "Tanpa Nama",
         jenis: doc.jenis_dokumen || "-",
         tanggalUpload: doc.tanggal_upload || "",
-        hashFile: "",
-        filePath: "",
+        hashFile: doc.hash_file || "",
+        filePath: doc.file_path || "",
       });
+    } else {
+      // Mode MASING_MASING: gunakan lb.dosen_id langsung jika tersedia
+      const ownerId: string | null = lb.dosen_id || null;
+      if (ownerId) {
+        const owner = dosenTerlibat.find((d) => d.id === ownerId);
+        if (owner && !owner.dokumen.find((d) => d.id === doc.id)) {
+          owner.dokumen.push({
+            id: doc.id,
+            name: doc.nama || "Tanpa Nama",
+            jenis: doc.jenis_dokumen || "-",
+            tanggalUpload: doc.tanggal_upload || "",
+            hashFile: doc.hash_file || "",
+            filePath: doc.file_path || "",
+          });
+        }
+      }
+      // Jika lb.dosen_id null (data lama), biarkan fetchActivity handle via kepemilikan
     }
   });
 

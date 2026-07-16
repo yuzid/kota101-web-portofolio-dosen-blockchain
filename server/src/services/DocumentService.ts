@@ -87,6 +87,24 @@ export class DocumentService {
     return contentType;
   }
 
+  private getPayloadDocuments(payload: Record<string, unknown>) {
+    if (Array.isArray(payload.dokumen)) {
+      return payload.dokumen as Array<Record<string, unknown>>;
+    }
+    if (Array.isArray(payload.dokumen_pendukung)) {
+      return payload.dokumen_pendukung as Array<Record<string, unknown>>;
+    }
+    return [];
+  }
+
+  private getPayloadDocumentId(document: Record<string, unknown>) {
+    return document.id || document.dokumen_id;
+  }
+
+  private getPayloadDocumentHash(document: Record<string, unknown>) {
+    return document.hash || document.hash_file;
+  }
+
   private async findBlockchainDocumentRecord(
     document: any,
     activityId?: string
@@ -102,23 +120,22 @@ export class DocumentService {
 
       for (const item of items) {
         const payload = item.data.json || {};
-        const documents = Array.isArray(payload.dokumen_pendukung)
-          ? (payload.dokumen_pendukung as Array<Record<string, unknown>>)
-          : [];
+        const documents = this.getPayloadDocuments(payload);
         const blockchainDocument = documents.find(
-          (entry) => entry.dokumen_id === document.id
+          (entry) => this.getPayloadDocumentId(entry) === document.id
         );
+        const hash = blockchainDocument ? this.getPayloadDocumentHash(blockchainDocument) : null;
 
         if (
           blockchainDocument &&
-          typeof blockchainDocument.hash_file === "string"
+          typeof hash === "string"
         ) {
           return {
             activityId: activity.id,
             txId: item.txid,
             blockHeight: item.blockheight ?? null,
             confirmations: item.confirmations,
-            hash: blockchainDocument.hash_file,
+            hash,
           };
         }
       }
@@ -448,10 +465,8 @@ export class DocumentService {
     if (!item) throw new Error("Snapshot riwayat tidak ditemukan.");
 
     const payload = item.data.json || {};
-    const documents = Array.isArray(payload.dokumen_pendukung)
-      ? payload.dokumen_pendukung as Array<Record<string, unknown>>
-      : [];
-    const snapshotDocument = documents.find((entry) => entry.dokumen_id === dokumenId);
+    const documents = this.getPayloadDocuments(payload);
+    const snapshotDocument = documents.find((entry) => this.getPayloadDocumentId(entry) === dokumenId);
     if (!snapshotDocument) {
       throw new Error("Dokumen tidak tercatat pada snapshot riwayat ini.");
     }

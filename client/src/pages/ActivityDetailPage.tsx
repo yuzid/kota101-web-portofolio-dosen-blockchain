@@ -137,17 +137,21 @@ interface ActivityLog {
     };
     partisipasi?: Array<Record<string, unknown>>;
     dokumen_pendukung?: Array<Record<string, unknown>>;
+    anggota?: Array<Record<string, unknown>>;
+    dokumen?: Array<Record<string, unknown>>;
   };
 }
 
+// Field definitions untuk payload v2 (key canonical) — v1 'nama_kegiatan' di-normalize ke 'nama'
 const activityFieldLabels: Record<string, string> = {
-  nama_kegiatan: "Nama kegiatan",
+  nama: "Nama kegiatan",
   kategori_tridharma: "Kategori Tridharma",
   jenis_kegiatan: "Jenis kegiatan",
   tanggal_mulai: "Tanggal mulai",
   tanggal_selesai: "Tanggal selesai",
   periode: "Tahun akademik",
   semester: "Semester",
+  jenis_bukti: "Tipe bukti",
 };
 
 const statusBadge: Record<
@@ -361,9 +365,20 @@ export function ActivityDetailPage() {
     return selectedIndex >= 0 ? logs[selectedIndex + 1] ?? null : null;
   };
 
+  // Normalisasi payload kegiatan: rename v1 key 'nama_kegiatan' → 'nama' agar
+  // perbandingan lintas-versi (v1 vs v2) konsisten
+  const normalizeKegiatanPayload = (kegiatan: Record<string, unknown>) => {
+    const normalized = { ...kegiatan };
+    if (!normalized.nama && normalized.nama_kegiatan) {
+      normalized.nama = normalized.nama_kegiatan;
+    }
+    return normalized;
+  };
+
   const getActivityChanges = (log: ActivityLog) => {
-    const current = log.payload.kegiatan ?? {};
-    const previous = getPreviousLog(log)?.payload.kegiatan ?? null;
+    const current = normalizeKegiatanPayload(log.payload.kegiatan ?? {});
+    const previousRaw = getPreviousLog(log)?.payload.kegiatan ?? null;
+    const previous = previousRaw ? normalizeKegiatanPayload(previousRaw) : null;
     return Object.entries(activityFieldLabels)
       .filter(([field]) => !previous || current[field] !== previous[field])
       .map(([field, label]) => ({
@@ -374,13 +389,44 @@ export function ActivityDetailPage() {
       }));
   };
 
+  const getPayloadParticipants = (payload: ActivityLog["payload"]) => {
+    if (Array.isArray(payload.anggota)) {
+      return payload.anggota.map((item) => ({
+        ...item,
+        dosen_id: item.id,
+        peran: "ANGGOTA",
+      }));
+    }
+    return payload.partisipasi ?? [];
+  };
+
+  const getPayloadDocuments = (payload: ActivityLog["payload"]) => {
+    if (Array.isArray(payload.dokumen)) {
+      return payload.dokumen.map((item) => ({
+        ...item,
+        dokumen_id: item.id,
+        jenis_dokumen: item.jenis,
+        tanggal_upload: item.tanggal,
+        hash_file: item.hash,
+      }));
+    }
+    return payload.dokumen_pendukung ?? [];
+  };
+
   const getCollectionChanges = (
     log: ActivityLog,
     collection: "partisipasi" | "dokumen_pendukung",
     idKey: string,
   ) => {
-    const current = log.payload[collection] ?? [];
-    const previous = getPreviousLog(log)?.payload[collection] ?? [];
+    const current = collection === "partisipasi"
+      ? getPayloadParticipants(log.payload)
+      : getPayloadDocuments(log.payload);
+    const previousPayload = getPreviousLog(log)?.payload;
+    const previous = previousPayload
+      ? collection === "partisipasi"
+        ? getPayloadParticipants(previousPayload)
+        : getPayloadDocuments(previousPayload)
+      : [];
     const currentById = new Map(current.map((item) => [getRecordId(item, idKey), item]));
     const previousById = new Map(previous.map((item) => [getRecordId(item, idKey), item]));
     return {
@@ -1069,10 +1115,38 @@ export function ActivityDetailPage() {
             const documentChanges = getCollectionChanges(selectedLog, "dokumen_pendukung", "dokumen_id");
             const activitySnapshot = selectedLog.payload.kegiatan ?? {};
             const recorder = selectedLog.payload.pencatat ?? {};
-            const participants = selectedLog.payload.partisipasi ?? [];
-            const documents = selectedLog.payload.dokumen_pendukung ?? [];
-            const previousParticipants = getPreviousLog(selectedLog)?.payload.partisipasi ?? [];
-            const previousDocuments = getPreviousLog(selectedLog)?.payload.dokumen_pendukung ?? [];
+            const rawParticipants = [
+              ...(selectedLog.payload.anggota
+                ? [{
+                    id: recorder.id,
+                    dosen_id: recorder.id,
+                    nama: recorder.nama,
+                    nidn: recorder.nidn,
+                    peran: "KETUA",
+                    status: "DITERIMA",
+                  }]
+                : []),
+              ...getPayloadParticipants(selectedLog.payload),
+            ];
+            const participants = Array.from(
+              rawParticipants.reduce((map, participant) => {
+                const participantId = getRecordId(participant, "dosen_id") || getRecordId(participant, "id") || String(participant.nama ?? "");
+                if (!participantId) return map;
+                const existing = map.get(participantId);
+                map.set(participantId, {
+                  ...existing,
+                  ...participant,
+                  dosen_id: participantId,
+                  peran: participantId === recorder.id ? "KETUA" : participant.peran ?? existing?.peran ?? "ANGGOTA",
+                  status: participantId === recorder.id ? "DITERIMA" : participant.status ?? existing?.status ?? "DITERIMA",
+                });
+                return map;
+              }, new Map<string, Record<string, unknown>>()).values()
+            );
+            const documents = getPayloadDocuments(selectedLog.payload);
+            const previousPayload = getPreviousLog(selectedLog)?.payload;
+            const previousParticipants = previousPayload ? getPayloadParticipants(previousPayload) : [];
+            const previousDocuments = previousPayload ? getPayloadDocuments(previousPayload) : [];
             const isDocumentEvent = isDocumentChangeAction(selectedLog.action);
             const documentEventChanges = documentChanges.changed.length > 0
               ? documentChanges.changed
@@ -1384,8 +1458,10 @@ function getDocumentMetadataChanges(
 
   const labels: Record<string, string> = {
     nama: "Nama",
+    jenis: "Jenis",
     jenis_dokumen: "Jenis",
     sumber_dokumen: "Sumber",
+    tanggal: "Tanggal",
     tanggal_upload: "Tanggal",
   };
 

@@ -401,12 +401,7 @@ describe('Staf TU & Dosen — Jenis Dokumen Dinamis', () => {
     dosenToken = makeDosenToken();
   });
 
-  it('TC-TU-JD-01: Get list jenis dokumen (gabungan defaults + custom) → 200', async () => {
-    const mockPrisma = require('../lib/prisma').prisma;
-    mockPrisma.jenisDokumen.findMany.mockResolvedValue([
-      { id: 'custom-1', nama: 'SURAT_KETERANGAN_AKTIF', created_at: new Date() }
-    ]);
-
+  it('TC-TU-JD-01: Get list jenis dokumen (defaults) → 200', async () => {
     const res = await request(app)
       .get('/api/jenis-dokumen')
       .set('Authorization', `Bearer ${tuToken}`);
@@ -414,18 +409,10 @@ describe('Staf TU & Dosen — Jenis Dokumen Dinamis', () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('success');
     expect(res.body.data).toContain('SURAT_KEPUTUSAN');
-    expect(res.body.data).toContain('SURAT_KETERANGAN_AKTIF');
+    expect(res.body.data).toContain('LAPORAN');
   });
 
   it('TC-TU-JD-02: Staf TU menambah jenis dokumen baru → 201', async () => {
-    const mockPrisma = require('../lib/prisma').prisma;
-    mockPrisma.jenisDokumen.findUnique.mockResolvedValue(null);
-    mockPrisma.jenisDokumen.create.mockResolvedValue({
-      id: 'custom-2',
-      nama: 'IJAZAH_DOSEN',
-      created_at: new Date()
-    });
-
     const res = await request(app)
       .post('/api/tatausaha/jenis-dokumen')
       .set('Authorization', `Bearer ${tuToken}`)

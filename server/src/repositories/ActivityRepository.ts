@@ -300,7 +300,8 @@ export class ActivityRepository {
                   include: { highlights: { include: { highlight_rect: true } } }
                 }
               }
-            }
+            },
+            dosen: true,
           }
         }
       }
@@ -354,7 +355,7 @@ export class ActivityRepository {
     ]);
   }
 
-  async createLampiran(data: any) {
+  async createLampiran(data: { kegiatan_id: string; dokumen_id: string; dosen_id?: string | null }) {
     return await prisma.lampiranBukti.create({ data });
   }
 
@@ -567,7 +568,9 @@ export class ActivityRepository {
           }
         },
         lampiran_bukti: {
-          include: {
+          select: {
+            id: true,
+            dosen_id: true,
             dokumen: {
               select: {
                 id: true,
@@ -575,7 +578,8 @@ export class ActivityRepository {
                 jenis_dokumen: true,
                 sumber_dokumen: true,
                 tanggal_upload: true,
-                hash_file: true
+                hash_file: true,
+                file_path: true
               }
             }
           }

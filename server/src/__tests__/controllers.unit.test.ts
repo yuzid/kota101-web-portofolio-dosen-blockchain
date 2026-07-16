@@ -309,20 +309,18 @@ describe('HighlightController unit', () => {
 });
 
 describe('JenisDokumenController unit', () => {
-  it('getAll dan create memanggil prisma langsung', async () => {
+  it('getAll dan create berjalan menggunakan static lists', async () => {
     const controller = new JenisDokumenController();
-    (prisma.jenisDokumen.findMany as jest.Mock).mockResolvedValue([{ nama: 'CUSTOM' }]);
-    (prisma.jenisDokumen.findUnique as jest.Mock).mockResolvedValue(null);
-    (prisma.jenisDokumen.create as jest.Mock).mockResolvedValue({ id: 'jenis-1', nama: 'CUSTOM_BARU' });
 
     let res = mockRes();
     await controller.getAll(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json.mock.calls[0][0].data).toContain('CUSTOM');
+    expect(res.json.mock.calls[0][0].data).toContain('SURAT_KEPUTUSAN');
 
     res = mockRes();
-    await controller.create(mockReq({ body: { nama: 'custom_baru' } }), res);
+    await controller.create(mockReq({ body: { nama: 'custom_baru_sekali' } }), res);
     expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json.mock.calls[0][0].data.nama).toBe('CUSTOM_BARU_SEKALI');
   });
 });
 
