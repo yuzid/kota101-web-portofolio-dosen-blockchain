@@ -32,71 +32,75 @@ export class ActivityService {
 
   private buildBlockchainPayload(activity: any, eventType: string, actorDosenId?: string) {
     const actor = this.getActorFromActivity(activity, actorDosenId);
-    const actorProgramStudi = actor.program_studi || activity.dosen.program_studi;
+    const creatorProgramStudi = activity.dosen.program_studi;
+    const isBuktiBersama = activity.jenis_bukti === 'BERSAMA';
+    const participantIds = new Set([
+      activity.dosen_id,
+      ...activity.partisipasi.map((participant: any) => participant.dosen_id),
+    ]);
 
     return {
       event_type: eventType,
-      payload_version: 1,
+      payload_version: 2,
       recorded_at: new Date().toISOString(),
       kegiatan: {
         id: activity.id,
-        dosen_id: activity.dosen_id,
+        nama: activity.nama_kegiatan,
         kategori_tridharma: activity.kategori_tridharma,
         jenis_kegiatan: activity.jenis_kegiatan,
-        nama_kegiatan: activity.nama_kegiatan,
-        tanggal_mulai: activity.tanggal_mulai.toISOString(),
-        tanggal_selesai: activity.tanggal_selesai.toISOString(),
+        tanggal_mulai: this.formatDateOnly(activity.tanggal_mulai),
+        tanggal_selesai: this.formatDateOnly(activity.tanggal_selesai),
         periode: activity.periode,
         semester: activity.semester,
         jenis_bukti: activity.jenis_bukti,
       },
       pencatat: {
-        id: actor.id,
-        nip: actor.nip,
-        nidn: actor.nidn,
-        nama: actor.nama,
-        program_studi: {
-          id: actorProgramStudi.id,
-          kode: actorProgramStudi.kode_prodi,
-          nama: actorProgramStudi.nama_prodi,
-        },
+        id: activity.dosen.id,
+        nidn: activity.dosen.nidn,
+        nama: activity.dosen.nama,
+        program_studi: creatorProgramStudi.nama_prodi,
       },
-      partisipasi: activity.partisipasi.map((participant: any) => ({
-        dosen_id: participant.dosen_id,
-        nip: participant.dosen.nip,
+      aktor: {
+        id: actor.id,
+        nama: actor.nama,
+      },
+      anggota: activity.partisipasi
+        .filter((participant: any) => participant.dosen_id !== activity.dosen_id)
+        .map((participant: any) => ({
+        id: participant.dosen_id,
         nidn: participant.dosen.nidn,
         nama: participant.dosen.nama,
-        peran: participant.peran,
         status: participant.status,
       })),
-      dokumen_pendukung: activity.lampiran_bukti.map((lampiran: any) => ({
-        dokumen_id: lampiran.dokumen.id,
+      dokumen: activity.lampiran_bukti.map((lampiran: any) => {
+        const kepemilikan = lampiran.dokumen.kepemilikan || [];
+        const owner =
+          kepemilikan.find((item: any) => item.dosen_id && participantIds.has(item.dosen_id)) ||
+          kepemilikan[0];
+
+        return {
+        id: lampiran.dokumen.id,
+        dosen_id: isBuktiBersama ? activity.dosen_id : owner?.dosen_id,
         nama: lampiran.dokumen.nama,
-        jenis_dokumen: lampiran.dokumen.jenis_dokumen,
-        sumber_dokumen: lampiran.dokumen.sumber_dokumen,
-        tanggal_upload: this.formatDateOnly(lampiran.dokumen.tanggal_upload),
-        hash_file: lampiran.dokumen.hash_file,
+        jenis: lampiran.dokumen.jenis_dokumen,
+        tanggal: this.formatDateOnly(lampiran.dokumen.tanggal_upload),
+        hash: lampiran.dokumen.hash_file,
         file_path: lampiran.dokumen.file_path,
-        highlights: (lampiran.dokumen.kepemilikan || []).flatMap((kepemilikan: any) =>
+        highlights: kepemilikan.flatMap((kepemilikan: any) =>
           (kepemilikan.highlights || []).map((highlight: any) => ({
-            highlight_id: highlight.id,
-            kepemilikan_id: kepemilikan.id,
-            dosen_id: kepemilikan.dosen_id,
-            page_number: highlight.page_number,
-            highlighted_text: highlight.highlighted_text,
+            page: highlight.page_number,
             rects: (highlight.highlight_rect || []).map((rect: any) => ({
-              id: rect.id,
               x1: rect.x1,
               x2: rect.x2,
               y1: rect.y1,
               y2: rect.y2,
               width: rect.width,
               height: rect.height,
-              boundary_rect: rect.boundary_rect,
             })),
           })),
         ),
-      })),
+      };
+      }),
     };
   }
 
@@ -343,22 +347,25 @@ export class ActivityService {
     return items.map((item) => {
       const payload = item.data.json || {};
       const pencatat = payload.pencatat as { nama?: string } | undefined;
-      const kegiatan = payload.kegiatan as { nama_kegiatan?: string } | undefined;
-      const documents = Array.isArray(payload.dokumen_pendukung)
-        ? payload.dokumen_pendukung
-        : [];
+      const aktor = payload.aktor as { nama?: string } | undefined;
+      const kegiatan = payload.kegiatan as { nama?: string; nama_kegiatan?: string } | undefined;
+      const documents = Array.isArray(payload.dokumen)
+        ? payload.dokumen
+        : Array.isArray(payload.dokumen_pendukung)
+          ? payload.dokumen_pendukung
+          : [];
 
       return {
         id: item.txid,
         txId: item.txid,
         action: String(payload.event_type || 'KEGIATAN_RECORDED'),
-        actor: pencatat?.nama || item.publishers[0] || 'Unknown',
+        actor: aktor?.nama || pencatat?.nama || item.publishers[0] || 'Unknown',
         publisher: item.publishers[0] || null,
         timestamp: String(
           payload.recorded_at ||
           new Date((item.blocktime || item.time || 0) * 1000).toISOString(),
         ),
-        details: kegiatan?.nama_kegiatan || activity.nama_kegiatan,
+        details: kegiatan?.nama || kegiatan?.nama_kegiatan || activity.nama_kegiatan,
         documentCount: documents.length,
         confirmations: item.confirmations,
         blockHeight: item.blockheight ?? null,

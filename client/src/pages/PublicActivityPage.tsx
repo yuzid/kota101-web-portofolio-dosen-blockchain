@@ -101,6 +101,7 @@ interface DocPreviewItem {
 
 interface SnapshotDocument {
   id: string;
+  dosenId?: string;
   name: string;
   jenis: string;
   tanggalUpload: string;
@@ -114,6 +115,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 const activityFieldLabels: Record<string, string> = {
+  nama: "Nama Kegiatan",
   nama_kegiatan: "Nama Kegiatan",
   jenis_tridharma: "Jenis Tridharma",
   kategori: "Kategori",
@@ -121,6 +123,7 @@ const activityFieldLabels: Record<string, string> = {
   tanggal_selesai: "Tanggal Selesai",
   tahun_akademik: "Tahun Akademik",
   semester: "Semester",
+  jenis_bukti: "Tipe Bukti",
   program_studi: "Program Studi",
 };
 
@@ -174,7 +177,9 @@ function getDocumentMetadataChanges(
 
   const labels: Record<string, string> = {
     nama: "Nama",
+    jenis: "Jenis",
     jenis_dokumen: "Jenis",
+    tanggal: "Tanggal",
     sumber_dokumen: "Sumber",
     tanggal_upload: "Tanggal",
   };
@@ -189,8 +194,10 @@ function getDocumentMetadataChanges(
 }
 
 function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocument[] {
-  const documents = Array.isArray(payload?.dokumen_pendukung)
-    ? payload.dokumen_pendukung
+  const documents = Array.isArray(payload?.dokumen)
+    ? payload.dokumen
+    : Array.isArray(payload?.dokumen_pendukung)
+      ? payload.dokumen_pendukung
     : [];
 
   return documents.map((doc: unknown) => {
@@ -202,7 +209,7 @@ function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocume
       return {
         id: String(h.highlight_id ?? crypto.randomUUID()),
         kepemilikan_id: String(h.kepemilikan_id ?? ""),
-        page_number: Number(h.page_number ?? 1),
+        page_number: Number(h.page ?? h.page_number ?? 1),
         highlighted_text: String(h.highlighted_text ?? ""),
         highlight_rect: rects.map((rect: unknown) => {
           const r = toRecord(rect);
@@ -221,26 +228,68 @@ function getSnapshotDocuments(payload?: Record<string, unknown>): SnapshotDocume
     });
 
     return {
-      id: String(d.dokumen_id ?? ""),
+      id: String(d.id ?? d.dokumen_id ?? ""),
+      dosenId: typeof d.dosen_id === "string" ? d.dosen_id : undefined,
       name: String(d.nama ?? "Tanpa Nama"),
-      jenis: String(d.jenis_dokumen ?? "-"),
-      tanggalUpload: String(d.tanggal_upload ?? ""),
-      hashFile: String(d.hash_file ?? "-"),
+      jenis: String(d.jenis ?? d.jenis_dokumen ?? "-"),
+      tanggalUpload: String(d.tanggal ?? d.tanggal_upload ?? ""),
+      hashFile: String(d.hash ?? d.hash_file ?? "-"),
       filePath: String(d.file_path ?? d.nama ?? ""),
       highlights,
     };
   }).filter((doc) => doc.id);
 }
 
+function getPayloadDocumentRecords(payload?: Record<string, unknown> | null): Array<Record<string, unknown>> {
+  if (!payload) return [];
+  if (Array.isArray(payload.dokumen)) {
+    return payload.dokumen.map((item) => {
+      const doc = toRecord(item);
+      return {
+        ...doc,
+        dokumen_id: doc.id,
+        jenis_dokumen: doc.jenis,
+        tanggal_upload: doc.tanggal,
+        hash_file: doc.hash,
+      };
+    });
+  }
+  return Array.isArray(payload.dokumen_pendukung)
+    ? payload.dokumen_pendukung.map((item) => toRecord(item))
+    : [];
+}
+
 function transformSnapshotLog(log: ActivityLog, activityId: string, liveActivity?: any): PublicActivity {
   const payload = log.payload || {};
   const kegiatan = toRecord(payload.kegiatan);
   const pencatat = toRecord(payload.pencatat);
-  const programStudi = toRecord(pencatat.program_studi);
+  const programStudi =
+    typeof pencatat.program_studi === "string"
+      ? pencatat.program_studi
+      : String(toRecord(pencatat.program_studi).nama ?? "Umum");
   const documents = getSnapshotDocuments(payload);
-  const participants = Array.isArray(payload.partisipasi)
-    ? payload.partisipasi.map((item) => toRecord(item))
-    : [];
+  const rawParticipants = Array.isArray(payload.anggota)
+    ? payload.anggota.map((item) => toRecord(item))
+    : Array.isArray(payload.partisipasi)
+      ? payload.partisipasi.map((item) => toRecord(item))
+      : [];
+  const participants = Array.isArray(payload.anggota)
+    ? [
+        {
+          id: pencatat.id,
+          dosen_id: pencatat.id,
+          nama: pencatat.nama,
+          nidn: pencatat.nidn,
+          peran: "KETUA",
+          status: "DITERIMA",
+        },
+        ...rawParticipants.map((participant) => ({
+          ...participant,
+          dosen_id: participant.id ?? participant.dosen_id,
+          peran: "ANGGOTA",
+        })),
+      ]
+    : rawParticipants;
 
   const jenisBukti = String(
     kegiatan.jenis_bukti ??
@@ -250,26 +299,34 @@ function transformSnapshotLog(log: ActivityLog, activityId: string, liveActivity
 
   const isBuktiBersama = jenisBukti === "BERSAMA";
 
+  const dosenTerlibatMap = new Map<string, PublicActivity["dosenTerlibat"][number]>();
+  participants.forEach((participant) => {
+    const participantId = String(participant.dosen_id ?? participant.id ?? participant.nama ?? crypto.randomUUID());
+    const existing = dosenTerlibatMap.get(participantId);
+    const isKetua = String(participantId) === String(pencatat.id);
+    dosenTerlibatMap.set(participantId, {
+      id: participantId,
+      name: String(participant.nama ?? existing?.name ?? "Unknown"),
+      nidn: String(participant.nidn ?? participant.nip ?? existing?.nidn ?? "-"),
+      peran: isKetua ? "KETUA" : String(participant.peran ?? existing?.peran ?? "ANGGOTA"),
+      status: isKetua ? "DITERIMA" : String(participant.status ?? existing?.status ?? "DITERIMA"),
+      dokumen: existing?.dokumen ?? [],
+    });
+  });
+
   return {
     id: activityId,
-    namaKegiatan: String(kegiatan.nama_kegiatan ?? ""),
+    namaKegiatan: String(kegiatan.nama ?? kegiatan.nama_kegiatan ?? ""),
     jenisTridharma: String(kegiatan.kategori_tridharma ?? "").toLowerCase(),
     kategori: String(kegiatan.jenis_kegiatan ?? ""),
     tanggalMulai: String(kegiatan.tanggal_mulai ?? ""),
     tanggalSelesai: String(kegiatan.tanggal_selesai ?? ""),
     tahunAkademik: String(kegiatan.periode ?? ""),
     semester: String(kegiatan.semester ?? "").toLowerCase(),
-    programStudi: String(programStudi.nama ?? "Umum"),
+    programStudi,
     statusKelengkapan: documents.length > 0 ? "lengkap" : "tidak_lengkap",
     jenisBukti,
-    dosenTerlibat: participants.map((participant) => ({
-      id: String(participant.dosen_id ?? participant.nama ?? crypto.randomUUID()),
-      name: String(participant.nama ?? "Unknown"),
-      nidn: String(participant.nidn ?? participant.nip ?? "-"),
-      peran: String(participant.peran ?? "ANGGOTA"),
-      status: String(participant.status ?? "DITERIMA"),
-      dokumen: [],
-    })),
+    dosenTerlibat: Array.from(dosenTerlibatMap.values()),
     dokumenBersama: isBuktiBersama
       ? documents.map((doc) => ({
           id: doc.id,
@@ -374,12 +431,14 @@ function getTimelineDot(action: string) {
 
 function getNameChangedDocuments(log: ActivityLog) {
   const modifiedDocs = log.collectionChanges?.dokumen_bukti?.modified || [];
-  const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
-    ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
-    : [];
+  const previousDocs = getPayloadDocumentRecords(log.previousPayload);
 
   return modifiedDocs.filter((doc) => {
-    const currentDoc = toRecord(doc);
+    const rawCurrentDoc = toRecord(doc);
+    const currentDoc = {
+      ...rawCurrentDoc,
+      dokumen_id: rawCurrentDoc.dokumen_id ?? rawCurrentDoc.id,
+    };
     const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
     return previousDoc && currentDoc.nama !== previousDoc.nama;
   });
@@ -434,10 +493,12 @@ function getDocumentHistoryDescription(log: ActivityLog) {
   if (isDocumentMetadataAction(log.action)) {
     const renamedDocs = getNameChangedDocuments(log);
     const descriptions = renamedDocs.map((doc) => {
-      const currentDoc = toRecord(doc);
-      const previousDocs = Array.isArray(log.previousPayload?.dokumen_pendukung)
-        ? log.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
-        : [];
+      const rawCurrentDoc = toRecord(doc);
+      const currentDoc = {
+        ...rawCurrentDoc,
+        dokumen_id: rawCurrentDoc.dokumen_id ?? rawCurrentDoc.id,
+      };
+      const previousDocs = getPayloadDocumentRecords(log.previousPayload);
       const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
       return `Nama dokumen ${formatAuditValue(previousDoc?.nama)} diubah menjadi ${formatAuditValue(currentDoc.nama)}.`;
     });
@@ -496,6 +557,27 @@ export function PublicActivityPage() {
         const computeDiff = (current: any, prev: any) => {
           const changes: Record<string, { old: unknown; new: unknown }> = {};
           const collectionChanges: Record<string, { added: unknown[]; removed: unknown[]; modified: unknown[] }> = {};
+          const getParticipants = (payload: any) => {
+            if (Array.isArray(payload.anggota)) {
+              return payload.anggota.map((item: any) => ({
+                ...item,
+                dosen_id: item.id,
+              }));
+            }
+            return payload.partisipasi || [];
+          };
+          const getDocuments = (payload: any) => {
+            if (Array.isArray(payload.dokumen)) {
+              return payload.dokumen.map((item: any) => ({
+                ...item,
+                dokumen_id: item.id,
+                hash_file: item.hash,
+                jenis_dokumen: item.jenis,
+                tanggal_upload: item.tanggal,
+              }));
+            }
+            return payload.dokumen_pendukung || [];
+          };
 
           if (!prev) {
             return { changes, collectionChanges };
@@ -504,7 +586,7 @@ export function PublicActivityPage() {
           const curKegiatan = current.kegiatan || {};
           const prevKegiatan = prev.kegiatan || {};
 
-          const keys = ['nama_kegiatan', 'kategori_tridharma', 'jenis_kegiatan', 'tanggal_mulai', 'tanggal_selesai', 'periode', 'semester'];
+          const keys = ['nama', 'nama_kegiatan', 'kategori_tridharma', 'jenis_kegiatan', 'tanggal_mulai', 'tanggal_selesai', 'periode', 'semester', 'jenis_bukti'];
           for (const key of keys) {
             const curVal = curKegiatan[key];
             const prevVal = prevKegiatan[key];
@@ -513,8 +595,8 @@ export function PublicActivityPage() {
             }
           }
 
-          const curPart = current.partisipasi || [];
-          const prevPart = prev.partisipasi || [];
+          const curPart = getParticipants(current);
+          const prevPart = getParticipants(prev);
           const addedPart = curPart.filter((p: any) => !prevPart.some((op: any) => op.dosen_id === p.dosen_id));
           const removedPart = prevPart.filter((op: any) => !curPart.some((p: any) => p.dosen_id === op.dosen_id));
           const modifiedPart = curPart.filter((p: any) => {
@@ -529,8 +611,8 @@ export function PublicActivityPage() {
             };
           }
 
-          const curDocs = current.dokumen_pendukung || [];
-          const prevDocs = prev.dokumen_pendukung || [];
+          const curDocs = getDocuments(current);
+          const prevDocs = getDocuments(prev);
           const addedDocs = curDocs.filter((d: any) => !prevDocs.some((od: any) => od.dokumen_id === d.dokumen_id));
           const removedDocs = prevDocs.filter((od: any) => !curDocs.some((d: any) => d.dokumen_id === od.dokumen_id));
           const modifiedDocs = curDocs.filter((d: any) => {
@@ -609,12 +691,12 @@ export function PublicActivityPage() {
           if (
             (actionMapped === 'document_metadata_updated' || actionMapped === 'document_highlight_synced') &&
             !collectionChanges.dokumen_bukti &&
-            Array.isArray(rawPayload.dokumen_pendukung)
+            (Array.isArray(rawPayload.dokumen_pendukung) || Array.isArray(rawPayload.dokumen))
           ) {
             collectionChanges.dokumen_bukti = {
               added: [],
               removed: [],
-              modified: rawPayload.dokumen_pendukung,
+              modified: Array.isArray(rawPayload.dokumen) ? rawPayload.dokumen : rawPayload.dokumen_pendukung,
             };
           }
           const description = generateDescription(actionMapped, changes, collectionChanges);
@@ -685,28 +767,31 @@ export function PublicActivityPage() {
             }
           });
         } else {
-          docResults.forEach((result) => {
-            if (result.status !== "fulfilled" || !result.value) return;
-            const detail = result.value;
-            const ownerIds = getOwnerDosenIds(detail);
-            const snapDoc = snapshotDocs.find((d) => d.id === detail.id);
+          snapshotDocs.forEach((snapDoc, index) => {
+            const result = docResults[index];
+            const detail = result?.status === "fulfilled" ? result.value : null;
+            const ownerIds = snapDoc.dosenId
+              ? [snapDoc.dosenId]
+              : detail
+                ? getOwnerDosenIds(detail)
+                : [];
 
             snapshotActivity.dosenTerlibat.forEach((dosen) => {
               if (ownerIds.includes(dosen.id)) {
                 const existing = dosen.dokumen.find(
-                  (d) => d.id === detail.id
+                  (d) => d.id === snapDoc.id
                 );
                 if (!existing) {
                   dosen.dokumen.push({
-                    id: detail.id,
-                    name: detail.nama || "Tanpa Nama",
-                    jenis: detail.jenis_dokumen || "-",
-                    tanggalUpload: detail.tanggal_upload || "",
-                    hashFile: snapDoc?.hashFile || detail.hash_file || "",
-                    filePath: detail.file_path || "",
-                    fileUrl: `${API_URL}/api/public/kegiatan/${id}/audit-trail/${selected.id}/dokumen/${detail.id}/content`,
-                    kepemilikanId: detail.kepemilikan?.find((k: any) => k.dosen?.id === dosen.id)?.id || undefined,
-                    snapshotHighlights: snapDoc?.highlights,
+                    id: snapDoc.id,
+                    name: snapDoc.name || detail?.nama || "Tanpa Nama",
+                    jenis: snapDoc.jenis || detail?.jenis_dokumen || "-",
+                    tanggalUpload: snapDoc.tanggalUpload || detail?.tanggal_upload || "",
+                    hashFile: snapDoc.hashFile || detail?.hash_file || "",
+                    filePath: snapDoc.filePath || detail?.file_path || "",
+                    fileUrl: `${API_URL}/api/public/kegiatan/${id}/audit-trail/${selected.id}/dokumen/${snapDoc.id}/content`,
+                    kepemilikanId: detail?.kepemilikan?.find((k: any) => k.dosen?.id === dosen.id)?.id || undefined,
+                    snapshotHighlights: snapDoc.highlights,
                   });
                 }
               }
@@ -1241,10 +1326,14 @@ function renderFullMode(
                           <h4 className="text-sm font-semibold mb-2">Perubahan Koleksi</h4>
                           <div className="space-y-2">
                             {selectedLog.collectionChanges.dokumen_bukti?.modified?.map((doc: unknown, i: number) => {
-                              const currentDoc = doc as Record<string, unknown>;
-                              const previousDocs = Array.isArray(selectedLog.previousPayload?.dokumen_pendukung)
-                                ? selectedLog.previousPayload?.dokumen_pendukung as Array<Record<string, unknown>>
-                                : [];
+                              const rawCurrentDoc = doc as Record<string, unknown>;
+                              const currentDoc = {
+                                ...rawCurrentDoc,
+                                dokumen_id: rawCurrentDoc.dokumen_id ?? rawCurrentDoc.id,
+                                jenis_dokumen: rawCurrentDoc.jenis_dokumen ?? rawCurrentDoc.jenis,
+                                tanggal_upload: rawCurrentDoc.tanggal_upload ?? rawCurrentDoc.tanggal,
+                              };
+                              const previousDocs = getPayloadDocumentRecords(selectedLog.previousPayload);
                               const previousDoc = previousDocs.find((item) => item.dokumen_id === currentDoc.dokumen_id);
                               const metadataChanges = getDocumentMetadataChanges(currentDoc, previousDoc);
 
