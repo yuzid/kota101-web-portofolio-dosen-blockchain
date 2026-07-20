@@ -90,29 +90,34 @@ export function transformPublicActivity(raw: any): {
   const isBuktiBersama = raw.jenis_bukti === "BERSAMA";
   const dokumenBersama: PublicDokumenBersama[] = [];
   const docEntries: RawDocEntry[] = [];
+  const kepemilikanList = raw.kepemilikan_dokumen || raw.lampiran_bukti || [];
 
-  (raw.lampiran_bukti || []).forEach((lb: any) => {
-    const doc = lb.dokumen || {};
+  kepemilikanList.forEach((kd: any) => {
+    const doc = kd.dokumen || {};
     const entry: RawDocEntry = {
       id: doc.id,
       name: doc.nama || "Tanpa Nama",
       jenis: doc.jenis_dokumen || "-",
       tanggalUpload: doc.tanggal_upload || "",
     };
-    docEntries.push(entry);
+    if (!docEntries.find((d) => d.id === doc.id)) {
+      docEntries.push(entry);
+    }
 
     if (isBuktiBersama) {
-      dokumenBersama.push({
-        id: doc.id,
-        name: doc.nama || "Tanpa Nama",
-        jenis: doc.jenis_dokumen || "-",
-        tanggalUpload: doc.tanggal_upload || "",
-        hashFile: doc.hash_file || "",
-        filePath: doc.file_path || "",
-      });
+      if (!dokumenBersama.find((d) => d.id === doc.id)) {
+        dokumenBersama.push({
+          id: doc.id,
+          name: doc.nama || "Tanpa Nama",
+          jenis: doc.jenis_dokumen || "-",
+          tanggalUpload: doc.tanggal_upload || "",
+          hashFile: doc.hash_file || "",
+          filePath: doc.file_path || "",
+          kepemilikanId: kd.id,
+        });
+      }
     } else {
-      // Mode MASING_MASING: gunakan lb.dosen_id langsung jika tersedia
-      const ownerId: string | null = lb.dosen_id || null;
+      const ownerId: string | null = kd.dosen_id || null;
       if (ownerId) {
         const owner = dosenTerlibat.find((d) => d.id === ownerId);
         if (owner && !owner.dokumen.find((d) => d.id === doc.id)) {
@@ -123,10 +128,10 @@ export function transformPublicActivity(raw: any): {
             tanggalUpload: doc.tanggal_upload || "",
             hashFile: doc.hash_file || "",
             filePath: doc.file_path || "",
+            kepemilikanId: kd.id,
           });
         }
       }
-      // Jika lb.dosen_id null (data lama), biarkan fetchActivity handle via kepemilikan
     }
   });
 
@@ -142,7 +147,7 @@ export function transformPublicActivity(raw: any): {
       semester: (raw.semester || "").toLowerCase(),
       programStudi: prodiName,
       statusKelengkapan:
-        (raw.lampiran_bukti || []).length > 0 ? "lengkap" : "tidak_lengkap",
+        kepemilikanList.length > 0 ? "lengkap" : "tidak_lengkap",
       jenisBukti: raw.jenis_bukti || "MASING_MASING",
       dosenTerlibat,
       dokumenBersama,

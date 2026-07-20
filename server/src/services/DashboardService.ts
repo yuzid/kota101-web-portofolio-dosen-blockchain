@@ -194,7 +194,7 @@ export class DashboardService {
     const pengabdian = activities.filter(a => a.kategori_tridharma === 'PENGABDIAN').length;
     const tugasTambahan = activities.filter(a => a.kategori_tridharma === 'TUGAS_TAMBAHAN').length;
     const tanpaBuktiCount = (tanpaBukti as any[]).length;
-    const totalSelesai = activities.filter(a => (a.lampiran_bukti || []).length > 0).length;
+    const totalSelesai = activities.filter(a => (a.kepemilikan_dokumen || []).length > 0).length;
 
     return {
       totalKegiatan: total,
@@ -226,7 +226,7 @@ export class DashboardService {
       prisma.kegiatanTridharma.count({
         where: {
           dosen: { program_studi_id: prodiId },
-          lampiran_bukti: { none: {} }
+          kepemilikan_dokumen: { none: {} }
         }
       }),
       prisma.rekapLaporan.count({
@@ -244,7 +244,7 @@ export class DashboardService {
       by: ['dosen_id'],
       where: {
         dosen: { program_studi_id: prodiId },
-        lampiran_bukti: { none: {} }
+        kepemilikan_dokumen: { none: {} }
       },
       _count: { id: true }
     });
@@ -307,7 +307,7 @@ export class DashboardService {
           const kegiatanWithBukti = await prisma.kegiatanTridharma.count({
             where: {
               dosen: { program_studi_id: prodi.id },
-              lampiran_bukti: { some: {} }
+              kepemilikan_dokumen: { some: {} }
             }
           });
           const completeness = count > 0

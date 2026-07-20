@@ -83,6 +83,25 @@ function generateFakeKepemilikanId(dokumenId: string): string {
   return `mock-${dokumenId}-${Date.now()}`;
 }
 
+export async function getHighlightsByKepemilikanId(
+  kepemilikanId: string,
+): Promise<HighlighResponse> {
+  if (USE_MOCK) {
+    const highlights: Highlight[] = getMockHighlights(kepemilikanId);
+    return { highlights, kepemilikanId };
+  }
+
+  const response = await apiFetch(
+    `${API_URL}/api/dosen/highlights/${encodeURIComponent(kepemilikanId)}`,
+  );
+  const result = await response.json();
+  if (!response.ok || result.status !== "success") {
+    throw new Error(result.error || "Gagal mengambil highlight");
+  }
+  const highlights: Highlight[] = result.data || [];
+  return { highlights, kepemilikanId: result.kepemilikanId || kepemilikanId };
+}
+
 export async function getHighlightsByDokumenId(
   dokumenId: string,
 ): Promise<HighlighResponse> {

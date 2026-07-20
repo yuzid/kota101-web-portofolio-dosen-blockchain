@@ -127,14 +127,7 @@ const mockPrisma: Record<string, any> = {
     delete: jest.fn(),
   },
 
-  // LampiranBukti
-  lampiranBukti: {
-    findUnique: jest.fn(),
-    findMany: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    delete: jest.fn(),
-  },
+  // LampiranBukti dihapus dari schema, tabel tetap ada di DB sebagai backup
 
   // AuditTrail
   auditTrail: {

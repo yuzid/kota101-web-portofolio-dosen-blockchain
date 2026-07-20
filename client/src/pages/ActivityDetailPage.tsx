@@ -910,6 +910,7 @@ export function ActivityDetailPage() {
                                       navigate(`/documents/${doc.id}/preview`, {
                                         state: {
                                           isDocumentOwner: dosen.isCurrentUser === true,
+                                          kepemilikanId: (doc as any).lampiranId,
                                           activityId: activity.id,
                                           breadcrumbs: [
                                             {
@@ -1541,6 +1542,7 @@ function FileRow({
             navigate(`/documents/${doc.id}/preview`, {
               state: {
                 isDocumentOwner: doc.isUploader === true,
+                kepemilikanId: doc.lampiranId,
                 activityId: activity.id,
                 breadcrumbs: [
                   { label: "Beranda", path: "/dashboard" },
