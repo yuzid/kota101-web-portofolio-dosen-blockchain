@@ -36,6 +36,7 @@ import { HighlightOverlay } from "../components/document/HighlightOverlay";
 import { HighlightMenu } from "../components/document/HighlightMenu";
 import { 
   getHighlightsByDokumenId,
+  getHighlightsByKepemilikanId,
   addHighlight,
   updateHighlight,
   deleteHighlight,
@@ -307,13 +308,17 @@ export function DocumentPreviewPage() {
     };
   }, [activityId, apiPrefix, id, token]);
 
+  const kepemilikanIdFromState = (location.state as Record<string, unknown>)?.kepemilikanId as string | undefined;
+
   const loadHighlights = useCallback(async () => {
     if (!id) return;
     setHighlightsLoading(true);
     setHighlightsError(null);
     try {
-      const result = await getHighlightsByDokumenId(id);
-      const myKepemilikanId = result.kepemilikanId;
+      const result = kepemilikanIdFromState
+        ? await getHighlightsByKepemilikanId(kepemilikanIdFromState)
+        : await getHighlightsByDokumenId(id);
+      const myKepemilikanId = result.kepemilikanId || kepemilikanIdFromState;
       setHighlights(result.highlights);
       if (myKepemilikanId) {
         setKepemilikanId(myKepemilikanId);
@@ -325,7 +330,7 @@ export function DocumentPreviewPage() {
     } finally {
       setHighlightsLoading(false);
     }
-  }, [id]);
+  }, [id, kepemilikanIdFromState]);
 
   useEffect(() => {
     if (fileUrl) {
