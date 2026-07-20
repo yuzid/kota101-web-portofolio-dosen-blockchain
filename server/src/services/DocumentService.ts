@@ -38,8 +38,9 @@ export class DocumentService {
     );
 
     // Check if document is attached to activities where user is creator or participant
-    const isInLinkedActivity = document.lampiran_bukti.some((item: any) => {
+    const isInLinkedActivity = document.kepemilikan.some((item: any) => {
       const activity = item.kegiatan;
+      if (!activity) return false;
       return (
         activity.dosen_id === currentUser.id ||
         activity.partisipasi.some(
@@ -51,7 +52,7 @@ export class DocumentService {
     // Check if user is Kajur and document is attached to activity in their jurusan
     const isAccessibleByKajur =
       currentUser.jabatan?.is_kajur &&
-      document.lampiran_bukti.some((item: any) => {
+      document.kepemilikan.some((item: any) => {
         const activity = item.kegiatan;
         return (
           activity?.dosen?.program_studi?.jurusan_id ===
@@ -62,7 +63,7 @@ export class DocumentService {
     // Check if user is Kaprodi and document is attached to activity in their prodi
     const isAccessibleByKaprodi =
       currentUser.jabatan?.is_kaprodi &&
-      document.lampiran_bukti.some((item: any) => {
+      document.kepemilikan.some((item: any) => {
         const activity = item.kegiatan;
         return (
           activity?.dosen?.program_studi_id ===
@@ -109,9 +110,10 @@ export class DocumentService {
     document: any,
     activityId?: string
   ) {
-    const linkedActivities = document.lampiran_bukti
+    // Dapatkan kegiatan yang terhubung via kepemilikan.kegiatan
+    const linkedActivities = document.kepemilikan
       .map((item: any) => item.kegiatan)
-      .filter((activity: any) => !activityId || activity.id === activityId);
+      .filter((activity: any) => activity && (!activityId || activity.id === activityId));
 
     for (const activity of linkedActivities) {
       const items = await this.multiChainService.getJsonStreamItems(
@@ -424,7 +426,7 @@ export class DocumentService {
     }
 
     // Pengecekan keterikatan dokumen dengan kegiatan
-    if (targetDoc.lampiran_bukti && targetDoc.lampiran_bukti.length > 0) {
+    if (targetDoc.kepemilikan.some((k: any) => k.kegiatan_id !== null)) {
       throw new Error(
         "Dokumen tidak dapat dihapus karena masih digunakan sebagai bukti pada kegiatan Tridharma."
       );

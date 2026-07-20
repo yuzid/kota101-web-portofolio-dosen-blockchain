@@ -12,7 +12,7 @@ export class ActivityRepository {
         ]
       },
       include: {
-        lampiran_bukti: true,
+        kepemilikan_dokumen: true,
         partisipasi: true,
         dosen: true,
       },
@@ -44,9 +44,9 @@ export class ActivityRepository {
 
     if (status) {
       if (status === 'lengkap') {
-        where.lampiran_bukti = { some: {} };
+        where.kepemilikan_dokumen = { some: {} };
       } else {
-        where.lampiran_bukti = { none: {} };
+        where.kepemilikan_dokumen = { none: {} };
       }
     }
 
@@ -69,9 +69,10 @@ export class ActivityRepository {
         where,
         include: {
           dosen: { include: { program_studi: true } },
-          lampiran_bukti: {
+          kepemilikan_dokumen: {
             include: {
-              dokumen: true
+              dokumen: true,
+              dosen: true,
             }
           },
           partisipasi: { include: { dosen: true } }
@@ -112,9 +113,9 @@ export class ActivityRepository {
 
     if (status) {
       if (status === 'lengkap') {
-        where.lampiran_bukti = { some: {} };
+        where.kepemilikan_dokumen = { some: {} };
       } else {
-        where.lampiran_bukti = { none: {} };
+        where.kepemilikan_dokumen = { none: {} };
       }
     }
 
@@ -137,9 +138,10 @@ export class ActivityRepository {
         where,
         include: {
           dosen: { include: { program_studi: true } },
-          lampiran_bukti: {
+          kepemilikan_dokumen: {
             include: {
-              dokumen: true
+              dokumen: true,
+              dosen: true,
             }
           },
           partisipasi: { include: { dosen: true } }
@@ -167,7 +169,7 @@ export class ActivityRepository {
           { partisipasi: { some: { dosen_id: dosenId, status: 'DITERIMA' } } }
         ]
       },
-      include: { lampiran_bukti: true }
+      include: { kepemilikan_dokumen: true }
     });
 
     const total_dokumen = await prisma.kepemilikanDokumen.count({
@@ -192,9 +194,9 @@ export class ActivityRepository {
     if (dosenId) where.dosen_id = dosenId;
     if (status) {
       if (status === 'lengkap') {
-        where.lampiran_bukti = { some: {} };
+        where.kepemilikan_dokumen = { some: {} };
       } else {
-        where.lampiran_bukti = { none: {} };
+        where.kepemilikan_dokumen = { none: {} };
       }
     }
     if (tanggalAwal || tanggalAkhir) {
@@ -237,9 +239,9 @@ export class ActivityRepository {
     if (dosenId) where.dosen_id = dosenId;
     if (status) {
       if (status === 'lengkap') {
-        where.lampiran_bukti = { some: {} };
+        where.kepemilikan_dokumen = { some: {} };
       } else {
-        where.lampiran_bukti = { none: {} };
+        where.kepemilikan_dokumen = { none: {} };
       }
     }
     if (tanggalAwal || tanggalAkhir) {
@@ -274,7 +276,7 @@ export class ActivityRepository {
     return await prisma.kegiatanTridharma.findMany({
       where: {
         dosen_id: dosenId,
-        lampiran_bukti: { none: {} }
+        kepemilikan_dokumen: { none: {} }
       },
       orderBy: { tanggal_mulai: 'desc' },
       take: 5
@@ -291,17 +293,10 @@ export class ActivityRepository {
             dosen: { include: { program_studi: true, user: { select: { email: true } } } },
           },
         },
-        lampiran_bukti: {
+        kepemilikan_dokumen: {
           include: {
-            dokumen: {
-              include: {
-                kepemilikan: {
-                  where: { status: 'DISETUJUI' },
-                  include: { highlights: { include: { highlight_rect: true } } }
-                }
-              }
-            },
-            dosen: true,
+            dokumen: true,
+            highlights: { include: { highlight_rect: true } },
           }
         }
       }
@@ -316,8 +311,14 @@ export class ActivityRepository {
       await tx.partisipasiKegiatanTridharma.createMany({ data: partisipasi });
 
       if (lampiranData.length > 0) {
-        const lampiran = lampiranData.map(l => ({ ...l, kegiatan_id: activity.id }));
-        await tx.lampiranBukti.createMany({ data: lampiran });
+        // lampiranData: { dokumen_id, dosen_id }
+        // Link kepemilikan dokumen ke kegiatan ini
+        for (const lampiran of lampiranData) {
+          await tx.kepemilikanDokumen.updateMany({
+            where: { dosen_id: lampiran.dosen_id, dokumen_id: lampiran.dokumen_id },
+            data: { kegiatan_id: activity.id }
+          });
+        }
       }
 
       return activity;
@@ -339,28 +340,54 @@ export class ActivityRepository {
   }
 
   async findActivityIdsByDocumentId(dokumenId: string): Promise<string[]> {
-    const lampiran = await prisma.lampiranBukti.findMany({
-      where: { dokumen_id: dokumenId },
+    const kepemilikan = await prisma.kepemilikanDokumen.findMany({
+      where: { dokumen_id: dokumenId, kegiatan_id: { not: null } },
       select: { kegiatan_id: true },
     });
 
-    return [...new Set(lampiran.map((item) => item.kegiatan_id))];
+    return [...new Set(
+      kepemilikan.map((item) => item.kegiatan_id).filter(Boolean) as string[]
+    )];
   }
 
   async delete(id: string) {
+    // kepemilikan_dokumen.kegiatan_id akan otomatis di-set NULL via onDelete: SetNull
     return await prisma.$transaction([
       prisma.partisipasiKegiatanTridharma.deleteMany({ where: { kegiatan_tridharma_id: id } }),
-      prisma.lampiranBukti.deleteMany({ where: { kegiatan_id: id } }),
       prisma.kegiatanTridharma.delete({ where: { id } })
     ]);
   }
 
-  async createLampiran(data: { kegiatan_id: string; dokumen_id: string; dosen_id?: string | null }) {
-    return await prisma.lampiranBukti.create({ data });
+  async createLampiran(data: { kegiatan_id: string; dokumen_id: string; dosen_id: string }) {
+    // Link kepemilikan dokumen ke kegiatan dengan update kegiatan_id
+    return await prisma.kepemilikanDokumen.update({
+      where: { dosen_id_dokumen_id: { dosen_id: data.dosen_id, dokumen_id: data.dokumen_id } },
+      data: { kegiatan_id: data.kegiatan_id }
+    });
   }
 
-  async deleteLampiran(id: string) {
-    return await prisma.lampiranBukti.delete({ where: { id } });
+  async deleteLampiran(kepemilikanId: string) {
+    // Hanya unlink kepemilikan yang spesifik ini (set kegiatan_id = null)
+    // Masing-masing kepemilikan bersifat independen per dosen
+    await prisma.kepemilikanDokumen.update({
+      where: { id: kepemilikanId },
+      data: { kegiatan_id: null }
+    });
+  }
+
+  async deleteLampiranBersama(kepemilikanId: string) {
+    // Untuk mode BERSAMA: unlink SEMUA kepemilikan anggota untuk dokumen yang sama di kegiatan yang sama
+    const kepemilikan = await prisma.kepemilikanDokumen.findUnique({
+      where: { id: kepemilikanId },
+      select: { dokumen_id: true, kegiatan_id: true }
+    });
+
+    if (!kepemilikan || !kepemilikan.kegiatan_id) return;
+
+    await prisma.kepemilikanDokumen.updateMany({
+      where: { dokumen_id: kepemilikan.dokumen_id, kegiatan_id: kepemilikan.kegiatan_id },
+      data: { kegiatan_id: null }
+    });
   }
 
   async findParticipationsByDosen(dosenId: string) {
@@ -439,14 +466,14 @@ export class ActivityRepository {
   }
 
   async getActivityDocumentIds(kegiatanId: string): Promise<string[]> {
-    const lampiran = await prisma.lampiranBukti.findMany({
+    const kepemilikan = await prisma.kepemilikanDokumen.findMany({
       where: { kegiatan_id: kegiatanId },
       select: { dokumen_id: true }
     });
-    return lampiran.map(l => l.dokumen_id);
+    return [...new Set(kepemilikan.map(k => k.dokumen_id))];
   }
 
-  async createKepemilikanIfNotExists(dosenId: string, dokumenIds: string[]) {
+  async createKepemilikanIfNotExists(dosenId: string, dokumenIds: string[], kegiatanId?: string) {
     const existing = await prisma.kepemilikanDokumen.findMany({
       where: { dosen_id: dosenId, dokumen_id: { in: dokumenIds } },
       select: { id: true, dokumen_id: true, status: true }
@@ -461,9 +488,20 @@ export class ActivityRepository {
     }
     const newData = dokumenIds
       .filter(id => !existingIds.has(id))
-      .map(dokumen_id => ({ dosen_id: dosenId, dokumen_id }));
+      .map(dokumen_id => ({
+        dosen_id: dosenId,
+        dokumen_id,
+        ...(kegiatanId ? { kegiatan_id: kegiatanId } : {})
+      }));
     if (newData.length > 0) {
       await prisma.kepemilikanDokumen.createMany({ data: newData });
+    }
+    // Jika kegiatanId diberikan, link kepemilikan yang sudah ada ke kegiatan ini
+    if (kegiatanId && existing.length > 0) {
+      await prisma.kepemilikanDokumen.updateMany({
+        where: { dosen_id: dosenId, dokumen_id: { in: dokumenIds }, kegiatan_id: null },
+        data: { kegiatan_id: kegiatanId }
+      });
     }
   }
 
@@ -517,7 +555,7 @@ export class ActivityRepository {
             status: true
           }
         },
-        lampiran_bukti: {
+        kepemilikan_dokumen: {
           include: {
             dokumen: {
               select: {
@@ -567,7 +605,7 @@ export class ActivityRepository {
             status: true
           }
         },
-        lampiran_bukti: {
+        kepemilikan_dokumen: {
           select: {
             id: true,
             dosen_id: true,

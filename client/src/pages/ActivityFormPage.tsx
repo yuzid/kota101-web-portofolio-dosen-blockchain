@@ -403,8 +403,13 @@ export function ActivityFormPage() {
   );
 
   const handleAddDoc = (doc: Document) => {
-    if (!lampiran.find(l => l.id === doc.id)) {
-      setLampiran([...lampiran, doc]);
+    // Cek hanya lampiran milik current user — bukan milik anggota lain.
+    // Dosen lain boleh punya file yang sama sebagai lampiran mereka sendiri.
+    const alreadyAddedByMe = lampiran.find(
+      l => l.id === doc.id && l.uploadedBy === user?.uuid
+    );
+    if (!alreadyAddedByMe) {
+      setLampiran([...lampiran, { ...doc, uploadedBy: user?.uuid, uploadedByName: user?.name }]);
     }
     setShowDocPicker(false);
   };
@@ -1089,6 +1094,9 @@ export function ActivityFormPage() {
         <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Pilih Dokumen Bukti</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Setiap dosen dapat menggunakan dokumen yang sama sebagai lampirannya masing-masing.
+            </p>
           </DialogHeader>
           <div className="space-y-4 py-4 overflow-y-auto max-h-[calc(80vh-120px)]">
             {availableDocs.length === 0 ? (
@@ -1096,17 +1104,31 @@ export function ActivityFormPage() {
             ) : (
               <div className="space-y-2">
                 {availableDocs.map(doc => {
+                  // Cek hanya lampiran milik saya — bukan milik dosen lain
+                  const isAlreadyAddedByMe = lampiran.some(
+                    l => l.id === doc.id && l.uploadedBy === user?.uuid
+                  );
                   return (
                     <div key={doc.id}
-                      className="flex items-start gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer"
-                      onClick={() => handleAddDoc(doc)}
+                      className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
+                        isAlreadyAddedByMe
+                          ? 'opacity-60 cursor-not-allowed bg-muted/50'
+                          : 'hover:bg-accent cursor-pointer'
+                      }`}
+                      onClick={() => { if (!isAlreadyAddedByMe) handleAddDoc(doc); }}
                     >
                       <FileText className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{doc.name}</p>
                         <p className="text-xs text-muted-foreground">{doc.jenis}</p>
                       </div>
-                      <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
+                      {isAlreadyAddedByMe ? (
+                        <span className="text-xs text-muted-foreground border rounded px-2 py-1 flex-shrink-0">
+                          Sudah ditambahkan
+                        </span>
+                      ) : (
+                        <Button variant="ghost" size="sm" className="flex-shrink-0">Pilih</Button>
+                      )}
                     </div>
                   );
                 })}

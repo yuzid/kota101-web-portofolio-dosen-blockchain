@@ -11,9 +11,6 @@ export class DocumentRepository {
         tanggal_upload: true,
         sumber_dokumen: true,
         file_path: true,
-        lampiran_bukti: {
-          select: { id: true }
-        },
         kepemilikan: {
           where: { status: 'DISETUJUI' },
           select: {
@@ -38,7 +35,6 @@ export class DocumentRepository {
       where: { id },
       include: { 
         kepemilikan: { where: { status: 'DISETUJUI' } },
-        lampiran_bukti: true
       }
     });
   }
@@ -61,8 +57,7 @@ export class DocumentRepository {
     return await prisma.dokumen.findUnique({
       where: { id },
       include: {
-        kepemilikan: true,
-        lampiran_bukti: {
+        kepemilikan: {
           include: {
             kegiatan: {
               include: {
@@ -163,11 +158,7 @@ export class DocumentRepository {
                 nama: true,
                 nip: true
               }
-            }
-          }
-        },
-        lampiran_bukti: {
-          select: {
+            },
             kegiatan: {
               select: {
                 id: true,
@@ -175,7 +166,7 @@ export class DocumentRepository {
               }
             }
           }
-        }
+        },
       },
       orderBy: { tanggal_upload: 'desc' }
     });
@@ -203,11 +194,7 @@ export class DocumentRepository {
                   }
                 }
               }
-            }
-          }
-        },
-        lampiran_bukti: {
-          include: {
+            },
             kegiatan: {
               select: {
                 id: true,
@@ -219,7 +206,7 @@ export class DocumentRepository {
               }
             }
           }
-        }
+        },
       }
     });
   }

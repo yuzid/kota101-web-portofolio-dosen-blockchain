@@ -441,8 +441,8 @@ export class AkademikRoleController {
       const lampiranId = req.params.lampiranId as string;
       const kegiatanId = req.params.kegiatanId as string;
 
-      // Verify the activity belongs to this jurusan
-      const lampiran = await prisma.lampiranBukti.findUnique({
+      // Verify the activity belongs to this jurusan via KepemilikanDokumen
+      const lampiran = await prisma.kepemilikanDokumen.findUnique({
         where: { id: lampiranId },
         include: {
           kegiatan: {
@@ -457,7 +457,7 @@ export class AkademikRoleController {
         return;
       }
 
-      if (lampiran.kegiatan.id !== kegiatanId) {
+      if (!lampiran.kegiatan || lampiran.kegiatan.id !== kegiatanId) {
         res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
         return;
       }
@@ -500,8 +500,8 @@ export class AkademikRoleController {
       const lampiranId = req.params.lampiranId as string;
       const kegiatanId = req.params.kegiatanId as string;
 
-      // Verify the activity belongs to this jurusan
-      const lampiran = await prisma.lampiranBukti.findUnique({
+      // Verify the activity belongs to this jurusan via KepemilikanDokumen
+      const lampiran = await prisma.kepemilikanDokumen.findUnique({
         where: { id: lampiranId },
         include: {
           kegiatan: {
@@ -516,7 +516,7 @@ export class AkademikRoleController {
         return;
       }
 
-      if (lampiran.kegiatan.id !== kegiatanId) {
+      if (!lampiran.kegiatan || lampiran.kegiatan.id !== kegiatanId) {
         res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
         return;
       }
@@ -564,8 +564,8 @@ export class AkademikRoleController {
       const lampiranId = req.params.lampiranId as string;
       const kegiatanId = req.params.kegiatanId as string;
 
-      // Verify the activity belongs to this prodi
-      const lampiran = await prisma.lampiranBukti.findUnique({
+      // Verify the activity belongs to this prodi via KepemilikanDokumen
+      const lampiran = await prisma.kepemilikanDokumen.findUnique({
         where: { id: lampiranId },
         include: {
           kegiatan: {
@@ -580,7 +580,7 @@ export class AkademikRoleController {
         return;
       }
 
-      if (lampiran.kegiatan.id !== kegiatanId) {
+      if (!lampiran.kegiatan || lampiran.kegiatan.id !== kegiatanId) {
         res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
         return;
       }
@@ -623,8 +623,8 @@ export class AkademikRoleController {
       const lampiranId = req.params.lampiranId as string;
       const kegiatanId = req.params.kegiatanId as string;
 
-      // Verify the activity belongs to this prodi
-      const lampiran = await prisma.lampiranBukti.findUnique({
+      // Verify the activity belongs to this prodi via KepemilikanDokumen
+      const lampiran = await prisma.kepemilikanDokumen.findUnique({
         where: { id: lampiranId },
         include: {
           kegiatan: {
@@ -639,7 +639,7 @@ export class AkademikRoleController {
         return;
       }
 
-      if (lampiran.kegiatan.id !== kegiatanId) {
+      if (!lampiran.kegiatan || lampiran.kegiatan.id !== kegiatanId) {
         res.status(400).json({ status: 'error', error: 'ID kegiatan tidak sesuai.' });
         return;
       }

@@ -15,7 +15,7 @@ import express from 'express';
 
 const mockPrismaJabatanKajur = { findFirst: jest.fn() };
 const mockPrismaJabatanKaprodi = { findFirst: jest.fn() };
-const mockPrismaLampiranBukti = { findUnique: jest.fn() };
+const mockPrismaKepemilikanDokumen = { findUnique: jest.fn() };
 const mockPrismaProgramStudi = { findMany: jest.fn() };
 const mockPrismaUser = { findUnique: jest.fn() };
 
@@ -23,7 +23,7 @@ jest.mock('../lib/prisma', () => ({
   prisma: {
     jabatanKajur: mockPrismaJabatanKajur,
     jabatanKaprodi: mockPrismaJabatanKaprodi,
-    lampiranBukti: mockPrismaLampiranBukti,
+    kepemilikanDokumen: mockPrismaKepemilikanDokumen,
     programStudi: mockPrismaProgramStudi,
     user: mockPrismaUser,
   },
@@ -489,7 +489,7 @@ describe('Kajur - Lampiran Preview & Content Yurisdiksi Jurusan', () => {
   });
 
   it('TC-KJ-LAMP-01: Kajur preview lampiran dalam jurusannya -> 200', async () => {
-    mockPrismaLampiranBukti.findUnique.mockResolvedValue({
+    mockPrismaKepemilikanDokumen.findUnique.mockResolvedValue({
       id: LAMPIRAN_ID,
       kegiatan_id: KEGIATAN_ID,
       dokumen_id: DOKUMEN_ID,
@@ -510,7 +510,7 @@ describe('Kajur - Lampiran Preview & Content Yurisdiksi Jurusan', () => {
   });
 
   it('TC-KJ-LAMP-02: Kajur download content lampiran dalam jurusannya -> 200', async () => {
-    mockPrismaLampiranBukti.findUnique.mockResolvedValue({
+    mockPrismaKepemilikanDokumen.findUnique.mockResolvedValue({
       id: LAMPIRAN_ID,
       kegiatan_id: KEGIATAN_ID,
       dokumen_id: DOKUMEN_ID,
@@ -531,7 +531,7 @@ describe('Kajur - Lampiran Preview & Content Yurisdiksi Jurusan', () => {
   });
 
   it('TC-KJ-LAMP-03: Lampiran dari jurusan lain ditolak -> 403', async () => {
-    mockPrismaLampiranBukti.findUnique.mockResolvedValue({
+    mockPrismaKepemilikanDokumen.findUnique.mockResolvedValue({
       id: LAMPIRAN_ID,
       kegiatan_id: KEGIATAN_ID,
       dokumen_id: DOKUMEN_ID,
@@ -551,7 +551,7 @@ describe('Kajur - Lampiran Preview & Content Yurisdiksi Jurusan', () => {
   });
 
   it('TC-KJ-LAMP-04: Lampiran tidak ditemukan -> 404', async () => {
-    mockPrismaLampiranBukti.findUnique.mockResolvedValue(null);
+    mockPrismaKepemilikanDokumen.findUnique.mockResolvedValue(null);
 
     const res = await request(app)
       .get(`/api/dosen/akademik-role/jurusan/kegiatan/${KEGIATAN_ID}/lampiran/tidak-ada/preview`)
@@ -562,7 +562,7 @@ describe('Kajur - Lampiran Preview & Content Yurisdiksi Jurusan', () => {
   });
 
   it('TC-KJ-LAMP-05: kegiatanId param tidak sesuai lampiran -> 400', async () => {
-    mockPrismaLampiranBukti.findUnique.mockResolvedValue({
+    mockPrismaKepemilikanDokumen.findUnique.mockResolvedValue({
       id: LAMPIRAN_ID,
       kegiatan_id: KEGIATAN_ID,
       dokumen_id: DOKUMEN_ID,
@@ -621,3 +621,4 @@ describe('Kajur - Access Control Endpoint Terlarang', () => {
     expect(res.status).toBe(403);
   });
 });
+
