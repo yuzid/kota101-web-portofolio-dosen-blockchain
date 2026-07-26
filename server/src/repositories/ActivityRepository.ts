@@ -3,14 +3,31 @@ import { KegiatanFilter, PageRequest, PageResponse } from '../types/activity';
 import { KegiatanTridharma } from '@prisma/client';
 
 export class ActivityRepository {
-  async findAll(dosenId: string) {
+  async findAll(dosenId: string, filter?: { tanggalAwal?: string; tanggalAkhir?: string }) {
+    const where: any = {
+      OR: [
+        { dosen_id: dosenId },
+        { partisipasi: { some: { dosen_id: dosenId, status: 'DITERIMA' } } }
+      ]
+    };
+
+    if (filter?.tanggalAwal || filter?.tanggalAkhir) {
+      where.AND = [];
+      if (filter.tanggalAkhir) {
+        where.AND.push({ tanggal_mulai: { lte: new Date(filter.tanggalAkhir) } });
+      }
+      if (filter.tanggalAwal) {
+        where.AND.push({
+          OR: [
+            { tanggal_selesai: null },
+            { tanggal_selesai: { gte: new Date(filter.tanggalAwal) } },
+          ],
+        });
+      }
+    }
+
     return await prisma.kegiatanTridharma.findMany({
-      where: {
-        OR: [
-          { dosen_id: dosenId },
-          { partisipasi: { some: { dosen_id: dosenId, status: 'DITERIMA' } } }
-        ]
-      },
+      where,
       include: {
         kepemilikan_dokumen: true,
         partisipasi: true,
@@ -51,9 +68,18 @@ export class ActivityRepository {
     }
 
     if (tanggalAwal || tanggalAkhir) {
-      where.tanggal_mulai = {};
-      if (tanggalAwal) where.tanggal_mulai.gte = new Date(tanggalAwal);
-      if (tanggalAkhir) where.tanggal_mulai.lte = new Date(tanggalAkhir);
+      where.AND = [];
+      if (tanggalAkhir) {
+        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+      }
+      if (tanggalAwal) {
+        where.AND.push({
+          OR: [
+            { tanggal_selesai: null },
+            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
+          ],
+        });
+      }
     }
 
     if (search) {
@@ -120,9 +146,18 @@ export class ActivityRepository {
     }
 
     if (tanggalAwal || tanggalAkhir) {
-      where.tanggal_mulai = {};
-      if (tanggalAwal) where.tanggal_mulai.gte = new Date(tanggalAwal);
-      if (tanggalAkhir) where.tanggal_mulai.lte = new Date(tanggalAkhir);
+      where.AND = [];
+      if (tanggalAkhir) {
+        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+      }
+      if (tanggalAwal) {
+        where.AND.push({
+          OR: [
+            { tanggal_selesai: null },
+            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
+          ],
+        });
+      }
     }
 
     if (search) {
@@ -200,9 +235,18 @@ export class ActivityRepository {
       }
     }
     if (tanggalAwal || tanggalAkhir) {
-      where.tanggal_mulai = {};
-      if (tanggalAwal) where.tanggal_mulai.gte = new Date(tanggalAwal);
-      if (tanggalAkhir) where.tanggal_mulai.lte = new Date(tanggalAkhir);
+      where.AND = [];
+      if (tanggalAkhir) {
+        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+      }
+      if (tanggalAwal) {
+        where.AND.push({
+          OR: [
+            { tanggal_selesai: null },
+            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
+          ],
+        });
+      }
     }
     if (search) {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };
@@ -245,9 +289,18 @@ export class ActivityRepository {
       }
     }
     if (tanggalAwal || tanggalAkhir) {
-      where.tanggal_mulai = {};
-      if (tanggalAwal) where.tanggal_mulai.gte = new Date(tanggalAwal);
-      if (tanggalAkhir) where.tanggal_mulai.lte = new Date(tanggalAkhir);
+      where.AND = [];
+      if (tanggalAkhir) {
+        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+      }
+      if (tanggalAwal) {
+        where.AND.push({
+          OR: [
+            { tanggal_selesai: null },
+            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
+          ],
+        });
+      }
     }
     if (search) {
       where.nama_kegiatan = { contains: search, mode: 'insensitive' };

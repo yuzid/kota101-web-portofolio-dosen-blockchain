@@ -64,6 +64,13 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getAllJenisDokumen } from "@/lib/utils";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
+import { CalendarIcon } from "lucide-react";
 
 interface DistribusiItem {
   id: string;
@@ -84,6 +91,7 @@ interface Document {
   sumber_dokumen: string;
   status?: string;
   distribusi: DistribusiItem[];
+  terikatKegiatan?: boolean;
 }
 
 interface Dosen {
@@ -134,6 +142,8 @@ export function DocumentDistributionPage() {
   const [jenisFilter, setJenisFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortBy, setSortBy] = useState("terbaru");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
   const [currentPage, setCurrentPage] = useState(1);
 
   const pageSize = 10;
@@ -182,7 +192,7 @@ export function DocumentDistributionPage() {
     [documents]
   );
 
-  const hasActiveFilter = searchTerm || jenisFilter || statusFilter || sortBy !== "terbaru";
+  const hasActiveFilter = searchTerm || jenisFilter || statusFilter || sortBy !== "terbaru" || filterDateFrom || filterDateTo;
 
   const filteredDocuments = useMemo(() => {
     let result = [...documents];
@@ -190,6 +200,8 @@ export function DocumentDistributionPage() {
     if (jenisFilter) result = result.filter(d => d.jenis_dokumen === jenisFilter);
     if (statusFilter === "terdistribusi") result = result.filter(d => d.distribusi && d.distribusi.length > 0);
     if (statusFilter === "belum") result = result.filter(d => !d.distribusi || d.distribusi.length === 0);
+    if (filterDateFrom) result = result.filter(d => new Date(d.tanggal_upload) >= filterDateFrom);
+    if (filterDateTo) result = result.filter(d => new Date(d.tanggal_upload) <= filterDateTo);
     switch (sortBy) {
       case "terlama": result.sort((a, b) => new Date(a.tanggal_upload).getTime() - new Date(b.tanggal_upload).getTime()); break;
       case "a-z": result.sort((a, b) => a.nama.localeCompare(b.nama)); break;
@@ -197,7 +209,7 @@ export function DocumentDistributionPage() {
       default: result.sort((a, b) => new Date(b.tanggal_upload).getTime() - new Date(a.tanggal_upload).getTime());
     }
     return result;
-  }, [documents, searchTerm, jenisFilter, statusFilter, sortBy]);
+  }, [documents, searchTerm, jenisFilter, statusFilter, sortBy, filterDateFrom, filterDateTo]);
 
   const totalPages = Math.ceil(filteredDocuments.length / pageSize);
   const paginatedDocs = filteredDocuments.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -207,6 +219,8 @@ export function DocumentDistributionPage() {
     setJenisFilter("");
     setStatusFilter("");
     setSortBy("terbaru");
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
     setCurrentPage(1);
   };
 
@@ -372,6 +386,28 @@ export function DocumentDistributionPage() {
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal h-9 text-sm">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
+                  </PopoverContent>
+                </Popover>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal h-9 text-sm">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
+                  </PopoverContent>
+                </Popover>
                 <Select value={jenisFilter} onValueChange={(v) => { setJenisFilter(v); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Jenis Dokumen" /></SelectTrigger>
                   <SelectContent>
@@ -484,16 +520,18 @@ export function DocumentDistributionPage() {
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="min-w-[130px]">
+                                <DropdownMenuContent align="end" className="min-w-[130px]">
                                 <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}`)}>
                                   <Eye className="w-3.5 h-3.5 mr-2" /> Lihat
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}/edit`)}>
                                   <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
-                                  <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
-                                </DropdownMenuItem>
+                                {!doc.terikatKegiatan && (
+                                  <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
+                                    <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -535,9 +573,11 @@ export function DocumentDistributionPage() {
                                   <DropdownMenuItem onClick={() => navigate(`/document-distribution/${doc.id}/edit`)}>
                                     <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
-                                    <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
-                                  </DropdownMenuItem>
+                                  {!doc.terikatKegiatan && (
+                                    <DropdownMenuItem onClick={() => handleDelete(doc)} className="text-red-600 focus:text-red-600">
+                                      <Trash2 className="w-3.5 h-3.5 mr-2" /> Hapus
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>

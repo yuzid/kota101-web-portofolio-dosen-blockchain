@@ -83,6 +83,7 @@ interface DocumentPreview {
   jenis: string;
   sumber: string;
   ownershipStatus?: string | null;
+  terikatKegiatan?: boolean;
   tanggalUpload: string;
   contentType: string;
   size: number;
@@ -724,7 +725,7 @@ export function DocumentPreviewPage() {
                 Edit
               </Button>
             )}
-            {isDocumentOwner && document.sumber !== "TATA_USAHA" && (
+            {isDocumentOwner && document.sumber !== "TATA_USAHA" && !document.terikatKegiatan && (
               <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Hapus

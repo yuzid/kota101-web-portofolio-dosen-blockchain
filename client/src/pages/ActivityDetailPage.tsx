@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { RippleButton } from "../components/ui/ripple-button";
 import { StatCard } from "../components/ui/stat-card";
@@ -339,23 +340,12 @@ export function ActivityDetailPage() {
   };
 
   const handleCopyLink = async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(activeShareLink);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = activeShareLink;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-      }
+    const ok = await copyToClipboard(activeShareLink);
+    if (ok) {
       setCopied(true);
       toast.success("Link berhasil disalin!");
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       toast.error("Gagal menyalin link");
     }
   };

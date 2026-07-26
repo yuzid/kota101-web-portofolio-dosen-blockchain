@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { EmptyState } from "../components/ui/empty-state";
 import { Badge } from "../components/ui/badge";
@@ -169,8 +170,9 @@ export function DocumentDistributionDetailPage() {
 
   const handleCopyLink = async () => {
     const link = doc?.file_path || `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`;
-    try { await navigator.clipboard.writeText(link); setCopied(true); toast.success("Link berhasil disalin"); setTimeout(() => setCopied(false), 2000); }
-    catch { toast.error("Gagal menyalin link"); }
+    const ok = await copyToClipboard(link);
+    if (ok) { setCopied(true); toast.success("Link berhasil disalin"); setTimeout(() => setCopied(false), 2000); }
+    else { toast.error("Gagal menyalin link"); }
   };
 
   useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);

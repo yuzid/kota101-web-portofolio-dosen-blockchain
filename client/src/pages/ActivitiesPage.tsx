@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical } from 'lucide-react';
+import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical, CalendarIcon, ArrowUpDown } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -41,11 +41,13 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, copyToClipboard } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { AnimatedTable, AnimatedTableRow } from '@/components/ui/animated-table';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Activity {
   id: string;
@@ -93,6 +95,9 @@ export function ActivitiesPage() {
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterSemester, setFilterSemester] = useState('all');
   const [filterTahun, setFilterTahun] = useState('all');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
+  const [sortOrder, setSortOrder] = useState<'terbaru' | 'terlama'>('terbaru');
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -102,14 +107,18 @@ export function ActivitiesPage() {
   const token = localStorage.getItem('token');
 
   useEffect(() => {
-    fetchActivities();
+    fetchActivities(filterDateFrom, filterDateTo);
     fetchPendingConfirmations();
-  }, []);
+  }, [filterDateFrom, filterDateTo]);
 
-  const fetchActivities = async () => {
+  const fetchActivities = async (dateFrom?: Date, dateTo?: Date) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`, {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('tanggalAwal', dateFrom.toISOString());
+      if (dateTo) params.append('tanggalAkhir', dateTo.toISOString());
+      const qs = params.toString();
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan${qs ? '?' + qs : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
@@ -185,6 +194,10 @@ export function ActivitiesPage() {
     const matchesTahun = filterTahun === 'all' || activity.periode === filterTahun;
     const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
     return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori;
+  }).sort((a, b) => {
+    const dateA = new Date(a.tanggalMulai).getTime();
+    const dateB = new Date(b.tanggalMulai).getTime();
+    return sortOrder === 'terbaru' ? dateB - dateA : dateA - dateB;
   });
 
   const counts = {
@@ -195,13 +208,15 @@ export function ActivitiesPage() {
     tugas_tambahan: activities.filter(a => a.jenisTridharma === 'tugas_tambahan').length,
   };
 
-  const hasActiveFilters = searchTerm !== '' || filterKategori !== 'all' || filterSemester !== 'all' || filterTahun !== 'all';
+  const hasActiveFilters = searchTerm !== '' || filterKategori !== 'all' || filterSemester !== 'all' || filterTahun !== 'all' || filterDateFrom || filterDateTo;
 
   const resetFilters = () => {
     setSearchTerm('');
     setFilterKategori('all');
     setFilterSemester('all');
     setFilterTahun('all');
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
   };
 
   const handleShare = (activity: Activity) => {
@@ -213,23 +228,12 @@ export function ActivitiesPage() {
   };
 
   const copyShareLink = async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareLink);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = shareLink;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-      }
+    const ok = await copyToClipboard(shareLink);
+    if (ok) {
       setCopied(true);
       toast.success('Link berhasil disalin!');
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } else {
       toast.error('Gagal menyalin link');
     }
   };
@@ -384,6 +388,41 @@ export function ActivitiesPage() {
                   className="pl-9 h-9"
                 />
               </div>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
+                </PopoverContent>
+              </Popover>
+
+              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'terbaru' | 'terlama')}>
+                <SelectTrigger className="w-[150px] h-9">
+                  <ArrowUpDown className="w-4 h-4 mr-1.5" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="terbaru">Terbaru</SelectItem>
+                  <SelectItem value="terlama">Terlama</SelectItem>
+                </SelectContent>
+              </Select>
 
               <Select value={filterSemester} onValueChange={setFilterSemester}>
                 <SelectTrigger className="w-[140px] h-9">

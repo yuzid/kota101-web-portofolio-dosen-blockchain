@@ -213,8 +213,8 @@ export class ActivityService {
     return JenisKegiatan.TUGAS_TAMBAHAN;
   }
 
-  async getAllActivities(dosenId: string) {
-    const activities = await this.activityRepository.findAll(dosenId);
+  async getAllActivities(dosenId: string, filter?: { tanggalAwal?: string; tanggalAkhir?: string }) {
+    const activities = await this.activityRepository.findAll(dosenId, filter);
     return activities.map(act => {
       const participantCount = act.partisipasi.length;
       return {

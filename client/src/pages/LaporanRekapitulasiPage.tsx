@@ -41,9 +41,17 @@ import {
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  CalendarIcon,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
 import {
   listRekap,
   getRekap,
@@ -61,6 +69,8 @@ export function LaporanRekapitulasiPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
 
   const isKajur = location.pathname.includes("/monitoring/jurusan");
   const roleTitle = isKajur ? "Jurusan" : "Program Studi";
@@ -133,12 +143,20 @@ export function LaporanRekapitulasiPage() {
   const filteredRekaps = sortData(
     rekaps.filter((r) => {
       const q = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         r.nama.toLowerCase().includes(q) ||
         (r.dibuatOleh.nama || "").toLowerCase().includes(q) ||
         (r.prodiNama || "").toLowerCase().includes(q) ||
         (r.jurusanNama || "").toLowerCase().includes(q)
       );
+      let matchesDate = true;
+      if (filterDateFrom) {
+        matchesDate = matchesDate && new Date(r.tanggalPerekapan) >= filterDateFrom;
+      }
+      if (filterDateTo) {
+        matchesDate = matchesDate && new Date(r.tanggalPerekapan) <= filterDateTo;
+      }
+      return matchesSearch && matchesDate;
     })
   );
 
@@ -232,8 +250,8 @@ export function LaporanRekapitulasiPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Cari laporan rekap..."
@@ -242,6 +260,33 @@ export function LaporanRekapitulasiPage() {
               className="pl-9"
             />
           </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[170px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[170px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
+            </PopoverContent>
+          </Popover>
+          {(filterDateFrom || filterDateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterDateFrom(undefined); setFilterDateTo(undefined); }}>
+              <X className="w-4 h-4 mr-1.5" /> Reset
+            </Button>
+          )}
         </div>
 
         <div className="border rounded-lg bg-background overflow-x-auto">

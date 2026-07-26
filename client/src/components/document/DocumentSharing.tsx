@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
+import { copyToClipboard } from '@/lib/utils';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Avatar, AvatarFallback } from '../ui/avatar';
@@ -108,11 +109,11 @@ export function DocumentSharing({ documentId, documentName, iconOnly = false, hi
 
   const handleCopyLink = async () => {
     const link = `${window.location.origin}/public/dokumen/${documentId}`;
-    try {
-      await navigator.clipboard.writeText(link);
+    const ok = await copyToClipboard(link);
+    if (ok) {
       toast.success('Link berhasil disalin ke clipboard');
-    } catch {
-      toast.info(`Link: ${link}`);
+    } else {
+      toast.error('Gagal menyalin link');
     }
   };
 

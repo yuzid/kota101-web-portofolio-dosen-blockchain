@@ -67,6 +67,7 @@ import {
   Download,
   AlertCircle,
   Files,
+  ArrowUpDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
@@ -88,6 +89,7 @@ interface Document {
   asal: "tu" | "dosen";
   size: string;
   hasHighlight: boolean;
+  terikatKegiatan?: boolean;
 }
 
 interface PendingRequest {
@@ -109,6 +111,7 @@ export function DocumentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterJenis, setFilterJenis] = useState("all");
   const [filterDateRange, setFilterDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [sortOrder, setSortOrder] = useState<'terbaru' | 'terlama'>('terbaru');
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -246,9 +249,17 @@ export function DocumentsPage() {
     if (filterDateRange.from && filterDateRange.to) {
       const docDate = new Date(doc.tanggal);
       matchesDate = docDate >= filterDateRange.from && docDate <= filterDateRange.to;
+    } else if (filterDateRange.from) {
+      matchesDate = new Date(doc.tanggal) >= filterDateRange.from;
+    } else if (filterDateRange.to) {
+      matchesDate = new Date(doc.tanggal) <= filterDateRange.to;
     }
 
     return matchesTab && matchesSearch && matchesJenis && matchesDate;
+  }).sort((a, b) => {
+    const dateA = new Date(a.tanggal).getTime();
+    const dateB = new Date(b.tanggal).getTime();
+    return sortOrder === 'terbaru' ? dateB - dateA : dateA - dateB;
   });
 
   const counts = {
@@ -501,6 +512,41 @@ export function DocumentsPage() {
                 />
               </div>
 
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateRange.from ? format(filterDateRange.from, "dd MMM yyyy") : "Dari tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateRange.from} onSelect={(d) => setFilterDateRange(prev => ({ ...prev, from: d }))} initialFocus />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateRange.to ? format(filterDateRange.to, "dd MMM yyyy") : "Sampai tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateRange.to} onSelect={(d) => setFilterDateRange(prev => ({ ...prev, to: d }))} initialFocus />
+                </PopoverContent>
+              </Popover>
+
+              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'terbaru' | 'terlama')}>
+                <SelectTrigger className="w-[150px] h-9">
+                  <ArrowUpDown className="w-4 h-4 mr-1.5" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="terbaru">Terbaru</SelectItem>
+                  <SelectItem value="terlama">Terlama</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-[180px] h-9">
                   <SelectValue placeholder="Jenis Dokumen" />
@@ -562,7 +608,7 @@ export function DocumentsPage() {
                                 <DropdownMenuItem onClick={() => setShareDocument(doc)}>
                                   <Share2 className="w-3.5 h-3.5 mr-2" /> Bagikan
                                 </DropdownMenuItem>
-                                {doc.asal === "dosen" && (
+                                {doc.asal === "dosen" && !doc.terikatKegiatan && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">
@@ -669,7 +715,7 @@ export function DocumentsPage() {
                                 <DropdownMenuItem onClick={() => setShareDocument(doc)}>
                                   <Share2 className="w-4 h-4 mr-2" /> Bagikan
                                 </DropdownMenuItem>
-                                {doc.asal === "dosen" && (
+                                {doc.asal === "dosen" && !doc.terikatKegiatan && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">

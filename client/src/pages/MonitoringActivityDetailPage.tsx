@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { StatCard } from "../components/ui/stat-card";
 import { Input } from "../components/ui/input";
@@ -230,13 +231,13 @@ export function MonitoringActivityDetailPage() {
   };
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(activeShareLink);
+    const ok = await copyToClipboard(activeShareLink);
+    if (ok) {
       setCopied(true);
       toast.success("Link berhasil disalin!");
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.info(`Link: ${activeShareLink}`);
+    } else {
+      toast.error("Gagal menyalin link");
     }
   };
 

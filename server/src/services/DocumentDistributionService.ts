@@ -170,7 +170,11 @@ export class DocumentDistributionService {
         const distribusi = await this.distributionRepository.findByDokumen(
           doc.id
         );
-        return { ...doc, distribusi };
+        return {
+          ...doc,
+          terikatKegiatan: doc.kepemilikan?.some((k: any) => k.kegiatan_id !== null) ?? false,
+          distribusi,
+        };
       })
     );
 

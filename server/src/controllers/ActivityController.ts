@@ -39,7 +39,11 @@ export class ActivityController {
         res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
         return;
       }
-      const activities = await this.activityService.getAllActivities(dosenId);
+      const { tanggalAwal, tanggalAkhir } = req.query;
+      const activities = await this.activityService.getAllActivities(dosenId, {
+        tanggalAwal: tanggalAwal as string | undefined,
+        tanggalAkhir: tanggalAkhir as string | undefined,
+      });
       res.status(200).json({ status: 'success', data: activities });
     } catch (error: any) {
       res.status(500).json({ status: 'error', error: error.message });
