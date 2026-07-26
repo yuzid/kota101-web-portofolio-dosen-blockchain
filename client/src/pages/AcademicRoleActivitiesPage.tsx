@@ -97,7 +97,7 @@ interface Activity {
     }
   };
   partisipasi: any[];
-  lampiran_bukti: any[];
+  kepemilikan_dokumen: any[];
 }
 
 export function AcademicRoleActivitiesPage() {
@@ -286,7 +286,7 @@ export function AcademicRoleActivitiesPage() {
 
   const getKelengkapanBadge = (activity: Activity) => {
     // Logic: Lengkap jika ada minimal 1 lampiran bukti
-    const isLengkap = activity.lampiran_bukti.length > 0;
+    const isLengkap = (activity.kepemilikan_dokumen?.length ?? 0) > 0;
     if (isLengkap) {
       return (
         <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
@@ -843,13 +843,13 @@ export function AcademicRoleActivitiesPage() {
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <Users className="w-3 h-3 mr-1" />
-                            {activity.partisipasi.length}
+                            {activity.partisipasi?.length ?? 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <FileText className="w-3 h-3 mr-1" />
-                            {activity.lampiran_bukti.length}
+                            {activity.kepemilikan_dokumen?.length ?? 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -940,11 +940,11 @@ export function AcademicRoleActivitiesPage() {
                           <div className="flex items-center gap-2 text-xs">
                             <Badge variant="outline" className="text-xs">
                               <Users className="w-3 h-3 mr-1" />
-                              {activity.partisipasi.length}
+                              {activity.partisipasi?.length ?? 0}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               <FileText className="w-3 h-3 mr-1" />
-                              {activity.lampiran_bukti.length}
+                              {activity.kepemilikan_dokumen?.length ?? 0}
                             </Badge>
                             {getKelengkapanBadge(activity)}
                           </div>
