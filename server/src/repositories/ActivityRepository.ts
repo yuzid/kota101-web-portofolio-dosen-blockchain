@@ -73,12 +73,7 @@ export class ActivityRepository {
         where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
       }
       if (tanggalAwal) {
-        where.AND.push({
-          OR: [
-            { tanggal_selesai: null },
-            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
-          ],
-        });
+        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
       }
     }
 
@@ -151,12 +146,7 @@ export class ActivityRepository {
         where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
       }
       if (tanggalAwal) {
-        where.AND.push({
-          OR: [
-            { tanggal_selesai: null },
-            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
-          ],
-        });
+        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
       }
     }
 
@@ -240,12 +230,7 @@ export class ActivityRepository {
         where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
       }
       if (tanggalAwal) {
-        where.AND.push({
-          OR: [
-            { tanggal_selesai: null },
-            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
-          ],
-        });
+        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
       }
     }
     if (search) {
@@ -294,12 +279,7 @@ export class ActivityRepository {
         where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
       }
       if (tanggalAwal) {
-        where.AND.push({
-          OR: [
-            { tanggal_selesai: null },
-            { tanggal_selesai: { gte: new Date(tanggalAwal) } },
-          ],
-        });
+        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
       }
     }
     if (search) {
