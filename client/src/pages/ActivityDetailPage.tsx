@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { copyToClipboard } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { Button } from "../components/ui/button";
 import { RippleButton } from "../components/ui/ripple-button";
 import { StatCard } from "../components/ui/stat-card";
@@ -249,7 +250,7 @@ export function ActivityDetailPage() {
         toast.success("Undangan kegiatan diterima");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menerima undangan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menerima undangan");
       }
     } catch {
       toast.error("Gagal menerima undangan");
@@ -271,7 +272,7 @@ export function ActivityDetailPage() {
         toast.success("Undangan kegiatan ditolak");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menolak undangan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menolak undangan");
       }
     } catch {
       toast.error("Gagal menolak undangan");
@@ -298,7 +299,7 @@ export function ActivityDetailPage() {
         const act = result.data;
         setActivity(act);
       } else {
-        toast.error(result.error || "Gagal mengambil detail kegiatan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal mengambil detail kegiatan");
         navigate("/activities");
       }
     } catch {
@@ -319,7 +320,7 @@ export function ActivityDetailPage() {
       );
       const result = await response.json();
       if (!response.ok || result.status !== "success") {
-        throw new Error(result.error || "Gagal mengambil riwayat blockchain");
+        throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengambil riwayat blockchain");
       }
       setLogs(result.data);
       setAuditLoaded(true);
@@ -444,7 +445,7 @@ export function ActivityDetailPage() {
         toast.success("Kegiatan berhasil dihapus");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menghapus kegiatan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus kegiatan");
       }
     } catch {
       toast.error("Terjadi kesalahan saat menghapus kegiatan");

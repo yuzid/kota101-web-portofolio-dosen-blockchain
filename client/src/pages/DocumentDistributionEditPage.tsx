@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAllJenisDokumen } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 
 interface Dosen {
   id: string;
@@ -200,7 +201,7 @@ export function DocumentDistributionEditPage() {
         method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(metaPayload),
       });
       const metaResult = await metaRes.json();
-      if (metaResult.status !== "success") throw new Error(metaResult.error || "Gagal menyimpan metadata.");
+      if (metaResult.status !== "success") throw new Error(metaResult.error ? sanitizeError(metaResult.error) : "Gagal menyimpan metadata.");
 
       // 2. Sync recipients
       const toRemove = initialRecipientIds.filter(id => !selectedRecipientIds.includes(id));
@@ -231,13 +232,13 @@ export function DocumentDistributionEditPage() {
           body: JSON.stringify({ dokumen_id: id, dosen_penerima_ids: toAdd }),
         });
         const addResult = await addRes.json();
-        if (addResult.status !== "success") throw new Error(addResult.error || "Gagal menambahkan penerima.");
+        if (addResult.status !== "success") throw new Error(addResult.error ? sanitizeError(addResult.error) : "Gagal menambahkan penerima.");
       }
 
       toast.success("Dokumen berhasil diperbarui.");
       navigate(`/document-distribution/${id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan perubahan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal menyimpan perubahan.");
     } finally {
       setSaving(false);
     }
@@ -379,7 +380,7 @@ export function DocumentDistributionEditPage() {
                           setNewJenisName("");
                           toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan.`);
                         } else {
-                          toast.error(result.error || 'Gagal menambahkan jenis dokumen');
+                          toast.error(result.error ? sanitizeError(result.error) : 'Gagal menambahkan jenis dokumen');
                         }
                       } catch {
                         toast.error('Gagal menghubungi server');

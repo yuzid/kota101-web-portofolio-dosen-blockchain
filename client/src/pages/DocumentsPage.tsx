@@ -72,6 +72,7 @@ import {
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { getHighlightStatusByDokumenId, isHighlightMockMode } from "../services/highlightService";
 import { PageHeader } from "@/components/ui/page-header";
@@ -197,7 +198,7 @@ export function DocumentsPage() {
         setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
         fetchDosenDocuments();
       } else {
-        toast.error(result.error || "Gagal menerima dokumen.");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menerima dokumen.");
       }
     } catch {
       toast.error("Gagal menerima dokumen.");
@@ -219,7 +220,7 @@ export function DocumentsPage() {
         toast.success("Dokumen ditolak.");
         setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
       } else {
-        toast.error(result.error || "Gagal menolak dokumen.");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menolak dokumen.");
       }
     } catch {
       toast.error("Gagal menolak dokumen.");
@@ -309,7 +310,7 @@ export function DocumentsPage() {
       });
 
       const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
+      if (!response.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengunggah dokumen.");
 
       setShowUploadDialog(false);
       setSelectedFile(null);
@@ -324,7 +325,7 @@ export function DocumentsPage() {
         fetchDosenDocuments();
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah dokumen.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal mengunggah dokumen.");
     } finally {
       setIsSubmitting(false);
     }
@@ -340,14 +341,14 @@ export function DocumentsPage() {
       });
 
       const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
+      if (!response.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal memproses penghapusan.");
 
       toast.success("Dokumen berhasil dihapus.");
       setShowDeleteDialog(false);
       setSelectedDocument(null);
       fetchDosenDocuments();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memproses penghapusan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal memproses penghapusan.");
     }
   };
 

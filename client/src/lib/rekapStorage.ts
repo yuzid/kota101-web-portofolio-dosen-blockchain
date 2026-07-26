@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { apiFetch } from "./api";
+import { sanitizeError } from "@/lib/errors";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -63,7 +64,7 @@ export async function createRekap(data: any, isKajur: boolean): Promise<RekapLap
     body: JSON.stringify(data)
   });
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal membuat rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal membuat rekap');
   return mapFromBackend(result.data);
 }
 
@@ -71,7 +72,7 @@ export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
   const endpoint = isKajur ? 'kajur/rekap/semua' : 'prodi/rekap';
   const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}`);
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal mengambil daftar rekap');
   return result.data.map(mapFromBackend);
 }
 
@@ -79,7 +80,7 @@ export async function getRekap(id: string, isKajur: boolean): Promise<RekapLapor
   const endpoint = isKajur ? 'jurusan' : 'prodi';
   const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`);
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil detail rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal mengambil detail rekap');
   return mapFromBackend(result.data);
 }
 
@@ -90,7 +91,7 @@ export async function updateRekap(id: string, data: any, isKajur: boolean): Prom
     body: JSON.stringify(data)
   });
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal memperbarui rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal memperbarui rekap');
   return mapFromBackend(result.data);
 }
 

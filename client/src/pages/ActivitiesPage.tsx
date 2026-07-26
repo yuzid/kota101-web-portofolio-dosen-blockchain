@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { cn, copyToClipboard } from '@/lib/utils';
+import { sanitizeError } from "@/lib/errors";
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
@@ -125,7 +126,7 @@ export function ActivitiesPage() {
       if (result.status === 'success') {
         setActivities(result.data);
       } else {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
       }
     } catch (error) {
       toast.error('Terjadi kesalahan koneksi ke server');
@@ -161,10 +162,10 @@ export function ActivitiesPage() {
         setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
         fetchActivities();
       } else {
-        toast.error(result.error || 'Gagal menerima undangan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menerima undangan');
       }
     } catch (error) {
-      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+      toast.error('Gagal terhubung ke server. Silakan coba lagi.');
     }
   };
 
@@ -180,10 +181,10 @@ export function ActivitiesPage() {
         setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
         setActivities(prev => prev.filter(a => a.id !== kegiatanId));
       } else {
-        toast.error(result.error || 'Gagal menolak undangan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menolak undangan');
       }
     } catch (error) {
-      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+      toast.error('Gagal terhubung ke server. Silakan coba lagi.');
     }
   };
 

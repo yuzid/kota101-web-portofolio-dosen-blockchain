@@ -68,6 +68,7 @@ import {
 import { Calendar } from "../components/ui/calendar";
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { isHighlightMockMode } from "../services/highlightService";
 
@@ -250,28 +251,6 @@ export function DocumentPreviewPage() {
     }
   }, [document]);
 
-  const sanitizeError = (message: string): string => {
-    if (message.includes("AWS Access Key") || message.includes("credential"))
-      return "Gagal mengakses file dari server penyimpanan.";
-    if (message.includes("does not exist") || message.includes("NoSuchKey"))
-      return "File dokumen tidak ditemukan di server penyimpanan.";
-    if (message.includes("Access Denied") || message.includes("access denied"))
-      return "Akses ke file dokumen ditolak oleh server.";
-    if (message.includes("ECONNREFUSED") || message.includes("ENOTFOUND"))
-      return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.";
-    if (message.includes("timeout") || message.includes("Timeout"))
-      return "Permintaan ke server habis waktu. Silakan coba lagi.";
-    if (message.includes("blockchain") || message.includes("MULTICHAIN") || message.includes("RPC"))
-      return "Layanan verifikasi blockchain sedang tidak tersedia.";
-    if (message.includes("Prisma") || message.includes("database"))
-      return "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.";
-    if (message.includes("Cannot read properties") || message.includes("TypeError"))
-      return "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi.";
-    if (message.length > 100)
-      return "Terjadi kesalahan saat memuat dokumen. Silakan coba lagi.";
-    return message;
-  };
-
   useEffect(() => {
     if (!id) return;
 
@@ -299,13 +278,13 @@ export function DocumentPreviewPage() {
         const previewResult = await previewResponse.json();
         if (!previewResponse.ok || previewResult.status !== "success") {
           throw new Error(
-            previewResult.error || "Gagal mengambil informasi dokumen",
+            previewResult.error ? sanitizeError(previewResult.error) : "Gagal mengambil informasi dokumen",
           );
         }
         if (!contentResponse.ok) {
           const contentResult = await contentResponse.json();
           throw new Error(
-            contentResult.error || "Gagal mengambil file dokumen",
+            contentResult.error ? sanitizeError(contentResult.error) : "Gagal mengambil file dokumen",
           );
         }
 
@@ -516,7 +495,7 @@ export function DocumentPreviewPage() {
         toast.success("Highlight berhasil diperbarui");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal memperbarui highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal memperbarui highlight");
       setHighlights((prev) =>
         prev.map((hl) =>
           hl.id === highlightId ? { ...hl, highlighted_text: "" } : hl,
@@ -537,7 +516,7 @@ export function DocumentPreviewPage() {
         toast.success("Highlight berhasil dihapus");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal menghapus highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menghapus highlight");
       if (deletedHighlight) {
         setHighlights((prev) => [...prev, deletedHighlight]);
       }
@@ -568,7 +547,7 @@ export function DocumentPreviewPage() {
         await syncHighlights(kepemilikanId, syncData);
         toast.success("Highlight berhasil disimpan");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Gagal menyimpan highlight");
+        toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menyimpan highlight");
       }
     }
     setAddMode((prev) => !prev);
@@ -584,7 +563,7 @@ export function DocumentPreviewPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
-      if (!res.ok || result.status === "error") throw new Error(result.error);
+      if (!res.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal menghapus dokumen.");
       toast.success("Dokumen berhasil dihapus.");
       navigate("/documents");
     } catch {
@@ -615,7 +594,7 @@ export function DocumentPreviewPage() {
       await syncHighlights(kepemilikanId, []);
       toast.success("Semua highlight berhasil dihapus");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal menghapus semua highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menghapus semua highlight");
     }
   };
 
@@ -647,7 +626,7 @@ export function DocumentPreviewPage() {
       });
       const metadataResult = await metadataRes.json();
       if (!metadataRes.ok || metadataResult.status === "error") {
-        throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
+        throw new Error(metadataResult.error ? sanitizeError(metadataResult.error) : "Gagal memperbarui metadata dokumen");
       }
 
       setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: format(editForm.tanggal, "yyyy-MM-dd") });
@@ -655,7 +634,7 @@ export function DocumentPreviewPage() {
       setShowEditDialog(false);
       toast.success("Dokumen berhasil diperbarui.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan perubahan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal menyimpan perubahan.");
     } finally {
       setSaving(false);
     }

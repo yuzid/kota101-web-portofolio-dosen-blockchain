@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/page-header";
 import { RoleBadge } from "@/components/ui/role-badge";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -404,7 +405,7 @@ export function ManageAccountsPage() {
           setPasswordError(msg);
         } else {
           setGeneralError(msg);
-          toast.error(msg);
+          toast.error(sanitizeError(msg));
         }
       }
     } catch (error) {
@@ -489,10 +490,10 @@ export function ManageAccountsPage() {
           setPasswordError(msg);
         } else if (lower.includes("email")) {
           setGeneralError(msg);
-          toast.error(msg);
+          toast.error(sanitizeError(msg));
         } else {
           setGeneralError(msg);
-          toast.error(msg);
+          toast.error(sanitizeError(msg));
         }
       }
     } catch (error) {
@@ -531,7 +532,7 @@ export function ManageAccountsPage() {
         );
         fetchUsers();
       } else {
-        toast.error(result.error || "Gagal mengubah status akun");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal mengubah status akun");
       }
     } catch (error) {
       toast.error("Terjadi kesalahan koneksi");

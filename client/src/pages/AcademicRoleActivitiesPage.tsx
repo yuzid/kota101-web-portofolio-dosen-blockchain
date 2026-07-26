@@ -72,6 +72,7 @@ import {
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { createRekap } from "../lib/rekapStorage";
 import {
   setMonitoringActivityDetail,
@@ -239,7 +240,7 @@ export function AcademicRoleActivitiesPage() {
         setTotal(result.data.total);
         setTotalPages(result.data.totalPages);
       } else {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
       }
 
       // Fetch Stats for badges
@@ -384,7 +385,7 @@ export function AcademicRoleActivitiesPage() {
       const result = await response.json();
 
       if (result.status !== 'success') {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
         return;
       }
 
@@ -437,7 +438,7 @@ export function AcademicRoleActivitiesPage() {
       if (result.status === 'success') {
         setPreviewData(result.data.data);
       } else {
-        toast.error(result.error || 'Gagal memuat preview');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal memuat preview');
       }
     } catch {
       toast.error('Terjadi kesalahan saat memuat preview');

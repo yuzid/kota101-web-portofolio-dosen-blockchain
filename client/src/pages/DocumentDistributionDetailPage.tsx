@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { copyToClipboard } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { Button } from "../components/ui/button";
 import { EmptyState } from "../components/ui/empty-state";
 import { Badge } from "../components/ui/badge";
@@ -136,7 +137,7 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Dokumen berhasil dihapus."); navigate("/document-distribution"); }
-      else toast.error(result.error || "Gagal menghapus dokumen.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus dokumen.");
     } catch { toast.error("Gagal menghapus dokumen."); }
   };
 
@@ -146,7 +147,7 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribusi/${distribusiId}/resend`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Dokumen berhasil dikirim ulang."); fetchDetail(); }
-      else toast.error(result.error || "Gagal mengirim ulang.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal mengirim ulang.");
     } catch { toast.error("Gagal mengirim ulang."); }
   };
 
@@ -156,7 +157,7 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribusi/${distribusiId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Penerima berhasil dihapus."); fetchDetail(); }
-      else toast.error(result.error || "Gagal menghapus penerima.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus penerima.");
     } catch { toast.error("Gagal menghapus penerima."); }
   };
 
