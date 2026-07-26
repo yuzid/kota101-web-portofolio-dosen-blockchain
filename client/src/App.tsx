@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { isTokenExpired } from "./lib/api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Lazy load semua pages
 const LoginPage = lazy(() =>
@@ -217,8 +218,9 @@ function RoleProtectedRoute({
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <Routes>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
         {/* Public */}
         <Route
           path="/login"
@@ -495,7 +497,8 @@ function AppRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
