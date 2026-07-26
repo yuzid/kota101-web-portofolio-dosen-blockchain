@@ -12,9 +12,9 @@ const adminUserController = new AdminUserController(adminUserService);
 
 router.get('/', asyncHandler(adminUserController.getAllUsers));
 router.get('/:id', asyncHandler(adminUserController.getUserById));
-router.post('/', asyncHandler(adminUserController.createUser), requireRole(["admin"]));
-router.patch('/:id', asyncHandler(adminUserController.updateUser), requireRole(["admin"]));
-router.patch('/:id/status', asyncHandler(adminUserController.updateUserStatus), requireRole(["admin"]));
-router.delete('/:id', asyncHandler(adminUserController.deleteUser), requireRole(["admin"]));
+router.post('/', requireRole(["admin"]), asyncHandler(adminUserController.createUser));
+router.patch('/:id', requireRole(["admin"]), asyncHandler(adminUserController.updateUser));
+router.patch('/:id/status', requireRole(["admin"]), asyncHandler(adminUserController.updateUserStatus));
+router.delete('/:id', requireRole(["admin"]), asyncHandler(adminUserController.deleteUser));
 
 export default router;
