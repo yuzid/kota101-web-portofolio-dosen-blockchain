@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { prisma } from '../lib/prisma';
 
 export interface AuthRequest extends Request {
   user?: { 
@@ -25,7 +26,7 @@ export const asyncHandler = (fn: AsyncHandler) =>
     Promise.resolve(fn(req, res, next)).catch(next);
 
 // Menyelaraskan nama menjadi verifyToken sesuai yang dipanggil di documentRoutes
-export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const verifyToken = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     res.status(401).json({ status: 'error', error: 'Token tidak ditemukan.' });
@@ -34,6 +35,24 @@ export const verifyToken = (req: AuthRequest, res: Response, next: NextFunction)
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as AuthRequest['user'];
+
+    // Verifikasi status akun langsung ke database
+    // Mencegah akun yang dinonaktifkan menggunakan token lama yang masih valid
+    const user = await prisma.user.findUnique({
+      where: { id: decoded!.id },
+      select: { status: true },
+    });
+
+    if (!user) {
+      res.status(401).json({ status: 'error', error: 'Akun tidak ditemukan.' });
+      return;
+    }
+
+    if (user.status !== 'active') {
+      res.status(403).json({ status: 'error', error: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' });
+      return;
+    }
+
     req.user = decoded;
     next();
   } catch {
