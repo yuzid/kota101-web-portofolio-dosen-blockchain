@@ -514,7 +514,7 @@ export function MonitoringActivityDetailPage() {
                 </div>
                 {activity.jenisBukti === "MASING_MASING" && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Setiap dosen memiliki dokumen bukti masing-masing
+                    Setiap dosen mengunggah bukti secara individual
                   </p>
                 )}
               </CardHeader>

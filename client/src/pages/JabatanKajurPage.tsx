@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { RippleButton } from "../components/ui/ripple-button";
@@ -35,7 +35,6 @@ import {
   X,
   Loader2,
   Landmark,
-  Filter,
   MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -101,8 +100,6 @@ export function JabatanKajurPage() {
   const [jurusans, setJurusans] = useState<Jurusan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterJurusan, setFilterJurusan] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -193,15 +190,12 @@ export function JabatanKajurPage() {
     const matchesSearch = dosenName
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesJurusan =
-      filterJurusan === "all" || item.jurusan_id === filterJurusan;
-    return matchesSearch && matchesJurusan;
+    return matchesSearch;
   });
 
-  const hasActiveFilters = searchTerm !== "" || filterJurusan !== "all";
+  const hasActiveFilters = searchTerm !== "";
   const resetFilters = () => {
     setSearchTerm("");
-    setFilterJurusan("all");
   };
 
   const openAddDialog = () => {
@@ -377,16 +371,6 @@ export function JabatanKajurPage() {
               />
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-9"
-            >
-              <Filter className="w-4 h-4 mr-1.5" />
-              Filter
-            </Button>
-
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -399,37 +383,6 @@ export function JabatanKajurPage() {
               </Button>
             )}
           </div>
-
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="pt-1 pb-2 flex flex-wrap gap-3">
-                  <Select
-                    value={filterJurusan}
-                    onValueChange={setFilterJurusan}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Jurusan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Jurusan</SelectItem>
-                      {jurusans.map((j) => (
-                        <SelectItem key={j.id} value={j.id}>
-                          {j.nama_jurusan}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         <motion.div layout className="border rounded-xl bg-card overflow-x-auto">

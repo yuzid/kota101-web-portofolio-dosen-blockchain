@@ -78,7 +78,11 @@ export class ActivityRepository {
     }
 
     if (search) {
-      where.nama_kegiatan = { contains: search, mode: 'insensitive' };
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     if (periode) where.periode = periode;
@@ -151,7 +155,11 @@ export class ActivityRepository {
     }
 
     if (search) {
-      where.nama_kegiatan = { contains: search, mode: 'insensitive' };
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+      ];
     }
 
     if (periode) where.periode = periode;
@@ -234,7 +242,11 @@ export class ActivityRepository {
       }
     }
     if (search) {
-      where.nama_kegiatan = { contains: search, mode: 'insensitive' };
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+      ];
     }
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;
@@ -283,7 +295,11 @@ export class ActivityRepository {
       }
     }
     if (search) {
-      where.nama_kegiatan = { contains: search, mode: 'insensitive' };
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+      ];
     }
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;

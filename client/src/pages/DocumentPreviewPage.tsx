@@ -770,7 +770,7 @@ export function DocumentPreviewPage() {
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Hash Database</p>
+            <p className="text-xs text-muted-foreground">Integritas File (SHA-256)</p>
             <p className="font-mono text-xs break-all">
               {document.databaseHash || "-"}
             </p>
@@ -854,7 +854,7 @@ export function DocumentPreviewPage() {
         {!document.contentMatchesDatabase && (
           <div className="flex items-center gap-3 border border-red-300 bg-red-50 p-3 text-sm text-red-900">
             <AlertCircle className="h-5 w-5 shrink-0" />
-            File di penyimpanan tidak sesuai dengan hash database.
+            File di penyimpanan tidak sesuai dengan integritas file.
           </div>
         )}
 

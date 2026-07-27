@@ -81,14 +81,6 @@ const FileManagementPage = lazy(() =>
     default: m.FileManagementPage,
   }))
 );
-const AMIRecapPage = lazy(() =>
-  import("./pages/AMIRecapPage").then((m) => ({ default: m.AMIRecapPage }))
-);
-const AMIActivityDetailPage = lazy(() =>
-  import("./pages/AMIActivityDetailPage").then((m) => ({
-    default: m.AMIActivityDetailPage,
-  }))
-);
 const AcademicRoleActivitiesPage = lazy(() =>
   import("./pages/AcademicRoleActivitiesPage").then((m) => ({
     default: m.AcademicRoleActivitiesPage,
@@ -389,24 +381,6 @@ function AppRoutes() {
           element={
             <RoleProtectedRoute allowedRoles={["dosen"]}>
               <FileManagementPage />
-            </RoleProtectedRoute>
-          }
-        />
-
-        {/* AMI */}
-        <Route
-          path="/ami-recap"
-          element={
-            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
-              <AMIRecapPage />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/ami-recap/activity/:id"
-          element={
-            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
-              <AMIActivityDetailPage />
             </RoleProtectedRoute>
           }
         />

@@ -153,7 +153,7 @@ const activityFieldLabels: Record<string, string> = {
   tanggal_selesai: "Tanggal selesai",
   periode: "Tahun akademik",
   semester: "Semester",
-  jenis_bukti: "Tipe bukti",
+  jenis_bukti: "Jenis Bukti",
 };
 
 const statusBadge: Record<
@@ -490,8 +490,7 @@ export function ActivityDetailPage() {
   const isCurrentUserMember = activity.dosenTerlibat.some(
     (d) => d.isCurrentUser
   );
-  const isReadOnlyView =
-    !isCurrentUserMember || location.pathname.includes("/ami-recap/");
+  const isReadOnlyView = !isCurrentUserMember;
   const shareLinkDetail = `${window.location.origin}/public/kegiatan/${id}`;
   const shareLinkDokumen = `${window.location.origin}/public/kegiatan/${id}/dokumen`;
   const activeShareLink = shareMode === "detail" ? shareLinkDetail : shareLinkDokumen;
@@ -535,8 +534,7 @@ export function ActivityDetailPage() {
                 <Edit className="w-4 h-4 mr-1.5" /> Edit
               </RippleButton>
             )}
-            {activity.isCurrentUserPencatat &&
-              !location.pathname.includes("/ami-recap/") && (
+            {activity.isCurrentUserPencatat && (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -789,7 +787,7 @@ export function ActivityDetailPage() {
                 </div>
                 {activity.jenisBukti === "MASING_MASING" && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Setiap dosen memiliki dokumen bukti masing-masing
+                    Setiap dosen mengunggah bukti secara individual
                   </p>
                 )}
               </CardHeader>

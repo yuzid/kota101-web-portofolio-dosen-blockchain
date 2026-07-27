@@ -918,7 +918,7 @@ export function ActivityFormPage() {
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">Bukti Diunggah Masing-Masing</p>
+                    <p className="font-medium">Bukti Per Individu</p>
                     <p className="text-sm text-muted-foreground">
                       Setiap dosen mengupload dokumen bukti secara mandiri
                     </p>
@@ -936,7 +936,7 @@ export function ActivityFormPage() {
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">Bukti Bersama</p>
+                    <p className="font-medium">Bukti Per Kelompok</p>
                     <p className="text-sm text-muted-foreground">
                       Satu dokumen yang digunakan bersama untuk seluruh anggota kegiatan
                     </p>
