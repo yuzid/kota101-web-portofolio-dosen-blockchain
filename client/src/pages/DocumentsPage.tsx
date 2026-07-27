@@ -67,7 +67,8 @@ import {
   Download,
   AlertCircle,
   Files,
-  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
@@ -111,8 +112,8 @@ export function DocumentsPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterJenis, setFilterJenis] = useState("all");
-  const [filterDateRange, setFilterDateRange] = useState<{ from?: Date; to?: Date }>({});
-  const [sortOrder, setSortOrder] = useState<'terbaru' | 'terlama'>('terbaru');
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggal");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -241,26 +242,38 @@ export function DocumentsPage() {
       activeTab === "semua" ||
       (activeTab === "tu" && doc.asal === "tu") ||
       (activeTab === "dosen" && doc.asal === "dosen");
-    const matchesSearch = doc.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      doc.name.toLowerCase().includes(q) ||
+      doc.jenis.toLowerCase().includes(q) ||
+      doc.asal.toLowerCase().includes(q);
     const matchesJenis = filterJenis === "all" || doc.jenis === filterJenis;
 
-    let matchesDate = true;
-    if (filterDateRange.from && filterDateRange.to) {
-      const docDate = new Date(doc.tanggal);
-      matchesDate = docDate >= filterDateRange.from && docDate <= filterDateRange.to;
-    } else if (filterDateRange.from) {
-      matchesDate = new Date(doc.tanggal) >= filterDateRange.from;
-    } else if (filterDateRange.to) {
-      matchesDate = new Date(doc.tanggal) <= filterDateRange.to;
-    }
-
-    return matchesTab && matchesSearch && matchesJenis && matchesDate;
+    return matchesTab && matchesSearch && matchesJenis;
   }).sort((a, b) => {
-    const dateA = new Date(a.tanggal).getTime();
-    const dateB = new Date(b.tanggal).getTime();
-    return sortOrder === 'terbaru' ? dateB - dateA : dateA - dateB;
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+    switch (sortColumn) {
+      case "name":
+        aVal = a.name.toLowerCase();
+        bVal = b.name.toLowerCase();
+        break;
+      case "jenis":
+        aVal = a.jenis.toLowerCase();
+        bVal = b.jenis.toLowerCase();
+        break;
+      case "tanggal":
+        aVal = new Date(a.tanggal).getTime();
+        bVal = new Date(b.tanggal).getTime();
+        break;
+      case "asal":
+        aVal = a.asal.toLowerCase();
+        bVal = b.asal.toLowerCase();
+        break;
+    }
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
   });
 
   const counts = {
@@ -271,14 +284,27 @@ export function DocumentsPage() {
 
   const hasActiveFilters =
     searchTerm !== "" ||
-    filterJenis !== "all" ||
-    filterDateRange.from ||
-    filterDateRange.to;
+    filterJenis !== "all";
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
 
   const resetFilters = () => {
     setSearchTerm("");
     setFilterJenis("all");
-    setFilterDateRange({});
   };
 
   const handleUpload = async () => {
@@ -506,47 +532,12 @@ export function DocumentsPage() {
               <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama dokumen..."
+                  placeholder="Cari nama dokumen, jenis, atau asal..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 h-9"
                 />
               </div>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterDateRange.from ? format(filterDateRange.from, "dd MMM yyyy") : "Dari tanggal"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={filterDateRange.from} onSelect={(d) => setFilterDateRange(prev => ({ ...prev, from: d }))} initialFocus />
-                </PopoverContent>
-              </Popover>
-
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {filterDateRange.to ? format(filterDateRange.to, "dd MMM yyyy") : "Sampai tanggal"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={filterDateRange.to} onSelect={(d) => setFilterDateRange(prev => ({ ...prev, to: d }))} initialFocus />
-                </PopoverContent>
-              </Popover>
-
-              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'terbaru' | 'terlama')}>
-                <SelectTrigger className="w-[150px] h-9">
-                  <ArrowUpDown className="w-4 h-4 mr-1.5" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="terbaru">Terbaru</SelectItem>
-                  <SelectItem value="terlama">Terlama</SelectItem>
-                </SelectContent>
-              </Select>
 
               <Select value={filterJenis} onValueChange={setFilterJenis}>
                 <SelectTrigger className="w-[180px] h-9">
@@ -668,15 +659,23 @@ export function DocumentsPage() {
                       <col className="w-20" />
                     </colgroup>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Nama Dokumen</TableHead>
-                        <TableHead>Jenis</TableHead>
-                        <TableHead>Tanggal</TableHead>
-                        <TableHead>Asal</TableHead>
-                        <TableHead className="text-center">Highlight</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                        <TableRow>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+                            Nama Dokumen <SortIcon column="name" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("jenis")}>
+                            Jenis <SortIcon column="jenis" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggal")}>
+                            Tanggal <SortIcon column="tanggal" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("asal")}>
+                            Asal <SortIcon column="asal" />
+                          </TableHead>
+                          <TableHead className="text-center">Highlight</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {filteredDocuments.map((doc) => (
                         <AnimatedTableRow key={doc.id}>

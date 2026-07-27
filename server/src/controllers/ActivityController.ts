@@ -40,6 +40,14 @@ export class ActivityController {
         return;
       }
       const { tanggalAwal, tanggalAkhir } = req.query;
+      if (tanggalAwal && isNaN(new Date(tanggalAwal as string).getTime())) {
+        res.status(400).json({ status: 'error', error: 'Format tanggalAwal tidak valid.' });
+        return;
+      }
+      if (tanggalAkhir && isNaN(new Date(tanggalAkhir as string).getTime())) {
+        res.status(400).json({ status: 'error', error: 'Format tanggalAkhir tidak valid.' });
+        return;
+      }
       const activities = await this.activityService.getAllActivities(dosenId, {
         tanggalAwal: tanggalAwal as string | undefined,
         tanggalAkhir: tanggalAkhir as string | undefined,

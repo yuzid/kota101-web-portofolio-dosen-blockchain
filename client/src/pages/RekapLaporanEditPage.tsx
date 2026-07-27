@@ -62,7 +62,6 @@ export function RekapLaporanEditPage() {
   const [rekap, setRekap] = useState<RekapLaporan | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [nama, setNama] = useState("");
-  const [tanggalPerekapan, setTanggalPerekapan] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isKajur = location.pathname.includes("/monitoring/jurusan");
@@ -79,7 +78,6 @@ export function RekapLaporanEditPage() {
       const data = await getRekap(id!, isKajur);
       setRekap(data);
       setNama(data.nama);
-      setTanggalPerekapan(data.tanggalPerekapan.split('T')[0]);
     } catch (error) {
       toast.error("Gagal memuat rekap");
     } finally {
@@ -164,16 +162,11 @@ export function RekapLaporanEditPage() {
       toast.error("Nama rekap harus diisi");
       return;
     }
-    if (!tanggalPerekapan) {
-      toast.error("Tanggal perekapan harus diisi");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const updated = await updateRekap(rekap.id, {
         nama: nama.trim(),
-        tanggalPerekapan,
       }, isKajur);
       
       if (updated) {
@@ -248,13 +241,8 @@ export function RekapLaporanEditPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-tanggal">Tanggal Perekapan *</Label>
-                <Input
-                  id="edit-tanggal"
-                  type="date"
-                  value={tanggalPerekapan}
-                  onChange={(e) => setTanggalPerekapan(e.target.value)}
-                />
+                <Label>Tanggal Perekapan</Label>
+                <p className="text-sm py-2">{formatDate(rekap.tanggalPerekapan)}</p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -291,15 +279,14 @@ export function RekapLaporanEditPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Tgl Mulai Pelaksanaan
+                  <Calendar className="w-3 h-3" /> Periode Kegiatan
                 </p>
-                <p className="font-medium text-sm">{getKegiatanDateRange()?.mulai || '-'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Tgl Selesai Pelaksanaan
+                <p className="font-medium text-sm">
+                  {getKegiatanDateRange()?.mulai || '-'}
+                  {getKegiatanDateRange()?.selesai && getKegiatanDateRange()?.mulai !== getKegiatanDateRange()?.selesai
+                    ? ` – ${getKegiatanDateRange()?.selesai}`
+                    : ''}
                 </p>
-                <p className="font-medium text-sm">{getKegiatanDateRange()?.selesai || '-'}</p>
               </div>
               {isKajur && rekap.prodiNama && (
                 <div className="space-y-1">

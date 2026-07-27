@@ -113,9 +113,9 @@ export function LaporanRekapitulasiPage() {
           aVal = a.nama.toLowerCase();
           bVal = b.nama.toLowerCase();
           break;
-        case "tanggalPerekapan":
-          aVal = a.tanggalPerekapan;
-          bVal = b.tanggalPerekapan;
+        case "periode":
+          aVal = a.filter?.tanggalAwal || "";
+          bVal = b.filter?.tanggalAwal || "";
           break;
         case "dibuatOleh":
           aVal = a.dibuatOleh.nama.toLowerCase();
@@ -306,8 +306,8 @@ export function LaporanRekapitulasiPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("nama")}>
                     Nama Rekap <SortIcon column="nama" />
                   </TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalPerekapan")}>
-                    Tanggal Perekapan <SortIcon column="tanggalPerekapan" />
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("periode")}>
+                    Periode Kegiatan <SortIcon column="periode" />
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("dibuatOleh")}>
                     Dibuat Oleh <SortIcon column="dibuatOleh" />
@@ -350,7 +350,12 @@ export function LaporanRekapitulasiPage() {
                   return (
                     <TableRow key={rekap.id}>
                       <TableCell className="font-medium truncate max-w-[220px]">{rekap.nama}</TableCell>
-                      <TableCell>{formatDate(rekap.tanggalPerekapan)}</TableCell>
+                      <TableCell>
+                        {rekap.filter.tanggalAwal
+                          ? `${formatDate(rekap.filter.tanggalAwal)}${rekap.filter.tanggalAkhir ? ` – ${formatDate(rekap.filter.tanggalAkhir)}` : ' – Sekarang'}`
+                          : <span className="text-xs text-muted-foreground">Semua periode</span>
+                        }
+                      </TableCell>
                       <TableCell>
                         <div>
                           <p className="text-sm">{rekap.dibuatOleh.nama}</p>
@@ -472,7 +477,12 @@ export function LaporanRekapitulasiPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{rekap.nama}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(rekap.tanggalPerekapan)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {rekap.filter.tanggalAwal
+                                ? `${formatDate(rekap.filter.tanggalAwal)}${rekap.filter.tanggalAkhir ? ` – ${formatDate(rekap.filter.tanggalAkhir)}` : ' – Sekarang'}`
+                                : 'Semua periode'
+                              }
+                            </p>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

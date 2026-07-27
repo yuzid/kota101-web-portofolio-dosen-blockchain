@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical, CalendarIcon, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical, CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -98,7 +98,8 @@ export function ActivitiesPage() {
   const [filterTahun, setFilterTahun] = useState('all');
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
-  const [sortOrder, setSortOrder] = useState<'terbaru' | 'terlama'>('terbaru');
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggalMulai");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -188,6 +189,22 @@ export function ActivitiesPage() {
     }
   };
 
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
+
   const filteredActivities = activities.filter(activity => {
     const matchesTab = activeTab === 'semua' || activity.jenisTridharma === activeTab;
     const matchesSearch = activity.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -196,9 +213,33 @@ export function ActivitiesPage() {
     const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
     return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori;
   }).sort((a, b) => {
-    const dateA = new Date(a.tanggalMulai).getTime();
-    const dateB = new Date(b.tanggalMulai).getTime();
-    return sortOrder === 'terbaru' ? dateB - dateA : dateA - dateB;
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+    switch (sortColumn) {
+      case "name":
+        aVal = a.name.toLowerCase();
+        bVal = b.name.toLowerCase();
+        break;
+      case "jenisTridharma":
+        aVal = a.jenisTridharma.toLowerCase();
+        bVal = b.jenisTridharma.toLowerCase();
+        break;
+      case "tanggalMulai":
+        aVal = new Date(a.tanggalMulai).getTime();
+        bVal = new Date(b.tanggalMulai).getTime();
+        break;
+      case "tanggalSelesai":
+        aVal = new Date(a.tanggalSelesai).getTime();
+        bVal = new Date(b.tanggalSelesai).getTime();
+        break;
+      case "periode":
+        aVal = a.periode.toLowerCase();
+        bVal = b.periode.toLowerCase();
+        break;
+    }
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
   });
 
   const counts = {
@@ -414,17 +455,6 @@ export function ActivitiesPage() {
                 </PopoverContent>
               </Popover>
 
-              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'terbaru' | 'terlama')}>
-                <SelectTrigger className="w-[150px] h-9">
-                  <ArrowUpDown className="w-4 h-4 mr-1.5" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="terbaru">Terbaru</SelectItem>
-                  <SelectItem value="terlama">Terlama</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Select value={filterSemester} onValueChange={setFilterSemester}>
                 <SelectTrigger className="w-[140px] h-9">
                   <SelectValue placeholder="Semester" />
@@ -547,11 +577,21 @@ export function ActivitiesPage() {
                   </colgroup>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nama Kegiatan</TableHead>
-                      <TableHead>Jenis Tridharma</TableHead>
-                      <TableHead>Tanggal Mulai</TableHead>
-                      <TableHead>Tanggal Selesai</TableHead>
-                      <TableHead>Tahun Akademik</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+                        Nama Kegiatan <SortIcon column="name" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("jenisTridharma")}>
+                        Jenis Tridharma <SortIcon column="jenisTridharma" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalMulai")}>
+                        Tanggal Mulai <SortIcon column="tanggalMulai" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalSelesai")}>
+                        Tanggal Selesai <SortIcon column="tanggalSelesai" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("periode")}>
+                        Tahun Akademik <SortIcon column="periode" />
+                      </TableHead>
                       <TableHead>Peran</TableHead>
                       <TableHead className="text-center">Anggota</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>

@@ -54,6 +54,8 @@ import {
   ListFilter,
   UserPlus,
   MoreHorizontal,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -64,13 +66,6 @@ import {
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { getAllJenisDokumen } from "@/lib/utils";
-import { Calendar } from "../components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 
 interface DistribusiItem {
   id: string;
@@ -141,9 +136,8 @@ export function DocumentDistributionPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [jenisFilter, setJenisFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [sortBy, setSortBy] = useState("terbaru");
-  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
-  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggal_upload");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
 
   const pageSize = 10;
@@ -192,24 +186,63 @@ export function DocumentDistributionPage() {
     [documents]
   );
 
-  const hasActiveFilter = searchTerm || jenisFilter || statusFilter || sortBy !== "terbaru" || filterDateFrom || filterDateTo;
+  const hasActiveFilter = searchTerm || jenisFilter || statusFilter;
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
 
   const filteredDocuments = useMemo(() => {
     let result = [...documents];
-    if (searchTerm) result = result.filter(d => d.nama.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(d =>
+        d.nama.toLowerCase().includes(q) ||
+        d.jenis_dokumen.toLowerCase().includes(q) ||
+        d.sumber_dokumen.toLowerCase().includes(q) ||
+        d.distribusi?.some(dist => dist.dosen?.nama?.toLowerCase().includes(q))
+      );
+    }
     if (jenisFilter) result = result.filter(d => d.jenis_dokumen === jenisFilter);
     if (statusFilter === "terdistribusi") result = result.filter(d => d.distribusi && d.distribusi.length > 0);
     if (statusFilter === "belum") result = result.filter(d => !d.distribusi || d.distribusi.length === 0);
-    if (filterDateFrom) result = result.filter(d => new Date(d.tanggal_upload) >= filterDateFrom);
-    if (filterDateTo) result = result.filter(d => new Date(d.tanggal_upload) <= filterDateTo);
-    switch (sortBy) {
-      case "terlama": result.sort((a, b) => new Date(a.tanggal_upload).getTime() - new Date(b.tanggal_upload).getTime()); break;
-      case "a-z": result.sort((a, b) => a.nama.localeCompare(b.nama)); break;
-      case "z-a": result.sort((a, b) => b.nama.localeCompare(a.nama)); break;
-      default: result.sort((a, b) => new Date(b.tanggal_upload).getTime() - new Date(a.tanggal_upload).getTime());
-    }
-    return result;
-  }, [documents, searchTerm, jenisFilter, statusFilter, sortBy, filterDateFrom, filterDateTo]);
+    return result.sort((a, b) => {
+      let aVal: string | number = "";
+      let bVal: string | number = "";
+      switch (sortColumn) {
+        case "nama":
+          aVal = a.nama.toLowerCase();
+          bVal = b.nama.toLowerCase();
+          break;
+        case "jenis_dokumen":
+          aVal = a.jenis_dokumen.toLowerCase();
+          bVal = b.jenis_dokumen.toLowerCase();
+          break;
+        case "tanggal_upload":
+          aVal = new Date(a.tanggal_upload).getTime();
+          bVal = new Date(b.tanggal_upload).getTime();
+          break;
+        default:
+          aVal = new Date(a.tanggal_upload).getTime();
+          bVal = new Date(b.tanggal_upload).getTime();
+      }
+      if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [documents, searchTerm, jenisFilter, statusFilter, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil(filteredDocuments.length / pageSize);
   const paginatedDocs = filteredDocuments.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -218,9 +251,6 @@ export function DocumentDistributionPage() {
     setSearchTerm("");
     setJenisFilter("");
     setStatusFilter("");
-    setSortBy("terbaru");
-    setFilterDateFrom(undefined);
-    setFilterDateTo(undefined);
     setCurrentPage(1);
   };
 
@@ -379,35 +409,13 @@ export function DocumentDistributionPage() {
               <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama dokumen..."
+                  placeholder="Cari nama dokumen atau dosen..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="pl-9 h-9 text-sm"
                 />
               </div>
               <div className="flex gap-2 flex-wrap">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal h-9 text-sm">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
-                  </PopoverContent>
-                </Popover>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-[150px] justify-start text-left font-normal h-9 text-sm">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
-                  </PopoverContent>
-                </Popover>
                 <Select value={jenisFilter} onValueChange={(v) => { setJenisFilter(v); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Jenis Dokumen" /></SelectTrigger>
                   <SelectContent>
@@ -421,15 +429,6 @@ export function DocumentDistributionPage() {
                     <SelectItem value=" ">Semua Status</SelectItem>
                     <SelectItem value="terdistribusi">Sudah Terdistribusi</SelectItem>
                     <SelectItem value="belum">Belum Terdistribusi</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[130px] h-9 text-sm"><SelectValue placeholder="Urutkan" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="terbaru">Terbaru</SelectItem>
-                    <SelectItem value="terlama">Terlama</SelectItem>
-                    <SelectItem value="a-z">A-Z</SelectItem>
-                    <SelectItem value="z-a">Z-A</SelectItem>
                   </SelectContent>
                 </Select>
                 {hasActiveFilter && (
@@ -482,15 +481,21 @@ export function DocumentDistributionPage() {
                       <col className="w-20" />
                     </colgroup>
                     <TableHeader>
-                      <TableRow className="bg-muted/30 border-b">
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Nama Dokumen</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Jenis</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3">Tanggal Upload</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[100px]">Penerima</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[140px]">Status</TableHead>
-                        <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 text-right">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 cursor-pointer select-none" onClick={() => handleSort("nama")}>
+                            Nama Dokumen <SortIcon column="nama" />
+                          </TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 cursor-pointer select-none" onClick={() => handleSort("jenis_dokumen")}>
+                            Jenis <SortIcon column="jenis_dokumen" />
+                          </TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 cursor-pointer select-none" onClick={() => handleSort("tanggal_upload")}>
+                            Tanggal Upload <SortIcon column="tanggal_upload" />
+                          </TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[100px]">Penerima</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 w-[140px]">Status</TableHead>
+                          <TableHead className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground py-2.5 px-3 text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {paginatedDocs.map((doc) => (
                         <TableRow key={doc.id} className="hover:bg-muted/50 transition-colors">

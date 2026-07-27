@@ -17,12 +17,7 @@ export class ActivityRepository {
         where.AND.push({ tanggal_mulai: { lte: new Date(filter.tanggalAkhir) } });
       }
       if (filter.tanggalAwal) {
-        where.AND.push({
-          OR: [
-            { tanggal_selesai: null },
-            { tanggal_selesai: { gte: new Date(filter.tanggalAwal) } },
-          ],
-        });
+        where.AND.push({ tanggal_selesai: { gte: new Date(filter.tanggalAwal) } });
       }
     }
 

@@ -232,12 +232,13 @@ export function RekapLaporanDetailPage() {
                 <p className="font-medium">{rekap.kegiatanData.length}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Tgl Mulai Pelaksanaan</p>
-                <p className="font-medium">{getKegiatanDateRange()?.mulai || '-'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tgl Selesai Pelaksanaan</p>
-                <p className="font-medium">{getKegiatanDateRange()?.selesai || '-'}</p>
+                <p className="text-sm text-muted-foreground">Periode Kegiatan</p>
+                <p className="font-medium">
+                  {getKegiatanDateRange()?.mulai || '-'}
+                  {getKegiatanDateRange()?.selesai && getKegiatanDateRange()?.mulai !== getKegiatanDateRange()?.selesai
+                    ? ` – ${getKegiatanDateRange()?.selesai}`
+                    : ''}
+                </p>
               </div>
               {isKajur && rekap.prodiNama && (
                 <div>
@@ -282,70 +283,105 @@ export function RekapLaporanDetailPage() {
               )}
             </div>
 
-            {/* Kegiatan */}
-            <div>
-              <h3 className="font-semibold mb-3">Daftar Kegiatan ({rekap.kegiatanData.length})</h3>
-              <div className="border rounded-lg overflow-x-auto">
-                <Table className="table-fixed">
-                  <colgroup>
-                    <col className="w-12" />
-                    <col className="w-1/4" />
-                    <col className="w-1/6" />
-                    <col className="w-1/6" />
-                    <col className="w-1/6" />
-                    <col className="w-28" />
-                    <col className="w-1/6" />
-                  </colgroup>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">No</TableHead>
-                      <TableHead className="min-w-[180px]">Nama Kegiatan</TableHead>
-                      <TableHead className="min-w-[140px]">Dosen</TableHead>
-                      <TableHead className="min-w-[120px]">Kategori Tridharma</TableHead>
-                      <TableHead className="min-w-[140px]">Jenis Kegiatan</TableHead>
-                      <TableHead className="min-w-[120px]">Tanggal</TableHead>
-                      <TableHead className="min-w-[200px]">Dokumen Bukti</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rekap.kegiatanData.map((kegiatan: any, i: number) => (
-                      <TableRow key={kegiatan.id}>
-                        <TableCell>{i + 1}</TableCell>
-                        <TableCell className="font-medium truncate max-w-[220px]">{kegiatan.nama_kegiatan}</TableCell>
-                        <TableCell>{kegiatan.dosen?.nama || "-"}</TableCell>
-                        <TableCell>{getJenisBadge(kegiatan.kategori_tridharma)}</TableCell>
-                        <TableCell className="text-sm">{kegiatan.jenis_kegiatan?.replace(/_/g, " ")}</TableCell>
-                        <TableCell className="text-sm whitespace-nowrap">
-                          {formatDate(kegiatan.tanggal_mulai)}
-                          {kegiatan.tanggal_selesai && ` - ${formatDate(kegiatan.tanggal_selesai)}`}
-                        </TableCell>
-                        <TableCell>
-                          {kegiatan.lampiran_bukti && kegiatan.lampiran_bukti.length > 0 ? (
-                            <a
-                              href={`/public/kegiatan/${kegiatan.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
-                            >
-                              Bukti Kegiatan
-                            </a>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+            {/* Kegiatan per Tridharma as Tabs */}
+            <Tabs defaultValue="PENDIDIKAN">
+              <TabsList>
+                {([
+                  { key: "PENDIDIKAN", label: "Pendidikan" },
+                  { key: "PENELITIAN", label: "Penelitian" },
+                  { key: "PENGABDIAN", label: "Pengabdian" },
+                  { key: "TUGAS_TAMBAHAN", label: "Tugas Tambahan" },
+                ] as const).map(({ key, label }) => {
+                  const count = rekap.kegiatanData.filter((k: any) => k.kategori_tridharma === key).length;
+                  return (
+                    <TabsTrigger key={key} value={key}>
+                      {label}
+                      <Badge variant="secondary" className="ml-2">{count}</Badge>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+
+              {([
+                { key: "PENDIDIKAN", label: "Pendidikan" },
+                { key: "PENELITIAN", label: "Penelitian" },
+                { key: "PENGABDIAN", label: "Pengabdian" },
+                { key: "TUGAS_TAMBAHAN", label: "Tugas Tambahan" },
+              ] as const).map(({ key }) => {
+                const filtered = rekap.kegiatanData.filter(
+                  (k: any) => k.kategori_tridharma === key
+                );
+                return (
+                  <TabsContent key={key} value={key}>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table className="table-fixed">
+                        <colgroup>
+                          <col className="w-12" />
+                          <col className="w-1/4" />
+                          <col className="w-1/5" />
+                          <col className="w-1/5" />
+                          <col className="w-[12%]" />
+                          <col className="w-[12%]" />
+                          <col className="w-36" />
+                          <col className="w-[15%]" />
+                        </colgroup>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">No</TableHead>
+                            <TableHead className="min-w-[180px]">Nama Kegiatan</TableHead>
+                            <TableHead className="min-w-[140px]">Pencatat</TableHead>
+                            <TableHead className="min-w-[140px]">Anggota</TableHead>
+                            <TableHead className="min-w-[120px]">Kategori Tridharma</TableHead>
+                            <TableHead className="min-w-[140px]">Jenis Kegiatan</TableHead>
+                            <TableHead className="min-w-[140px]">Tanggal</TableHead>
+                            <TableHead className="min-w-[200px]">Dokumen Bukti</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map((kegiatan: any, i: number) => (
+                            <TableRow key={kegiatan.id}>
+                              <TableCell>{i + 1}</TableCell>
+                              <TableCell className="font-medium truncate max-w-[220px]">{kegiatan.nama_kegiatan}</TableCell>
+                              <TableCell>{kegiatan.dosen?.nama || "-"}</TableCell>
+                              <TableCell className="text-sm">
+                                {kegiatan.partisipasi?.filter((p: any) => p.status === "DITERIMA").map((p: any) => p.dosen?.nama).join(", ") || "-"}
+                              </TableCell>
+                              <TableCell>{getJenisBadge(kegiatan.kategori_tridharma)}</TableCell>
+                              <TableCell className="text-sm">{kegiatan.jenis_kegiatan?.replace(/_/g, " ")}</TableCell>
+                              <TableCell className="text-sm whitespace-nowrap">
+                                {formatDate(kegiatan.tanggal_mulai)}
+                                {kegiatan.tanggal_selesai && ` - ${formatDate(kegiatan.tanggal_selesai)}`}
+                              </TableCell>
+                              <TableCell>
+                                {kegiatan.lampiran_bukti && kegiatan.lampiran_bukti.length > 0 ? (
+                                  <a
+                                    href={`/public/kegiatan/${kegiatan.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 underline hover:text-blue-800 truncate max-w-[180px] block"
+                                  >
+                                    Bukti Kegiatan
+                                  </a>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {filtered.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                Tidak ada kegiatan
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {rekap.kegiatanData.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          <EmptyState title="Belum Ada Kegiatan" description="Belum ada data kegiatan yang tercatat dalam rekap ini." icon={FileX} />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="riwayat" className="space-y-4 mt-4">
