@@ -30,7 +30,6 @@ import {
 import {
   Loader2,
   ArrowLeft,
-  Calendar,
   User,
   Filter,
   FileText,
@@ -117,24 +116,6 @@ export function RekapLaporanEditPage() {
 
   const formatDateTime = (dateStr: string) => {
     try { return format(new Date(dateStr), "dd MMM yyyy HH:mm"); } catch { return dateStr; }
-  };
-
-  const getKegiatanDateRange = (): { mulai: string; selesai: string } | null => {
-    const dates = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_mulai)
-      .map((k: any) => new Date(k.tanggal_mulai).getTime());
-    if (dates.length === 0) return null;
-    const min = new Date(Math.min(...dates));
-    const max = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_selesai)
-      .reduce((latest: Date | null, k: any) => {
-        const d = new Date(k.tanggal_selesai);
-        return !latest || d > latest ? d : latest;
-      }, null);
-    return {
-      mulai: formatDate(min.toISOString()),
-      selesai: max ? formatDate(max.toISOString()) : formatDate(min.toISOString()),
-    };
   };
 
   const getJenisBadge = (jenis: string) => {
@@ -276,17 +257,6 @@ export function RekapLaporanEditPage() {
                   <BookOpen className="w-3 h-3" /> Jumlah Kegiatan
                 </p>
                 <p className="font-medium text-sm">{rekap.kegiatanData.length}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Periode Kegiatan
-                </p>
-                <p className="font-medium text-sm">
-                  {getKegiatanDateRange()?.mulai || '-'}
-                  {getKegiatanDateRange()?.selesai && getKegiatanDateRange()?.mulai !== getKegiatanDateRange()?.selesai
-                    ? ` – ${getKegiatanDateRange()?.selesai}`
-                    : ''}
-                </p>
               </div>
               {isKajur && rekap.prodiNama && (
                 <div className="space-y-1">

@@ -105,24 +105,6 @@ export function RekapLaporanDetailPage() {
     try { return format(new Date(dateStr), "dd MMM yyyy HH:mm"); } catch { return dateStr; }
   };
 
-  const getKegiatanDateRange = (): { mulai: string; selesai: string } | null => {
-    const dates = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_mulai)
-      .map((k: any) => new Date(k.tanggal_mulai).getTime());
-    if (dates.length === 0) return null;
-    const min = new Date(Math.min(...dates));
-    const max = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_selesai)
-      .reduce((latest: Date | null, k: any) => {
-        const d = new Date(k.tanggal_selesai);
-        return !latest || d > latest ? d : latest;
-      }, null);
-    return {
-      mulai: formatDate(min.toISOString()),
-      selesai: max ? formatDate(max.toISOString()) : formatDate(min.toISOString()),
-    };
-  };
-
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "PENDIDIKAN": return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
@@ -230,15 +212,6 @@ export function RekapLaporanDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Jumlah Kegiatan</p>
                 <p className="font-medium">{rekap.kegiatanData.length}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Periode Kegiatan</p>
-                <p className="font-medium">
-                  {getKegiatanDateRange()?.mulai || '-'}
-                  {getKegiatanDateRange()?.selesai && getKegiatanDateRange()?.mulai !== getKegiatanDateRange()?.selesai
-                    ? ` – ${getKegiatanDateRange()?.selesai}`
-                    : ''}
-                </p>
               </div>
               {isKajur && rekap.prodiNama && (
                 <div>

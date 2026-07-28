@@ -244,9 +244,7 @@ export function DocumentsPage() {
       (activeTab === "dosen" && doc.asal === "dosen");
     const q = searchTerm.toLowerCase();
     const matchesSearch =
-      doc.name.toLowerCase().includes(q) ||
-      doc.jenis.toLowerCase().includes(q) ||
-      doc.asal.toLowerCase().includes(q);
+      doc.name.toLowerCase().includes(q);
     const matchesJenis = filterJenis === "all" || doc.jenis === filterJenis;
 
     return matchesTab && matchesSearch && matchesJenis;
@@ -532,7 +530,7 @@ export function DocumentsPage() {
               <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama dokumen, jenis, atau asal..."
+                  placeholder="Cari berdasarkan nama dokumen..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 h-9"

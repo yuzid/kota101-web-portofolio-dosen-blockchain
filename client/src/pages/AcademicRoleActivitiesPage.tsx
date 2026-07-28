@@ -170,7 +170,7 @@ export function AcademicRoleActivitiesPage() {
 
   useEffect(() => {
     fetchActivities();
-  }, [page, size, activeTab, filterProdi, filterKelengkapan, filterDateFrom, filterDateTo, filterSemester, filterTahunAkademik]);
+  }, [searchTerm, page, size, activeTab, filterProdi, filterKelengkapan, filterDateFrom, filterDateTo, filterSemester, filterTahunAkademik]);
 
   const fetchFilterOptions = async () => {
     try {
