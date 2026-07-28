@@ -164,11 +164,13 @@ export function DocumentDistributionDetailPage() {
   };
 
   const handleDownload = () => {
-    if (!fileUrl) return;
     const a = document.createElement("a");
-    a.href = fileUrl;
+    a.href = `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/content`;
     a.download = doc?.nama || "dokumen";
+    a.target = "_blank";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   const handleCopyLink = async () => {
@@ -237,7 +239,7 @@ export function DocumentDistributionDetailPage() {
             >
               <Edit className="w-4 h-4 mr-1.5" /> Edit Dokumen
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!fileUrl}>
+            <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="w-4 h-4 mr-1.5" /> Unduh
             </Button>
             <Button
@@ -257,7 +259,7 @@ export function DocumentDistributionDetailPage() {
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
               <p className="font-semibold mb-0.5">Dokumen Distribusi Dikunci</p>
-              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima.</p>
+              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima. Namun, dokumen tetap dapat diunduh.</p>
             </div>
           </div>
         )}
@@ -439,9 +441,9 @@ export function DocumentDistributionDetailPage() {
                         {d.kegiatan_id ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled>
+                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted/50 cursor-not-allowed">
                                 <UserMinus className="w-3.5 h-3.5 text-muted-foreground" />
-                              </Button>
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent>Dokumen sudah dilampirkan ke kegiatan oleh dosen ini</TooltipContent>
                           </Tooltip>
