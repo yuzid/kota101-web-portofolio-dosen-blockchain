@@ -536,14 +536,14 @@ export function MonitoringActivityDetailPage() {
                             <span className="font-medium text-sm truncate">
                               {dosen.name}
                             </span>
-                            {dosen.isPencatat && (
-                               <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs h-5">
-                                 Pembuat
-                               </Badge>
-                             )}
-                             {dosen.isKetua && !dosen.isPencatat && (
+                            {dosen.isKetua && (
                                <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">
                                  Ketua
+                               </Badge>
+                             )}
+                             {!dosen.isKetua && (
+                               <Badge variant="secondary" className="text-xs h-5">
+                                 Anggota
                                </Badge>
                              )}
                           </div>

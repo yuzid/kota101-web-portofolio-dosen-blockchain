@@ -317,7 +317,7 @@ export function RekapLaporanDetailPage() {
                               <TableCell className="font-medium truncate max-w-[220px]">{kegiatan.nama_kegiatan}</TableCell>
                               <TableCell>{kegiatan.dosen?.nama || "-"}</TableCell>
                               <TableCell className="text-sm">
-                                {kegiatan.partisipasi?.filter((p: any) => p.status === "DITERIMA").map((p: any) => p.dosen?.nama).join(", ") || "-"}
+                                {kegiatan.partisipasi?.filter((p: any) => p.status === "DITERIMA" && p.dosen_id !== kegiatan.dosen_id).map((p: any) => p.dosen?.nama).join(", ") || "-"}
                               </TableCell>
                               <TableCell>{getJenisBadge(kegiatan.kategori_tridharma)}</TableCell>
                               <TableCell className="text-sm">{kegiatan.jenis_kegiatan?.replace(/_/g, " ")}</TableCell>

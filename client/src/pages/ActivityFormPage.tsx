@@ -763,7 +763,7 @@ export function ActivityFormPage() {
               </div>
               <div className="flex gap-2">
                 {isCurrentUserPencatat && (
-                   <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                   <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Ketua</Badge>
                  )}
               </div>
             </div>
@@ -871,7 +871,7 @@ export function ActivityFormPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {d.isPencatat ? (
-                         <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                         <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Ketua</Badge>
                        ) : (
                          <Badge variant="secondary">Anggota</Badge>
                        )}

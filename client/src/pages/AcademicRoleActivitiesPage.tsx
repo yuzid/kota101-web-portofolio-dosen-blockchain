@@ -846,7 +846,7 @@ export function AcademicRoleActivitiesPage() {
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <Users className="w-3 h-3 mr-1" />
-                            {activity.partisipasi?.length ?? 0}
+                            {activity.partisipasi?.filter((p: any) => p.dosen_id !== activity.dosen_id).length ?? 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -943,7 +943,7 @@ export function AcademicRoleActivitiesPage() {
                           <div className="flex items-center gap-2 text-xs">
                             <Badge variant="outline" className="text-xs">
                               <Users className="w-3 h-3 mr-1" />
-                              {activity.partisipasi?.length ?? 0}
+                              {activity.partisipasi?.filter((p: any) => p.dosen_id !== activity.dosen_id).length ?? 0}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               <FileText className="w-3 h-3 mr-1" />
