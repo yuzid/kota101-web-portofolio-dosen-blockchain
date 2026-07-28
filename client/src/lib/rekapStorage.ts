@@ -114,11 +114,27 @@ function formatDokumenLinks(k: any): string {
 }
 
 export function exportRekapXlsx(rekap: RekapLaporan): void {
+  const formatDosen = (k: any) => {
+    const pencatat = k.dosen?.nama && k.dosen?.nidn
+      ? `${k.dosen.nama} (${k.dosen.nidn})`
+      : k.dosen?.nama || '-';
+    const anggota = (k.partisipasi || [])
+      .filter((p: any) => p.status === 'DITERIMA' && p.dosen && p.dosen.nama !== k.dosen?.nama)
+      .map((p: any) => `${p.dosen.nama} (${p.dosen.nidn})`);
+    return anggota.length > 0
+      ? `${pencatat},\n${anggota.join(',\n')}`
+      : pencatat;
+  };
+
+  const formatTanggal = (val: string) => {
+    if (!val) return '-';
+    return new Date(val).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const rows = rekap.kegiatanData.map((k: any, i: number) => ({
     No: i + 1,
     'Nama Kegiatan': k.nama_kegiatan || '-',
-    Dosen: k.dosen?.nama || '-',
-    NIDN: k.dosen?.nidn || '-',
+    Dosen: formatDosen(k),
     'Program Studi': k.dosen?.program_studi?.nama_prodi || '-',
     'Kategori Tridharma': k.kategori_tridharma || '-',
     'Jenis Kegiatan': k.jenis_kegiatan || '-',
@@ -135,7 +151,7 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
   const ws = XLSX.utils.json_to_sheet(rows);
 
   const colWidths = [
-    { wch: 4 }, { wch: 40 }, { wch: 25 }, { wch: 20 },
+    { wch: 4 }, { wch: 40 }, { wch: 35 }, { wch: 20 },
     { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 },
     { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 50 },
   ];
@@ -145,12 +161,12 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
 
   const metaRows = [
     { Key: 'Nama Rekap', Value: rekap.nama },
-    { Key: 'Tanggal Perekapan', Value: rekap.tanggalPerekapan },
+    { Key: 'Tanggal Perekapan', Value: formatTanggal(rekap.tanggalPerekapan) },
     { Key: 'Dibuat Oleh', Value: rekap.dibuatOleh.nama },
     { Key: 'Peran', Value: rekap.dibuatOleh.role },
     { Key: 'Jumlah Kegiatan', Value: rekap.kegiatanData.length },
-    { Key: 'Tanggal Filter Awal', Value: rekap.filter.tanggalAwal || '-' },
-    { Key: 'Tanggal Filter Akhir', Value: rekap.filter.tanggalAkhir || '-' },
+    { Key: 'Tanggal Filter Awal', Value: formatTanggal(rekap.filter.tanggalAwal || '') },
+    { Key: 'Tanggal Filter Akhir', Value: formatTanggal(rekap.filter.tanggalAkhir || '') },
     { Key: 'Kategori Filter', Value: rekap.filter.kategori?.join(', ') || 'Semua' },
   ];
   const metaWs = XLSX.utils.json_to_sheet(metaRows);
@@ -161,11 +177,27 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
 }
 
 export function exportRekapCsv(rekap: RekapLaporan): void {
+  const formatDosen = (k: any) => {
+    const pencatat = k.dosen?.nama && k.dosen?.nidn
+      ? `${k.dosen.nama} (${k.dosen.nidn})`
+      : k.dosen?.nama || '-';
+    const anggota = (k.partisipasi || [])
+      .filter((p: any) => p.status === 'DITERIMA' && p.dosen && p.dosen.nama !== k.dosen?.nama)
+      .map((p: any) => `${p.dosen.nama} (${p.dosen.nidn})`);
+    return anggota.length > 0
+      ? `${pencatat}, ${anggota.join(', ')}`
+      : pencatat;
+  };
+
+  const formatTanggal = (val: string) => {
+    if (!val) return '-';
+    return new Date(val).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const rows = rekap.kegiatanData.map((k: any, i: number) => ({
     No: i + 1,
     Nama_Kegiatan: k.nama_kegiatan || '-',
-    Dosen: k.dosen?.nama || '-',
-    NIDN: k.dosen?.nidn || '-',
+    Dosen: formatDosen(k),
     Program_Studi: k.dosen?.program_studi?.nama_prodi || '-',
     Kategori_Tridharma: k.kategori_tridharma || '-',
     Jenis_Kegiatan: k.jenis_kegiatan || '-',

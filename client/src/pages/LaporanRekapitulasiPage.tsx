@@ -293,7 +293,7 @@ export function LaporanRekapitulasiPage() {
           <Table className="table-fixed">
               <colgroup>
                 <col className="w-1/4" />
-                <col className="w-28" />
+                <col className="w-[185px]" />
                 <col className="w-1/6" />
                 <col className="w-1/6" />
                 <col className="w-24" />
@@ -307,7 +307,7 @@ export function LaporanRekapitulasiPage() {
                     Nama Rekap <SortIcon column="nama" />
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("periode")}>
-                    Periode Kegiatan <SortIcon column="periode" />
+                    Rentang Tanggal <SortIcon column="periode" />
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("dibuatOleh")}>
                     Dibuat Oleh <SortIcon column="dibuatOleh" />

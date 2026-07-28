@@ -37,15 +37,8 @@ export class ActivityRepository {
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
-    const where: any = {
-      dosen: {
-        program_studi: {
-          jurusan_id: jurusanId
-        }
-      }
-    };
+    const where: any = {};
 
-    if (prodiId) where.dosen.program_studi_id = prodiId;
     if (dosenId) where.dosen_id = dosenId;
     if (jenis) {
       where.kategori_tridharma = Array.isArray(jenis) ? { in: jenis } : jenis;
@@ -62,26 +55,31 @@ export class ActivityRepository {
       }
     }
 
-    if (tanggalAwal || tanggalAkhir) {
-      where.AND = [];
-      if (tanggalAkhir) {
-        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
-      }
-      if (tanggalAwal) {
-        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
-      }
-    }
-
-    if (search) {
-      where.OR = [
-        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
-
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;
+
+    where.AND = [
+      prodiId
+        ? { dosen: { program_studi: { jurusan_id: jurusanId, id: prodiId } } }
+        : { dosen: { program_studi: { jurusan_id: jurusanId } } },
+    ];
+
+    if (search) {
+      where.AND.push({
+        OR: [
+          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (tanggalAkhir) {
+      where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+    }
+    if (tanggalAwal) {
+      where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
+    }
 
     const [total, data] = await Promise.all([
       prisma.kegiatanTridharma.count({ where }),
@@ -117,11 +115,7 @@ export class ActivityRepository {
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
-    const where: any = {
-      dosen: {
-        program_studi_id: prodiId
-      }
-    };
+    const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
     if (jenis) {
@@ -139,26 +133,29 @@ export class ActivityRepository {
       }
     }
 
-    if (tanggalAwal || tanggalAkhir) {
-      where.AND = [];
-      if (tanggalAkhir) {
-        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
-      }
-      if (tanggalAwal) {
-        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
-      }
-    }
-
-    if (search) {
-      where.OR = [
-        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
-
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;
+
+    where.AND = [
+      { dosen: { program_studi_id: prodiId } },
+    ];
+
+    if (search) {
+      where.AND.push({
+        OR: [
+          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (tanggalAkhir) {
+      where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+    }
+    if (tanggalAwal) {
+      where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
+    }
 
     const [total, data] = await Promise.all([
       prisma.kegiatanTridharma.count({ where }),
@@ -210,15 +207,8 @@ export class ActivityRepository {
   async findJurusanSummaryStats(jurusanId: string, filter: KegiatanFilter) {
     const { prodiId, dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
-    const where: any = {
-      dosen: {
-        program_studi: {
-          jurusan_id: jurusanId
-        }
-      }
-    };
+    const where: any = {};
 
-    if (prodiId) where.dosen.program_studi_id = prodiId;
     if (dosenId) where.dosen_id = dosenId;
     if (status) {
       if (status === 'lengkap') {
@@ -227,24 +217,31 @@ export class ActivityRepository {
         where.kepemilikan_dokumen = { none: {} };
       }
     }
-    if (tanggalAwal || tanggalAkhir) {
-      where.AND = [];
-      if (tanggalAkhir) {
-        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
-      }
-      if (tanggalAwal) {
-        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
-      }
-    }
-    if (search) {
-      where.OR = [
-        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;
+
+    where.AND = [
+      prodiId
+        ? { dosen: { program_studi: { jurusan_id: jurusanId, id: prodiId } } }
+        : { dosen: { program_studi: { jurusan_id: jurusanId } } },
+    ];
+
+    if (search) {
+      where.AND.push({
+        OR: [
+          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (tanggalAkhir) {
+      where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+    }
+    if (tanggalAwal) {
+      where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
+    }
 
     const stats = await prisma.kegiatanTridharma.groupBy({
       by: ['kategori_tridharma'],
@@ -266,11 +263,7 @@ export class ActivityRepository {
   async findProdiSummaryStats(prodiId: string, filter: KegiatanFilter) {
     const { dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
-    const where: any = {
-      dosen: {
-        program_studi_id: prodiId
-      }
-    };
+    const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
     if (status) {
@@ -280,24 +273,29 @@ export class ActivityRepository {
         where.kepemilikan_dokumen = { none: {} };
       }
     }
-    if (tanggalAwal || tanggalAkhir) {
-      where.AND = [];
-      if (tanggalAkhir) {
-        where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
-      }
-      if (tanggalAwal) {
-        where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
-      }
-    }
-    if (search) {
-      where.OR = [
-        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-        { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
     if (periode) where.periode = periode;
     if (semester) where.semester = semester;
+
+    where.AND = [
+      { dosen: { program_studi_id: prodiId } },
+    ];
+
+    if (search) {
+      where.AND.push({
+        OR: [
+          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
+        ],
+      });
+    }
+
+    if (tanggalAkhir) {
+      where.AND.push({ tanggal_mulai: { lte: new Date(tanggalAkhir) } });
+    }
+    if (tanggalAwal) {
+      where.AND.push({ tanggal_selesai: { gte: new Date(tanggalAwal) } });
+    }
 
     const stats = await prisma.kegiatanTridharma.groupBy({
       by: ['kategori_tridharma'],
