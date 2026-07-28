@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
 import { Separator } from "../components/ui/separator";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../components/ui/tooltip";
 import {
   ArrowLeft,
   Edit,
@@ -44,6 +45,7 @@ interface DistribusiItem {
   id: string;
   dosen_id: string;
   status: string;
+  kegiatan_id: string | null;
   tanggal_distribusi: string;
   tanggal_keputusan: string | null;
   dosen: {
@@ -428,16 +430,27 @@ export function DocumentDistributionDetailPage() {
                           <span>{format(new Date(d.tanggal_distribusi), "dd MMM", { locale: localeId })}</span>
                         </div>
                       </div>
-                      {d.status === "DITOLAK" && (
-                        <div className="flex gap-0.5 shrink-0">
+                      <div className="flex gap-0.5 shrink-0">
+                        {d.status === "DITOLAK" && (
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowResendDialog(d.id)} title="Kirim ulang">
                             <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
                           </Button>
+                        )}
+                        {d.kegiatan_id ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled>
+                                <UserMinus className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Dokumen sudah dilampirkan ke kegiatan oleh dosen ini</TooltipContent>
+                          </Tooltip>
+                        ) : (
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowRemoveDialog(d.id)} title="Hapus penerima">
                             <UserMinus className="w-3.5 h-3.5 text-red-500" />
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
