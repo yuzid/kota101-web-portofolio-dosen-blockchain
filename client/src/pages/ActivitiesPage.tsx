@@ -117,8 +117,8 @@ export function ActivitiesPage() {
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      if (dateFrom) params.append('tanggalAwal', dateFrom.toISOString());
-      if (dateTo) params.append('tanggalAkhir', dateTo.toISOString());
+      if (dateFrom) params.append('tanggalAwal', format(dateFrom, 'yyyy-MM-dd'));
+      if (dateTo) params.append('tanggalAkhir', format(dateTo, 'yyyy-MM-dd'));
       const qs = params.toString();
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan${qs ? '?' + qs : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }

@@ -200,8 +200,8 @@ export function AcademicRoleActivitiesPage() {
       if (activeTab !== 'semua') params.append('jenis', activeTab);
       if (isKajur && filterProdi !== 'all') params.append('prodiId', filterProdi);
       if (filterKelengkapan !== 'all') params.append('status', filterKelengkapan);
-      if (filterDateFrom) params.append('tanggalAwal', filterDateFrom.toISOString());
-      if (filterDateTo) params.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterDateFrom) params.append('tanggalAwal', format(filterDateFrom, 'yyyy-MM-dd'));
+      if (filterDateTo) params.append('tanggalAkhir', format(filterDateTo, 'yyyy-MM-dd'));
       if (filterSemester !== 'all') params.append('semester', filterSemester);
       if (filterTahunAkademik !== 'all') params.append('periode', filterTahunAkademik);
 
@@ -225,8 +225,8 @@ export function AcademicRoleActivitiesPage() {
       if (searchTerm) statsParams.append('search', searchTerm);
       if (isKajur && filterProdi !== 'all') statsParams.append('prodiId', filterProdi);
       if (filterKelengkapan !== 'all') statsParams.append('status', filterKelengkapan);
-      if (filterDateFrom) statsParams.append('tanggalAwal', filterDateFrom.toISOString());
-      if (filterDateTo) statsParams.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterDateFrom) statsParams.append('tanggalAwal', format(filterDateFrom, 'yyyy-MM-dd'));
+      if (filterDateTo) statsParams.append('tanggalAkhir', format(filterDateTo, 'yyyy-MM-dd'));
       if (filterSemester !== 'all') statsParams.append('semester', filterSemester);
       if (filterTahunAkademik !== 'all') statsParams.append('periode', filterTahunAkademik);
 
@@ -382,8 +382,8 @@ export function AcademicRoleActivitiesPage() {
     setIsSubmittingRekap(true);
     try {
       const params = new URLSearchParams({ page: '1', size: '1000' });
-      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
-      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', rekapForm.tanggalAwal);
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', rekapForm.tanggalAkhir);
       if (rekapForm.jenisTridharma.length > 0) {
         rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
       }
@@ -434,8 +434,8 @@ export function AcademicRoleActivitiesPage() {
     setHasPreviewed(true);
     try {
       const params = new URLSearchParams({ page: '1', size: '1000' });
-      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
-      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', rekapForm.tanggalAwal);
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', rekapForm.tanggalAkhir);
       if (rekapForm.jenisTridharma.length > 0) {
         rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
       }
