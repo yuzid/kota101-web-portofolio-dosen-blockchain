@@ -114,6 +114,7 @@ export class AkademikRoleController {
 
       res.status(200).json({ status: 'success', data: result });
     } catch (error: any) {
+      console.error('[getProdiActivities]', error);
       res.status(500).json({ status: 'error', error: error.message });
     }
   };
@@ -191,6 +192,7 @@ export class AkademikRoleController {
       const result = await this.activityRepository.findProdiSummaryStats(jabatan.program_studi_id, filter);
       res.status(200).json({ status: 'success', data: result });
     } catch (error: any) {
+      console.error('[getProdiSummaryStats]', error);
       res.status(500).json({ status: 'error', error: error.message });
     }
   };

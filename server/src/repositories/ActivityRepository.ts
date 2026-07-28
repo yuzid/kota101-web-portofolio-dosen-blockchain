@@ -37,6 +37,15 @@ export class ActivityRepository {
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
+    let matchingDosenIds: string[] = [];
+    if (search) {
+      const matches = await prisma.dosen.findMany({
+        where: { nama: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      matchingDosenIds = matches.map(d => d.id);
+    }
+
     const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
@@ -65,13 +74,11 @@ export class ActivityRepository {
     ];
 
     if (search) {
-      where.AND.push({
-        OR: [
-          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-        ],
-      });
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
+      ];
     }
 
     if (tanggalAkhir) {
@@ -115,6 +122,15 @@ export class ActivityRepository {
     const { page, size } = pageRequest;
     const skip = (page - 1) * size;
 
+    let matchingDosenIds: string[] = [];
+    if (search) {
+      const matches = await prisma.dosen.findMany({
+        where: { nama: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      matchingDosenIds = matches.map(d => d.id);
+    }
+
     const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
@@ -141,13 +157,11 @@ export class ActivityRepository {
     ];
 
     if (search) {
-      where.AND.push({
-        OR: [
-          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-        ],
-      });
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
+      ];
     }
 
     if (tanggalAkhir) {
@@ -207,6 +221,15 @@ export class ActivityRepository {
   async findJurusanSummaryStats(jurusanId: string, filter: KegiatanFilter) {
     const { prodiId, dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
+    let matchingDosenIds: string[] = [];
+    if (search) {
+      const matches = await prisma.dosen.findMany({
+        where: { nama: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      matchingDosenIds = matches.map(d => d.id);
+    }
+
     const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
@@ -227,13 +250,11 @@ export class ActivityRepository {
     ];
 
     if (search) {
-      where.AND.push({
-        OR: [
-          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-        ],
-      });
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
+      ];
     }
 
     if (tanggalAkhir) {
@@ -263,6 +284,15 @@ export class ActivityRepository {
   async findProdiSummaryStats(prodiId: string, filter: KegiatanFilter) {
     const { dosenId, tanggalAwal, tanggalAkhir, search, status, periode, semester } = filter;
 
+    let matchingDosenIds: string[] = [];
+    if (search) {
+      const matches = await prisma.dosen.findMany({
+        where: { nama: { contains: search, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      matchingDosenIds = matches.map(d => d.id);
+    }
+
     const where: any = {};
 
     if (dosenId) where.dosen_id = dosenId;
@@ -281,13 +311,11 @@ export class ActivityRepository {
     ];
 
     if (search) {
-      where.AND.push({
-        OR: [
-          { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-          { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
-          { dosen: { nama: { contains: search, mode: 'insensitive' } } },
-        ],
-      });
+      where.OR = [
+        { nama_kegiatan: { contains: search, mode: 'insensitive' } },
+        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
+        ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
+      ];
     }
 
     if (tanggalAkhir) {
