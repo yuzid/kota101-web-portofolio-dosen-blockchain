@@ -70,6 +70,7 @@ import {
   Plus,
   ArrowUp,
   ArrowDown,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
@@ -522,51 +523,59 @@ export function AcademicRoleActivitiesPage() {
          </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Kegiatan
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total Kegiatan</CardTitle>
               <Activity className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{total}</div>
+              <div className="text-2xl font-bold">{counts.semua}</div>
               <p className="text-xs text-muted-foreground">Kegiatan ditemukan</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Halaman Saat Ini
-              </CardTitle>
-              <CheckCircle className="w-4 h-4 text-green-500" />
+              <CardTitle className="text-sm font-medium">Pendidikan</CardTitle>
+              <Activity className="w-4 h-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {activities.length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Kegiatan ditampilkan
-              </p>
+              <div className="text-2xl font-bold text-blue-600">{counts.PENDIDIKAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Halaman
-              </CardTitle>
-              <AlertCircle className="w-4 h-4 text-blue-500" />
+              <CardTitle className="text-sm font-medium">Penelitian</CardTitle>
+              <Activity className="w-4 h-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {totalPages}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Data terpaginasi
-              </p>
+              <div className="text-2xl font-bold text-green-600">{counts.PENELITIAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Pengabdian</CardTitle>
+              <Activity className="w-4 h-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{counts.PENGABDIAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Tugas Tambahan</CardTitle>
+              <Briefcase className="w-4 h-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{counts.TUGAS_TAMBAHAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
             </CardContent>
           </Card>
         </div>
@@ -614,7 +623,7 @@ export function AcademicRoleActivitiesPage() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="Cari nama kegiatan, dosen, atau jenis kegiatan..."
+                      placeholder="Cari nama kegiatan atau nama dosen..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9"
