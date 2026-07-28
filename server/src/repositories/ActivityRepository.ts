@@ -76,7 +76,6 @@ export class ActivityRepository {
     if (search) {
       where.OR = [
         { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
         ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
       ];
     }
@@ -159,7 +158,6 @@ export class ActivityRepository {
     if (search) {
       where.OR = [
         { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
         ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
       ];
     }
@@ -252,7 +250,6 @@ export class ActivityRepository {
     if (search) {
       where.OR = [
         { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
         ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
       ];
     }
@@ -313,7 +310,6 @@ export class ActivityRepository {
     if (search) {
       where.OR = [
         { nama_kegiatan: { contains: search, mode: 'insensitive' } },
-        { jenis_kegiatan: { contains: search, mode: 'insensitive' } },
         ...(matchingDosenIds.length > 0 ? [{ dosen_id: { in: matchingDosenIds } }] : []),
       ];
     }
