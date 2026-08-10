@@ -123,7 +123,7 @@ const activityFieldLabels: Record<string, string> = {
   tanggal_selesai: "Tanggal Selesai",
   tahun_akademik: "Tahun Akademik",
   semester: "Semester",
-  jenis_bukti: "Tipe Bukti",
+  jenis_bukti: "Jenis Bukti",
   program_studi: "Program Studi",
 };
 

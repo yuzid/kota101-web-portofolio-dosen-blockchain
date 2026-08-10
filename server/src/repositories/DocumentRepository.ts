@@ -22,7 +22,8 @@ export class DocumentRepository {
             },
             highlights: {
               select: { id: true }
-            }
+            },
+            kegiatan_id: true
           }
         }
       },

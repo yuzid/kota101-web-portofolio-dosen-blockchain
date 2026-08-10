@@ -50,6 +50,7 @@ import {
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -346,7 +347,7 @@ export function ActivityFormPage() {
         toast.success(isEdit ? "Kegiatan berhasil diperbarui." : "Kegiatan berhasil dicatat.");
         navigate(isEdit ? `/activities/${id}` : "/activities");
       } else {
-        toast.error(result.error || 'Gagal menyimpan kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menyimpan kegiatan');
       }
     } catch (error) {
       toast.error('Terjadi kesalahan saat menyimpan');
@@ -367,7 +368,7 @@ export function ActivityFormPage() {
         toast.success(`Kegiatan berhasil dihapus.`);
         navigate("/activities");
       } else {
-        toast.error(result.error || 'Gagal menghapus kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menghapus kegiatan');
       }
     } catch (error) {
       if (isEdit && id) {
@@ -467,7 +468,7 @@ export function ActivityFormPage() {
           }
           toast.success('Dokumen berhasil diupload');
         } else {
-          toast.error(result.error || 'Gagal upload dokumen');
+          toast.error(result.error ? sanitizeError(result.error) : 'Gagal upload dokumen');
         }
       } catch (error) {
         toast.error('Gagal upload dokumen');
@@ -762,7 +763,7 @@ export function ActivityFormPage() {
               </div>
               <div className="flex gap-2">
                 {isCurrentUserPencatat && (
-                   <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                   <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Ketua</Badge>
                  )}
               </div>
             </div>
@@ -870,7 +871,7 @@ export function ActivityFormPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {d.isPencatat ? (
-                         <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pembuat</Badge>
+                         <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">Ketua</Badge>
                        ) : (
                          <Badge variant="secondary">Anggota</Badge>
                        )}
@@ -917,7 +918,7 @@ export function ActivityFormPage() {
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">Bukti Diunggah Masing-Masing</p>
+                    <p className="font-medium">Bukti Per Individu</p>
                     <p className="text-sm text-muted-foreground">
                       Setiap dosen mengupload dokumen bukti secara mandiri
                     </p>
@@ -935,7 +936,7 @@ export function ActivityFormPage() {
                     )}
                   </div>
                   <div>
-                    <p className="font-medium">Bukti Bersama</p>
+                    <p className="font-medium">Bukti Per Kelompok</p>
                     <p className="text-sm text-muted-foreground">
                       Satu dokumen yang digunakan bersama untuk seluruh anggota kegiatan
                     </p>

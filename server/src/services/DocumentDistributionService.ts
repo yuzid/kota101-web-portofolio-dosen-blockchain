@@ -170,7 +170,11 @@ export class DocumentDistributionService {
         const distribusi = await this.distributionRepository.findByDokumen(
           doc.id
         );
-        return { ...doc, distribusi };
+        return {
+          ...doc,
+          terikatKegiatan: doc.kepemilikan?.some((k: any) => k.kegiatan_id !== null) ?? false,
+          distribusi,
+        };
       })
     );
 
@@ -267,21 +271,9 @@ export class DocumentDistributionService {
     const distribusi = await this.distributionRepository.findById(distribusiId);
     if (!distribusi) throw new Error("Distribusi tidak ditemukan.");
 
-    // Guard 1: Status penerima yang ingin dihapus harus menunggu atau ditolak
-    if (distribusi.status === "DISETUJUI") {
+    if (distribusi.kegiatan_id) {
       throw new Error(
-        "Penerima tidak dapat dihapus karena sudah menyetujui dokumen ini."
-      );
-    }
-
-    // Guard 2: Tidak boleh ada penerima lain dari dokumen yang sama yang sudah menyetujui (diterima)
-    const allDistributions = await this.distributionRepository.findByDokumen(
-      distribusi.dokumen_id
-    );
-    const hasAnyAccepted = allDistributions.some((d) => d.status === "DISETUJUI");
-    if (hasAnyAccepted) {
-      throw new Error(
-        "Penerima tidak dapat dihapus karena dokumen sudah disetujui oleh salah satu penerima."
+        "Penerima tidak dapat dihapus karena dokumen ini sudah dilampirkan ke kegiatan oleh dosen tersebut."
       );
     }
 

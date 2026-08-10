@@ -68,10 +68,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  ArrowUp,
+  ArrowDown,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { createRekap } from "../lib/rekapStorage";
 import {
   setMonitoringActivityDetail,
@@ -97,7 +101,7 @@ interface Activity {
     }
   };
   partisipasi: any[];
-  lampiran_bukti: any[];
+  kepemilikan_dokumen: any[];
 }
 
 export function AcademicRoleActivitiesPage() {
@@ -105,17 +109,16 @@ export function AcademicRoleActivitiesPage() {
   const location = useLocation();
   const { user } = useAuth();
   
-  // State from AMIRecapPage structure
   const [activeTab, setActiveTab] = useState("semua");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterProdi, setFilterProdi] = useState("all");
-  const [filterDosen, setFilterDosen] = useState("all");
-  const [filterKategori, setFilterKategori] = useState("all");
   const [filterKelengkapan, setFilterKelengkapan] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
   const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
   const [filterSemester, setFilterSemester] = useState("all");
   const [filterTahunAkademik, setFilterTahunAkademik] = useState("all");
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggal_mulai");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Pagination and data state
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -134,13 +137,11 @@ export function AcademicRoleActivitiesPage() {
   });
   
   // Filter options
-  const [dosenList, setDosenList] = useState<{id: string, nama: string}[]>([]);
   const [prodiList, setProdiList] = useState<{id: string, nama: string}[]>([]);
-  const [kategoriList, setKategoriList] = useState<string[]>([]);
 
   // Rekap modal state
   const [showRekapModal, setShowRekapModal] = useState(false);
-  const [rekapForm, setRekapForm] = useState({ nama: '', tanggalPerekapan: '', tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [] as string[], kategori: [] as string[] });
+  const [rekapForm, setRekapForm] = useState({ nama: '', tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [] as string[], kategori: [] as string[] });
   const [isSubmittingRekap, setIsSubmittingRekap] = useState(false);
   const [previewData, setPreviewData] = useState<Activity[]>([]);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -170,24 +171,10 @@ export function AcademicRoleActivitiesPage() {
 
   useEffect(() => {
     fetchActivities();
-  }, [page, size, activeTab, filterProdi, filterDosen, filterKategori, filterKelengkapan, filterDateFrom, filterDateTo, filterSemester, filterTahunAkademik]);
+  }, [searchTerm, page, size, activeTab, filterProdi, filterKelengkapan, filterDateFrom, filterDateTo, filterSemester, filterTahunAkademik]);
 
   const fetchFilterOptions = async () => {
     try {
-      // Fetch Dosen
-      const dResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users?role=dosen&status=active`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const dResult = await dResponse.json();
-      if (dResult.status === 'success') {
-        setDosenList(dResult.data
-          .filter((u: any) => u.status === "active")
-          .map((u: any) => ({ 
-            id: u.id, 
-            nama: u.dosen?.nama || u.admin?.nama || u.tata_usaha?.nama || u.email 
-          })));
-      }
-
       // Fetch Prodi
       const pResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/akademik/prodi`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -196,13 +183,6 @@ export function AcademicRoleActivitiesPage() {
       if (pResult.status === 'success') {
         setProdiList(pResult.data.map((p: any) => ({ id: p.id, nama: p.nama_prodi })));
       }
-
-      // Kategori are fixed but could be dynamic
-      setKategoriList([
-        "PENGAJARAN", "BAHAN_AJAR", "BIMBINGAN_MAHASISWA", 
-        "PENELITIAN", "PUBLIKASI_KARYA", "PATEN", 
-        "PENGABDIAN", "TUGAS_TAMBAHAN"
-      ]);
     } catch (error) {
       console.error('Gagal mengambil opsi filter', error);
     }
@@ -219,11 +199,9 @@ export function AcademicRoleActivitiesPage() {
       if (searchTerm) params.append('search', searchTerm);
       if (activeTab !== 'semua') params.append('jenis', activeTab);
       if (isKajur && filterProdi !== 'all') params.append('prodiId', filterProdi);
-      if (filterDosen !== 'all') params.append('dosenId', filterDosen);
-      if (filterKategori !== 'all') params.append('kategori', filterKategori);
       if (filterKelengkapan !== 'all') params.append('status', filterKelengkapan);
-      if (filterDateFrom) params.append('tanggalAwal', filterDateFrom.toISOString());
-      if (filterDateTo) params.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterDateFrom) params.append('tanggalAwal', format(filterDateFrom, 'yyyy-MM-dd'));
+      if (filterDateTo) params.append('tanggalAkhir', format(filterDateTo, 'yyyy-MM-dd'));
       if (filterSemester !== 'all') params.append('semester', filterSemester);
       if (filterTahunAkademik !== 'all') params.append('periode', filterTahunAkademik);
 
@@ -239,18 +217,16 @@ export function AcademicRoleActivitiesPage() {
         setTotal(result.data.total);
         setTotalPages(result.data.totalPages);
       } else {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
       }
 
       // Fetch Stats for badges
       const statsParams = new URLSearchParams();
       if (searchTerm) statsParams.append('search', searchTerm);
       if (isKajur && filterProdi !== 'all') statsParams.append('prodiId', filterProdi);
-      if (filterDosen !== 'all') statsParams.append('dosenId', filterDosen);
-      if (filterKategori !== 'all') statsParams.append('kategori', filterKategori);
       if (filterKelengkapan !== 'all') statsParams.append('status', filterKelengkapan);
-      if (filterDateFrom) statsParams.append('tanggalAwal', filterDateFrom.toISOString());
-      if (filterDateTo) statsParams.append('tanggalAkhir', filterDateTo.toISOString());
+      if (filterDateFrom) statsParams.append('tanggalAwal', format(filterDateFrom, 'yyyy-MM-dd'));
+      if (filterDateTo) statsParams.append('tanggalAkhir', format(filterDateTo, 'yyyy-MM-dd'));
       if (filterSemester !== 'all') statsParams.append('semester', filterSemester);
       if (filterTahunAkademik !== 'all') statsParams.append('periode', filterTahunAkademik);
 
@@ -286,7 +262,7 @@ export function AcademicRoleActivitiesPage() {
 
   const getKelengkapanBadge = (activity: Activity) => {
     // Logic: Lengkap jika ada minimal 1 lampiran bukti
-    const isLengkap = activity.lampiran_bukti.length > 0;
+    const isLengkap = (activity.kepemilikan_dokumen?.length ?? 0) > 0;
     if (isLengkap) {
       return (
         <Badge variant="outline" className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
@@ -306,8 +282,6 @@ export function AcademicRoleActivitiesPage() {
   const hasActiveFilters =
     searchTerm !== "" ||
     filterProdi !== "all" ||
-    filterDosen !== "all" ||
-    filterKategori !== "all" ||
     filterKelengkapan !== "all" ||
     filterDateFrom ||
     filterDateTo ||
@@ -338,8 +312,6 @@ export function AcademicRoleActivitiesPage() {
   const resetFilters = () => {
     setSearchTerm("");
     setFilterProdi("all");
-    setFilterDosen("all");
-    setFilterKategori("all");
     setFilterKelengkapan("all");
     setFilterDateFrom(undefined);
     setFilterDateTo(undefined);
@@ -348,8 +320,54 @@ export function AcademicRoleActivitiesPage() {
     setPage(1);
   };
 
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
+
+  const sortedActivities = [...activities].sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+    switch (sortColumn) {
+      case "nama_kegiatan":
+        aVal = a.nama_kegiatan.toLowerCase();
+        bVal = b.nama_kegiatan.toLowerCase();
+        break;
+      case "dosen":
+        aVal = a.dosen.nama.toLowerCase();
+        bVal = b.dosen.nama.toLowerCase();
+        break;
+      case "kategori_tridharma":
+        aVal = a.kategori_tridharma.toLowerCase();
+        bVal = b.kategori_tridharma.toLowerCase();
+        break;
+      case "periode":
+        aVal = a.periode.toLowerCase();
+        bVal = b.periode.toLowerCase();
+        break;
+      case "tanggal_mulai":
+        aVal = new Date(a.tanggal_mulai).getTime();
+        bVal = new Date(b.tanggal_mulai).getTime();
+        break;
+    }
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  });
+
   const openRekapModal = () => {
-    setRekapForm({ nama: '', tanggalPerekapan: new Date().toISOString().split('T')[0], tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [], kategori: [] });
+    setRekapForm({ nama: '', tanggalAwal: '', tanggalAkhir: '', jenisTridharma: [], kategori: [] });
     setPreviewData([]);
     setHasPreviewed(false);
     setShowRekapModal(true);
@@ -360,16 +378,12 @@ export function AcademicRoleActivitiesPage() {
       toast.error('Nama rekap harus diisi');
       return;
     }
-    if (!rekapForm.tanggalPerekapan) {
-      toast.error('Tanggal perekapan harus diisi');
-      return;
-    }
 
     setIsSubmittingRekap(true);
     try {
       const params = new URLSearchParams({ page: '1', size: '1000' });
-      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
-      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', rekapForm.tanggalAwal);
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', rekapForm.tanggalAkhir);
       if (rekapForm.jenisTridharma.length > 0) {
         rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
       }
@@ -384,7 +398,7 @@ export function AcademicRoleActivitiesPage() {
       const result = await response.json();
 
       if (result.status !== 'success') {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
         return;
       }
 
@@ -396,7 +410,7 @@ export function AcademicRoleActivitiesPage() {
 
       const rekap = await createRekap({
         nama: rekapForm.nama.trim(),
-        tanggalPerekapan: rekapForm.tanggalPerekapan,
+        tanggalPerekapan: new Date().toISOString().split('T')[0],
         filter: {
           tanggalAwal: rekapForm.tanggalAwal || undefined,
           tanggalAkhir: rekapForm.tanggalAkhir || undefined,
@@ -420,8 +434,8 @@ export function AcademicRoleActivitiesPage() {
     setHasPreviewed(true);
     try {
       const params = new URLSearchParams({ page: '1', size: '1000' });
-      if (rekapForm.tanggalAwal) params.append('tanggalAwal', new Date(rekapForm.tanggalAwal).toISOString());
-      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', new Date(rekapForm.tanggalAkhir).toISOString());
+      if (rekapForm.tanggalAwal) params.append('tanggalAwal', rekapForm.tanggalAwal);
+      if (rekapForm.tanggalAkhir) params.append('tanggalAkhir', rekapForm.tanggalAkhir);
       if (rekapForm.jenisTridharma.length > 0) {
         rekapForm.jenisTridharma.forEach(j => params.append('jenis', j));
       }
@@ -437,7 +451,7 @@ export function AcademicRoleActivitiesPage() {
       if (result.status === 'success') {
         setPreviewData(result.data.data);
       } else {
-        toast.error(result.error || 'Gagal memuat preview');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal memuat preview');
       }
     } catch {
       toast.error('Terjadi kesalahan saat memuat preview');
@@ -483,7 +497,7 @@ export function AcademicRoleActivitiesPage() {
           transition={{ duration: 0.4, ease: "easeOut" }}
         >
         <div className="space-y-4">
-         {/* Header from AMIRecapPage */}
+         {/* Header */}
          <div className="flex justify-between items-center">
            <div>
              <h2 className="text-2xl font-bold">Monitoring Kegiatan</h2>
@@ -497,7 +511,7 @@ export function AcademicRoleActivitiesPage() {
           </RippleButton>
         </div>
 
-        {/* Info Banner from AMIRecapPage */}
+        {/* Info Banner */}
         <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm">
            <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
              ℹ️ Tentang Status Kelengkapan:
@@ -508,57 +522,65 @@ export function AcademicRoleActivitiesPage() {
            </p>
          </div>
 
-        {/* Stats Cards from AMIRecapPage (Placeholder counts based on current list or simple logic) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Kegiatan
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total Kegiatan</CardTitle>
               <Activity className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{total}</div>
+              <div className="text-2xl font-bold">{counts.semua}</div>
               <p className="text-xs text-muted-foreground">Kegiatan ditemukan</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Halaman Saat Ini
-              </CardTitle>
-              <CheckCircle className="w-4 h-4 text-green-500" />
+              <CardTitle className="text-sm font-medium">Pendidikan</CardTitle>
+              <Activity className="w-4 h-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {activities.length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Kegiatan ditampilkan
-              </p>
+              <div className="text-2xl font-bold text-blue-600">{counts.PENDIDIKAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Halaman
-              </CardTitle>
-              <AlertCircle className="w-4 h-4 text-blue-500" />
+              <CardTitle className="text-sm font-medium">Penelitian</CardTitle>
+              <Activity className="w-4 h-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {totalPages}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Data terpaginasi
-              </p>
+              <div className="text-2xl font-bold text-green-600">{counts.PENELITIAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Pengabdian</CardTitle>
+              <Activity className="w-4 h-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{counts.PENGABDIAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Tugas Tambahan</CardTitle>
+              <Briefcase className="w-4 h-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{counts.TUGAS_TAMBAHAN}</div>
+              <p className="text-xs text-muted-foreground">Kegiatan</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content from AMIRecapPage */}
+        {/* Main Content */}
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setPage(1); }}>
           <TabsList>
             <TabsTrigger value="semua">
@@ -594,32 +616,20 @@ export function AcademicRoleActivitiesPage() {
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4 mt-4">
-            {/* Filters from AMIRecapPage */}
+            {/* Filters */}
             <div className="space-y-3">
               <div className="flex flex-wrap gap-3">
                 <div className="flex-1 min-w-[250px]">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="Cari kegiatan atau dosen..."
+                      placeholder="Cari nama kegiatan atau nama dosen..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-9"
                     />
                   </div>
                 </div>
-
-                <Select value={filterDosen} onValueChange={setFilterDosen}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Dosen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Dosen</SelectItem>
-                    {dosenList.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.nama}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
 
                 <Popover>
                   <PopoverTrigger asChild>
@@ -689,21 +699,6 @@ export function AcademicRoleActivitiesPage() {
                 )}
 
                 <Select
-                  value={filterKategori}
-                  onValueChange={setFilterKategori}
-                >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="Kategori Kegiatan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Kategori</SelectItem>
-                    {kategoriList.map((k) => (
-                      <SelectItem key={k} value={k}>{formatCategory(k)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
                   value={filterKelengkapan}
                   onValueChange={setFilterKelengkapan}
                 >
@@ -748,16 +743,24 @@ export function AcademicRoleActivitiesPage() {
               </div>
             </div>
 
-            {/* Table from AMIRecapPage */}
+            {/* Table */}
             <div className="border rounded-lg bg-background overflow-x-auto">
               <Table className="table-fixed">
-                <TableHeader>
+                    <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[26%]">Nama Kegiatan</TableHead>
-                    <TableHead className="w-[16%]">Pencatat</TableHead>
+                    <TableHead className="w-[26%] cursor-pointer select-none" onClick={() => handleSort("nama_kegiatan")}>
+                      Nama Kegiatan <SortIcon column="nama_kegiatan" />
+                    </TableHead>
+                    <TableHead className="w-[16%] cursor-pointer select-none" onClick={() => handleSort("dosen")}>
+                      Pencatat <SortIcon column="dosen" />
+                    </TableHead>
                     {isKajur && <TableHead className="w-[14%]">Program Studi</TableHead>}
-                    <TableHead className="w-[14%]">Kategori</TableHead>
-                    <TableHead className="w-[130px]">Periode</TableHead>
+                    <TableHead className="w-[14%] cursor-pointer select-none" onClick={() => handleSort("kategori_tridharma")}>
+                      Kategori <SortIcon column="kategori_tridharma" />
+                    </TableHead>
+                    <TableHead className="w-[130px] cursor-pointer select-none" onClick={() => handleSort("periode")}>
+                      Periode <SortIcon column="periode" />
+                    </TableHead>
                     <TableHead className="w-[80px] text-center">Anggota</TableHead>
                     <TableHead className="w-[80px] text-center">Dokumen</TableHead>
                     <TableHead className="w-[110px] text-center">Kelengkapan</TableHead>
@@ -772,7 +775,7 @@ export function AcademicRoleActivitiesPage() {
                         <p className="mt-2 text-muted-foreground">Memuat data monitoring...</p>
                       </TableCell>
                     </TableRow>
-                  ) : activities.length === 0 ? (
+                  ) : sortedActivities.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={isKajur ? 9 : 8}
@@ -794,7 +797,7 @@ export function AcademicRoleActivitiesPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    activities.map((activity) => (
+                    sortedActivities.map((activity) => (
                       <TableRow key={activity.id}>
                         <TableCell className="w-[26%]">
                           <Tooltip>
@@ -843,13 +846,13 @@ export function AcademicRoleActivitiesPage() {
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <Users className="w-3 h-3 mr-1" />
-                            {activity.partisipasi.length}
+                            {activity.partisipasi?.filter((p: any) => p.dosen_id !== activity.dosen_id).length ?? 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline">
                             <FileText className="w-3 h-3 mr-1" />
-                            {activity.lampiran_bukti.length}
+                            {activity.kepemilikan_dokumen?.length ?? 0}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
@@ -887,7 +890,7 @@ export function AcademicRoleActivitiesPage() {
                     </CardContent>
                   </Card>
                 ))
-              ) : activities.length === 0 ? (
+              ) : sortedActivities.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
                   <Activity className="w-8 h-8" />
                   <p className="text-sm">Tidak ada kegiatan yang sesuai dengan filter</p>
@@ -898,7 +901,7 @@ export function AcademicRoleActivitiesPage() {
                   )}
                 </div>
               ) : (
-                activities.map((activity) => (
+                sortedActivities.map((activity) => (
                   <Card key={activity.id} className="overflow-hidden">
                     <CardContent className="p-4">
                       <div className="flex items-start gap-3">
@@ -940,11 +943,11 @@ export function AcademicRoleActivitiesPage() {
                           <div className="flex items-center gap-2 text-xs">
                             <Badge variant="outline" className="text-xs">
                               <Users className="w-3 h-3 mr-1" />
-                              {activity.partisipasi.length}
+                              {activity.partisipasi?.filter((p: any) => p.dosen_id !== activity.dosen_id).length ?? 0}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               <FileText className="w-3 h-3 mr-1" />
-                              {activity.lampiran_bukti.length}
+                              {activity.kepemilikan_dokumen?.length ?? 0}
                             </Badge>
                             {getKelengkapanBadge(activity)}
                           </div>
@@ -1015,14 +1018,8 @@ export function AcademicRoleActivitiesPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="rekap-tanggal" className="text-sm font-semibold">Tanggal Perekapan *</Label>
-                <Input
-                  id="rekap-tanggal"
-                  type="date"
-                  value={rekapForm.tanggalPerekapan}
-                  onChange={(e) => setRekapForm({ ...rekapForm, tanggalPerekapan: e.target.value })}
-                  className="border-muted-foreground/20"
-                />
+                <Label className="text-sm font-semibold">Tanggal Perekapan</Label>
+                <p className="text-sm text-muted-foreground">{format(new Date(), "dd MMMM yyyy")}</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

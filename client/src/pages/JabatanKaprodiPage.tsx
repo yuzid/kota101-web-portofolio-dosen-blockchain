@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Button } from "../components/ui/button";
 import { RippleButton } from "../components/ui/ripple-button";
@@ -40,7 +40,6 @@ import {
   X,
   Loader2,
   GraduationCap,
-  Filter,
   MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -103,8 +102,6 @@ export function JabatanKaprodiPage() {
   const [prodis, setProdis] = useState<Prodi[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterProdi, setFilterProdi] = useState("all");
-  const [showFilters, setShowFilters] = useState(false);
 
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -195,15 +192,12 @@ export function JabatanKaprodiPage() {
     const matchesSearch = dosenName
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesProdi =
-      filterProdi === "all" || item.program_studi_id === filterProdi;
-    return matchesSearch && matchesProdi;
+    return matchesSearch;
   });
 
-  const hasActiveFilters = searchTerm !== "" || filterProdi !== "all";
+  const hasActiveFilters = searchTerm !== "";
   const resetFilters = () => {
     setSearchTerm("");
-    setFilterProdi("all");
   };
 
   const openAddDialog = () => {
@@ -379,16 +373,6 @@ export function JabatanKaprodiPage() {
               />
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-9"
-            >
-              <Filter className="w-4 h-4 mr-1.5" />
-              Filter
-            </Button>
-
             {hasActiveFilters && (
               <Button
                 variant="ghost"
@@ -401,37 +385,6 @@ export function JabatanKaprodiPage() {
               </Button>
             )}
           </div>
-
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="pt-1 pb-2 flex flex-wrap gap-3">
-                  <Select
-                    value={filterProdi}
-                    onValueChange={setFilterProdi}
-                  >
-                    <SelectTrigger className="w-[220px]">
-                      <SelectValue placeholder="Program Studi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Prodi</SelectItem>
-                      {prodis.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nama_prodi}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         <motion.div layout className="border rounded-xl bg-card overflow-x-auto">

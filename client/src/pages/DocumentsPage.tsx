@@ -67,10 +67,13 @@ import {
   Download,
   AlertCircle,
   Files,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { getHighlightStatusByDokumenId, isHighlightMockMode } from "../services/highlightService";
 import { PageHeader } from "@/components/ui/page-header";
@@ -88,6 +91,7 @@ interface Document {
   asal: "tu" | "dosen";
   size: string;
   hasHighlight: boolean;
+  terikatKegiatan?: boolean;
 }
 
 interface PendingRequest {
@@ -108,7 +112,8 @@ export function DocumentsPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterJenis, setFilterJenis] = useState("all");
-  const [filterDateRange, setFilterDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggal");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -194,7 +199,7 @@ export function DocumentsPage() {
         setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
         fetchDosenDocuments();
       } else {
-        toast.error(result.error || "Gagal menerima dokumen.");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menerima dokumen.");
       }
     } catch {
       toast.error("Gagal menerima dokumen.");
@@ -216,7 +221,7 @@ export function DocumentsPage() {
         toast.success("Dokumen ditolak.");
         setPendingRequests(prev => prev.filter(p => p.dokumenId !== dokumenId));
       } else {
-        toast.error(result.error || "Gagal menolak dokumen.");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menolak dokumen.");
       }
     } catch {
       toast.error("Gagal menolak dokumen.");
@@ -237,18 +242,36 @@ export function DocumentsPage() {
       activeTab === "semua" ||
       (activeTab === "tu" && doc.asal === "tu") ||
       (activeTab === "dosen" && doc.asal === "dosen");
-    const matchesSearch = doc.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      doc.name.toLowerCase().includes(q);
     const matchesJenis = filterJenis === "all" || doc.jenis === filterJenis;
 
-    let matchesDate = true;
-    if (filterDateRange.from && filterDateRange.to) {
-      const docDate = new Date(doc.tanggal);
-      matchesDate = docDate >= filterDateRange.from && docDate <= filterDateRange.to;
+    return matchesTab && matchesSearch && matchesJenis;
+  }).sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+    switch (sortColumn) {
+      case "name":
+        aVal = a.name.toLowerCase();
+        bVal = b.name.toLowerCase();
+        break;
+      case "jenis":
+        aVal = a.jenis.toLowerCase();
+        bVal = b.jenis.toLowerCase();
+        break;
+      case "tanggal":
+        aVal = new Date(a.tanggal).getTime();
+        bVal = new Date(b.tanggal).getTime();
+        break;
+      case "asal":
+        aVal = a.asal.toLowerCase();
+        bVal = b.asal.toLowerCase();
+        break;
     }
-
-    return matchesTab && matchesSearch && matchesJenis && matchesDate;
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
   });
 
   const counts = {
@@ -259,14 +282,27 @@ export function DocumentsPage() {
 
   const hasActiveFilters =
     searchTerm !== "" ||
-    filterJenis !== "all" ||
-    filterDateRange.from ||
-    filterDateRange.to;
+    filterJenis !== "all";
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
+  };
 
   const resetFilters = () => {
     setSearchTerm("");
     setFilterJenis("all");
-    setFilterDateRange({});
   };
 
   const handleUpload = async () => {
@@ -298,7 +334,7 @@ export function DocumentsPage() {
       });
 
       const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
+      if (!response.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengunggah dokumen.");
 
       setShowUploadDialog(false);
       setSelectedFile(null);
@@ -313,7 +349,7 @@ export function DocumentsPage() {
         fetchDosenDocuments();
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal mengunggah dokumen.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal mengunggah dokumen.");
     } finally {
       setIsSubmitting(false);
     }
@@ -329,14 +365,14 @@ export function DocumentsPage() {
       });
 
       const result = await response.json();
-      if (!response.ok || result.status === "error") throw new Error(result.error);
+      if (!response.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal memproses penghapusan.");
 
       toast.success("Dokumen berhasil dihapus.");
       setShowDeleteDialog(false);
       setSelectedDocument(null);
       fetchDosenDocuments();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memproses penghapusan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal memproses penghapusan.");
     }
   };
 
@@ -494,7 +530,7 @@ export function DocumentsPage() {
               <div className="relative flex-1 min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama dokumen..."
+                  placeholder="Cari berdasarkan nama dokumen..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 h-9"
@@ -562,7 +598,7 @@ export function DocumentsPage() {
                                 <DropdownMenuItem onClick={() => setShareDocument(doc)}>
                                   <Share2 className="w-3.5 h-3.5 mr-2" /> Bagikan
                                 </DropdownMenuItem>
-                                {doc.asal === "dosen" && (
+                                {doc.asal === "dosen" && !doc.terikatKegiatan && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">
@@ -621,15 +657,23 @@ export function DocumentsPage() {
                       <col className="w-20" />
                     </colgroup>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Nama Dokumen</TableHead>
-                        <TableHead>Jenis</TableHead>
-                        <TableHead>Tanggal</TableHead>
-                        <TableHead>Asal</TableHead>
-                        <TableHead className="text-center">Highlight</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                        <TableRow>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+                            Nama Dokumen <SortIcon column="name" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("jenis")}>
+                            Jenis <SortIcon column="jenis" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggal")}>
+                            Tanggal <SortIcon column="tanggal" />
+                          </TableHead>
+                          <TableHead className="cursor-pointer select-none" onClick={() => handleSort("asal")}>
+                            Asal <SortIcon column="asal" />
+                          </TableHead>
+                          <TableHead className="text-center">Highlight</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {filteredDocuments.map((doc) => (
                         <AnimatedTableRow key={doc.id}>
@@ -669,7 +713,7 @@ export function DocumentsPage() {
                                 <DropdownMenuItem onClick={() => setShareDocument(doc)}>
                                   <Share2 className="w-4 h-4 mr-2" /> Bagikan
                                 </DropdownMenuItem>
-                                {doc.asal === "dosen" && (
+                                {doc.asal === "dosen" && !doc.terikatKegiatan && (
                                   <>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={() => { setSelectedDocument(doc); setShowDeleteDialog(true); }} className="text-destructive">

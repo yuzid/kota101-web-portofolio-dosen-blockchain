@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { Button } from "../components/ui/button";
 import { EmptyState } from "../components/ui/empty-state";
 import { Badge } from "../components/ui/badge";
@@ -10,6 +12,7 @@ import { Avatar, AvatarFallback } from "../components/ui/avatar";
 import { Progress } from "../components/ui/progress";
 import { Separator } from "../components/ui/separator";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
+import { Tooltip, TooltipTrigger, TooltipContent } from "../components/ui/tooltip";
 import {
   ArrowLeft,
   Edit,
@@ -42,6 +45,7 @@ interface DistribusiItem {
   id: string;
   dosen_id: string;
   status: string;
+  kegiatan_id: string | null;
   tanggal_distribusi: string;
   tanggal_keputusan: string | null;
   dosen: {
@@ -135,7 +139,7 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Dokumen berhasil dihapus."); navigate("/document-distribution"); }
-      else toast.error(result.error || "Gagal menghapus dokumen.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus dokumen.");
     } catch { toast.error("Gagal menghapus dokumen."); }
   };
 
@@ -145,7 +149,7 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribusi/${distribusiId}/resend`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Dokumen berhasil dikirim ulang."); fetchDetail(); }
-      else toast.error(result.error || "Gagal mengirim ulang.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal mengirim ulang.");
     } catch { toast.error("Gagal mengirim ulang."); }
   };
 
@@ -155,22 +159,25 @@ export function DocumentDistributionDetailPage() {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/distribusi/${distribusiId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       const result = await res.json();
       if (result.status === "success") { toast.success("Penerima berhasil dihapus."); fetchDetail(); }
-      else toast.error(result.error || "Gagal menghapus penerima.");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus penerima.");
     } catch { toast.error("Gagal menghapus penerima."); }
   };
 
   const handleDownload = () => {
-    if (!fileUrl) return;
     const a = document.createElement("a");
-    a.href = fileUrl;
+    a.href = `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/content`;
     a.download = doc?.nama || "dokumen";
+    a.target = "_blank";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   const handleCopyLink = async () => {
     const link = doc?.file_path || `${import.meta.env.VITE_API_URL}/api/tatausaha/dokumen/${id}/preview`;
-    try { await navigator.clipboard.writeText(link); setCopied(true); toast.success("Link berhasil disalin"); setTimeout(() => setCopied(false), 2000); }
-    catch { toast.error("Gagal menyalin link"); }
+    const ok = await copyToClipboard(link);
+    if (ok) { setCopied(true); toast.success("Link berhasil disalin"); setTimeout(() => setCopied(false), 2000); }
+    else { toast.error("Gagal menyalin link"); }
   };
 
   useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);
@@ -232,7 +239,7 @@ export function DocumentDistributionDetailPage() {
             >
               <Edit className="w-4 h-4 mr-1.5" /> Edit Dokumen
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!fileUrl}>
+            <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="w-4 h-4 mr-1.5" /> Unduh
             </Button>
             <Button
@@ -252,7 +259,7 @@ export function DocumentDistributionDetailPage() {
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
               <p className="font-semibold mb-0.5">Dokumen Distribusi Dikunci</p>
-              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima.</p>
+              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima. Namun, dokumen tetap dapat diunduh.</p>
             </div>
           </div>
         )}
@@ -425,16 +432,27 @@ export function DocumentDistributionDetailPage() {
                           <span>{format(new Date(d.tanggal_distribusi), "dd MMM", { locale: localeId })}</span>
                         </div>
                       </div>
-                      {d.status === "DITOLAK" && (
-                        <div className="flex gap-0.5 shrink-0">
+                      <div className="flex gap-0.5 shrink-0">
+                        {d.status === "DITOLAK" && (
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowResendDialog(d.id)} title="Kirim ulang">
                             <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
                           </Button>
+                        )}
+                        {d.kegiatan_id ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-muted/50 cursor-not-allowed">
+                                <UserMinus className="w-3.5 h-3.5 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Dokumen sudah dilampirkan ke kegiatan oleh dosen ini</TooltipContent>
+                          </Tooltip>
+                        ) : (
                           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowRemoveDialog(d.id)} title="Hapus penerima">
                             <UserMinus className="w-3.5 h-3.5 text-red-500" />
                           </Button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

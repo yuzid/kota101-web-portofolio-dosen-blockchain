@@ -1,4 +1,5 @@
 import { apiFetch } from "../lib/api";
+import { sanitizeError } from "@/lib/errors";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -96,7 +97,7 @@ export async function getHighlightsByKepemilikanId(
   );
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal mengambil highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengambil highlight");
   }
   const highlights: Highlight[] = result.data || [];
   return { highlights, kepemilikanId: result.kepemilikanId || kepemilikanId };
@@ -116,7 +117,7 @@ export async function getHighlightsByDokumenId(
   );
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal mengambil highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengambil highlight");
   }
   const highlights: Highlight[] = result.data || [];
   const kepemilikanId: string | undefined = result.kepemilikanId;
@@ -159,7 +160,7 @@ export async function addHighlight(
   );
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal menambah highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal menambah highlight");
   }
   return result.data;
 }
@@ -200,7 +201,7 @@ export async function updateHighlight(
   });
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal mengupdate highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengupdate highlight");
   }
   return result.data;
 }
@@ -224,7 +225,7 @@ export async function deleteHighlight(id: string): Promise<void> {
   });
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal menghapus highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal menghapus highlight");
   }
 }
 
@@ -258,7 +259,7 @@ export async function syncHighlights(
   );
   const result = await response.json();
   if (!response.ok || result.status !== "success") {
-    throw new Error(result.error || "Gagal sinkronisasi highlight");
+    throw new Error(result.error ? sanitizeError(result.error) : "Gagal sinkronisasi highlight");
   }
   return result.data;
 }

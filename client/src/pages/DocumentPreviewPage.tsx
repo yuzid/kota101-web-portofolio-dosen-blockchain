@@ -68,6 +68,7 @@ import {
 import { Calendar } from "../components/ui/calendar";
 import { format } from "date-fns";
 import { cn, getAllJenisDokumen } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { DocumentSharing } from "../components/document/DocumentSharing";
 import { isHighlightMockMode } from "../services/highlightService";
 
@@ -83,6 +84,7 @@ interface DocumentPreview {
   jenis: string;
   sumber: string;
   ownershipStatus?: string | null;
+  terikatKegiatan?: boolean;
   tanggalUpload: string;
   contentType: string;
   size: number;
@@ -276,13 +278,13 @@ export function DocumentPreviewPage() {
         const previewResult = await previewResponse.json();
         if (!previewResponse.ok || previewResult.status !== "success") {
           throw new Error(
-            previewResult.error || "Gagal mengambil informasi dokumen",
+            previewResult.error ? sanitizeError(previewResult.error) : "Gagal mengambil informasi dokumen",
           );
         }
         if (!contentResponse.ok) {
           const contentResult = await contentResponse.json();
           throw new Error(
-            contentResult.error || "Gagal mengambil file dokumen",
+            contentResult.error ? sanitizeError(contentResult.error) : "Gagal mengambil file dokumen",
           );
         }
 
@@ -292,11 +294,8 @@ export function DocumentPreviewPage() {
         setServedHash(contentResponse.headers.get("X-Content-SHA256"));
         setFileUrl(objectUrl);
       } catch (loadError) {
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Gagal memuat dokumen",
-        );
+        const raw = loadError instanceof Error ? loadError.message : "Gagal memuat dokumen";
+        setError(sanitizeError(raw));
       } finally {
         setIsLoading(false);
       }
@@ -496,7 +495,7 @@ export function DocumentPreviewPage() {
         toast.success("Highlight berhasil diperbarui");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal memperbarui highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal memperbarui highlight");
       setHighlights((prev) =>
         prev.map((hl) =>
           hl.id === highlightId ? { ...hl, highlighted_text: "" } : hl,
@@ -517,7 +516,7 @@ export function DocumentPreviewPage() {
         toast.success("Highlight berhasil dihapus");
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal menghapus highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menghapus highlight");
       if (deletedHighlight) {
         setHighlights((prev) => [...prev, deletedHighlight]);
       }
@@ -548,7 +547,7 @@ export function DocumentPreviewPage() {
         await syncHighlights(kepemilikanId, syncData);
         toast.success("Highlight berhasil disimpan");
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Gagal menyimpan highlight");
+        toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menyimpan highlight");
       }
     }
     setAddMode((prev) => !prev);
@@ -564,7 +563,7 @@ export function DocumentPreviewPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
-      if (!res.ok || result.status === "error") throw new Error(result.error);
+      if (!res.ok || result.status === "error") throw new Error(result.error ? sanitizeError(result.error) : "Gagal menghapus dokumen.");
       toast.success("Dokumen berhasil dihapus.");
       navigate("/documents");
     } catch {
@@ -595,7 +594,7 @@ export function DocumentPreviewPage() {
       await syncHighlights(kepemilikanId, []);
       toast.success("Semua highlight berhasil dihapus");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal menghapus semua highlight");
+      toast.error(error instanceof Error ? sanitizeError(error.message) : "Gagal menghapus semua highlight");
     }
   };
 
@@ -627,7 +626,7 @@ export function DocumentPreviewPage() {
       });
       const metadataResult = await metadataRes.json();
       if (!metadataRes.ok || metadataResult.status === "error") {
-        throw new Error(metadataResult.error || "Gagal memperbarui metadata dokumen");
+        throw new Error(metadataResult.error ? sanitizeError(metadataResult.error) : "Gagal memperbarui metadata dokumen");
       }
 
       setDocument({ ...document, name: editForm.name, jenis: editForm.jenis, tanggalUpload: format(editForm.tanggal, "yyyy-MM-dd") });
@@ -635,7 +634,7 @@ export function DocumentPreviewPage() {
       setShowEditDialog(false);
       toast.success("Dokumen berhasil diperbarui.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan perubahan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal menyimpan perubahan.");
     } finally {
       setSaving(false);
     }
@@ -724,7 +723,7 @@ export function DocumentPreviewPage() {
                 Edit
               </Button>
             )}
-            {isDocumentOwner && document.sumber !== "TATA_USAHA" && (
+            {isDocumentOwner && document.sumber !== "TATA_USAHA" && !document.terikatKegiatan && (
               <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Hapus
@@ -771,7 +770,7 @@ export function DocumentPreviewPage() {
             </p>
           </div>
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Hash Database</p>
+            <p className="text-xs text-muted-foreground">Integritas File (SHA-256)</p>
             <p className="font-mono text-xs break-all">
               {document.databaseHash || "-"}
             </p>
@@ -855,7 +854,7 @@ export function DocumentPreviewPage() {
         {!document.contentMatchesDatabase && (
           <div className="flex items-center gap-3 border border-red-300 bg-red-50 p-3 text-sm text-red-900">
             <AlertCircle className="h-5 w-5 shrink-0" />
-            File di penyimpanan tidak sesuai dengan hash database.
+            File di penyimpanan tidak sesuai dengan integritas file.
           </div>
         )}
 

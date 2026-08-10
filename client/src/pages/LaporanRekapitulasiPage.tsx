@@ -41,9 +41,17 @@ import {
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  CalendarIcon,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
 import {
   listRekap,
   getRekap,
@@ -61,6 +69,8 @@ export function LaporanRekapitulasiPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
 
   const isKajur = location.pathname.includes("/monitoring/jurusan");
   const roleTitle = isKajur ? "Jurusan" : "Program Studi";
@@ -103,9 +113,9 @@ export function LaporanRekapitulasiPage() {
           aVal = a.nama.toLowerCase();
           bVal = b.nama.toLowerCase();
           break;
-        case "tanggalPerekapan":
-          aVal = a.tanggalPerekapan;
-          bVal = b.tanggalPerekapan;
+        case "periode":
+          aVal = a.filter?.tanggalAwal || "";
+          bVal = b.filter?.tanggalAwal || "";
           break;
         case "dibuatOleh":
           aVal = a.dibuatOleh.nama.toLowerCase();
@@ -133,12 +143,20 @@ export function LaporanRekapitulasiPage() {
   const filteredRekaps = sortData(
     rekaps.filter((r) => {
       const q = searchTerm.toLowerCase();
-      return (
+      const matchesSearch = (
         r.nama.toLowerCase().includes(q) ||
         (r.dibuatOleh.nama || "").toLowerCase().includes(q) ||
         (r.prodiNama || "").toLowerCase().includes(q) ||
         (r.jurusanNama || "").toLowerCase().includes(q)
       );
+      let matchesDate = true;
+      if (filterDateFrom) {
+        matchesDate = matchesDate && new Date(r.tanggalPerekapan) >= filterDateFrom;
+      }
+      if (filterDateTo) {
+        matchesDate = matchesDate && new Date(r.tanggalPerekapan) <= filterDateTo;
+      }
+      return matchesSearch && matchesDate;
     })
   );
 
@@ -232,8 +250,8 @@ export function LaporanRekapitulasiPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Cari laporan rekap..."
@@ -242,13 +260,40 @@ export function LaporanRekapitulasiPage() {
               className="pl-9"
             />
           </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[170px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[170px] justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
+            </PopoverContent>
+          </Popover>
+          {(filterDateFrom || filterDateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setFilterDateFrom(undefined); setFilterDateTo(undefined); }}>
+              <X className="w-4 h-4 mr-1.5" /> Reset
+            </Button>
+          )}
         </div>
 
         <div className="border rounded-lg bg-background overflow-x-auto">
           <Table className="table-fixed">
               <colgroup>
                 <col className="w-1/4" />
-                <col className="w-28" />
+                <col className="w-[185px]" />
                 <col className="w-1/6" />
                 <col className="w-1/6" />
                 <col className="w-24" />
@@ -261,8 +306,8 @@ export function LaporanRekapitulasiPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("nama")}>
                     Nama Rekap <SortIcon column="nama" />
                   </TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalPerekapan")}>
-                    Tanggal Perekapan <SortIcon column="tanggalPerekapan" />
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort("periode")}>
+                    Rentang Tanggal <SortIcon column="periode" />
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => handleSort("dibuatOleh")}>
                     Dibuat Oleh <SortIcon column="dibuatOleh" />
@@ -305,7 +350,12 @@ export function LaporanRekapitulasiPage() {
                   return (
                     <TableRow key={rekap.id}>
                       <TableCell className="font-medium truncate max-w-[220px]">{rekap.nama}</TableCell>
-                      <TableCell>{formatDate(rekap.tanggalPerekapan)}</TableCell>
+                      <TableCell>
+                        {rekap.filter.tanggalAwal
+                          ? `${formatDate(rekap.filter.tanggalAwal)}${rekap.filter.tanggalAkhir ? ` – ${formatDate(rekap.filter.tanggalAkhir)}` : ' – Sekarang'}`
+                          : <span className="text-xs text-muted-foreground">Semua periode</span>
+                        }
+                      </TableCell>
                       <TableCell>
                         <div>
                           <p className="text-sm">{rekap.dibuatOleh.nama}</p>
@@ -427,7 +477,12 @@ export function LaporanRekapitulasiPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{rekap.nama}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(rekap.tanggalPerekapan)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {rekap.filter.tanggalAwal
+                                ? `${formatDate(rekap.filter.tanggalAwal)}${rekap.filter.tanggalAkhir ? ` – ${formatDate(rekap.filter.tanggalAkhir)}` : ' – Sekarang'}`
+                                : 'Semua periode'
+                              }
+                            </p>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

@@ -45,6 +45,7 @@ import {
   MoreVertical,
 } from "lucide-react";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -112,7 +113,7 @@ export function AkademikProdiPage() {
       });
       const result = await res.json();
       if (result.status === "success") setItems(result.data);
-      else toast.error(result.error || "Gagal memuat data program studi");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal memuat data program studi");
     } catch {
       toast.error("Terjadi kesalahan koneksi");
     } finally {
@@ -186,7 +187,7 @@ export function AkademikProdiPage() {
         setShowAddDialog(false);
         fetchProdi();
       } else {
-        toast.error(result.error || "Gagal membuat program studi");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal membuat program studi");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");
@@ -223,7 +224,7 @@ export function AkademikProdiPage() {
         setShowEditDialog(false);
         fetchProdi();
       } else {
-        toast.error(result.error || "Gagal memperbarui program studi");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal memperbarui program studi");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");
@@ -248,7 +249,7 @@ export function AkademikProdiPage() {
         setShowDeleteDialog(false);
         fetchProdi();
       } else {
-        toast.error(result.error || "Gagal menghapus program studi");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus program studi");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");

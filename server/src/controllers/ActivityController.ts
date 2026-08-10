@@ -39,7 +39,19 @@ export class ActivityController {
         res.status(401).json({ status: 'error', error: 'Sesi tidak valid.' });
         return;
       }
-      const activities = await this.activityService.getAllActivities(dosenId);
+      const { tanggalAwal, tanggalAkhir } = req.query;
+      if (tanggalAwal && isNaN(new Date(tanggalAwal as string).getTime())) {
+        res.status(400).json({ status: 'error', error: 'Format tanggalAwal tidak valid.' });
+        return;
+      }
+      if (tanggalAkhir && isNaN(new Date(tanggalAkhir as string).getTime())) {
+        res.status(400).json({ status: 'error', error: 'Format tanggalAkhir tidak valid.' });
+        return;
+      }
+      const activities = await this.activityService.getAllActivities(dosenId, {
+        tanggalAwal: tanggalAwal as string | undefined,
+        tanggalAkhir: tanggalAkhir as string | undefined,
+      });
       res.status(200).json({ status: 'success', data: activities });
     } catch (error: any) {
       res.status(500).json({ status: 'error', error: error.message });

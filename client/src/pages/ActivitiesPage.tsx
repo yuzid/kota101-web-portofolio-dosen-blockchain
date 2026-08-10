@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical } from 'lucide-react';
+import { Plus, Search, Eye, Share2, X, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Activity, MoreVertical, CalendarIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -41,11 +41,14 @@ import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, copyToClipboard } from '@/lib/utils';
+import { sanitizeError } from "@/lib/errors";
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { TableSkeleton } from '@/components/ui/loading-skeleton';
 import { AnimatedTable, AnimatedTableRow } from '@/components/ui/animated-table';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Activity {
   id: string;
@@ -93,6 +96,10 @@ export function ActivitiesPage() {
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterSemester, setFilterSemester] = useState('all');
   const [filterTahun, setFilterTahun] = useState('all');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
+  const [sortColumn, setSortColumn] = useState<string | null>("tanggalMulai");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
@@ -102,21 +109,25 @@ export function ActivitiesPage() {
   const token = localStorage.getItem('token');
 
   useEffect(() => {
-    fetchActivities();
+    fetchActivities(filterDateFrom, filterDateTo);
     fetchPendingConfirmations();
-  }, []);
+  }, [filterDateFrom, filterDateTo]);
 
-  const fetchActivities = async () => {
+  const fetchActivities = async (dateFrom?: Date, dateTo?: Date) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan`, {
+      const params = new URLSearchParams();
+      if (dateFrom) params.append('tanggalAwal', format(dateFrom, 'yyyy-MM-dd'));
+      if (dateTo) params.append('tanggalAkhir', format(dateTo, 'yyyy-MM-dd'));
+      const qs = params.toString();
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dosen/kegiatan${qs ? '?' + qs : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const result = await response.json();
       if (result.status === 'success') {
         setActivities(result.data);
       } else {
-        toast.error(result.error || 'Gagal mengambil data kegiatan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal mengambil data kegiatan');
       }
     } catch (error) {
       toast.error('Terjadi kesalahan koneksi ke server');
@@ -152,10 +163,10 @@ export function ActivitiesPage() {
         setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
         fetchActivities();
       } else {
-        toast.error(result.error || 'Gagal menerima undangan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menerima undangan');
       }
     } catch (error) {
-      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+      toast.error('Gagal terhubung ke server. Silakan coba lagi.');
     }
   };
 
@@ -171,11 +182,27 @@ export function ActivitiesPage() {
         setPendingConfirmations(prev => prev.filter(p => p.id !== partisipasiId));
         setActivities(prev => prev.filter(a => a.id !== kegiatanId));
       } else {
-        toast.error(result.error || 'Gagal menolak undangan');
+        toast.error(result.error ? sanitizeError(result.error) : 'Gagal menolak undangan');
       }
     } catch (error) {
-      toast.error('Endpoint belum tersedia - lihat Backend Requirement');
+      toast.error('Gagal terhubung ke server. Silakan coba lagi.');
     }
+  };
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return null;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 inline" />
+      : <ArrowDown className="w-3 h-3 ml-1 inline" />;
   };
 
   const filteredActivities = activities.filter(activity => {
@@ -185,6 +212,34 @@ export function ActivitiesPage() {
     const matchesTahun = filterTahun === 'all' || activity.periode === filterTahun;
     const matchesKategori = filterKategori === 'all' || activity.kategori === filterKategori;
     return matchesTab && matchesSearch && matchesSemester && matchesTahun && matchesKategori;
+  }).sort((a, b) => {
+    let aVal: string | number = "";
+    let bVal: string | number = "";
+    switch (sortColumn) {
+      case "name":
+        aVal = a.name.toLowerCase();
+        bVal = b.name.toLowerCase();
+        break;
+      case "jenisTridharma":
+        aVal = a.jenisTridharma.toLowerCase();
+        bVal = b.jenisTridharma.toLowerCase();
+        break;
+      case "tanggalMulai":
+        aVal = new Date(a.tanggalMulai).getTime();
+        bVal = new Date(b.tanggalMulai).getTime();
+        break;
+      case "tanggalSelesai":
+        aVal = new Date(a.tanggalSelesai).getTime();
+        bVal = new Date(b.tanggalSelesai).getTime();
+        break;
+      case "periode":
+        aVal = a.periode.toLowerCase();
+        bVal = b.periode.toLowerCase();
+        break;
+    }
+    if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+    return 0;
   });
 
   const counts = {
@@ -195,13 +250,15 @@ export function ActivitiesPage() {
     tugas_tambahan: activities.filter(a => a.jenisTridharma === 'tugas_tambahan').length,
   };
 
-  const hasActiveFilters = searchTerm !== '' || filterKategori !== 'all' || filterSemester !== 'all' || filterTahun !== 'all';
+  const hasActiveFilters = searchTerm !== '' || filterKategori !== 'all' || filterSemester !== 'all' || filterTahun !== 'all' || filterDateFrom || filterDateTo;
 
   const resetFilters = () => {
     setSearchTerm('');
     setFilterKategori('all');
     setFilterSemester('all');
     setFilterTahun('all');
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
   };
 
   const handleShare = (activity: Activity) => {
@@ -213,23 +270,12 @@ export function ActivitiesPage() {
   };
 
   const copyShareLink = async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(shareLink);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = shareLink;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-      }
+    const ok = await copyToClipboard(shareLink);
+    if (ok) {
       setCopied(true);
       toast.success('Link berhasil disalin!');
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } else {
       toast.error('Gagal menyalin link');
     }
   };
@@ -385,6 +431,30 @@ export function ActivitiesPage() {
                 />
               </div>
 
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateFrom ? format(filterDateFrom, "dd MMM yyyy") : "Dari tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} initialFocus />
+                </PopoverContent>
+              </Popover>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[170px] justify-start text-left font-normal h-9">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {filterDateTo ? format(filterDateTo, "dd MMM yyyy") : "Sampai tanggal"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} initialFocus />
+                </PopoverContent>
+              </Popover>
+
               <Select value={filterSemester} onValueChange={setFilterSemester}>
                 <SelectTrigger className="w-[140px] h-9">
                   <SelectValue placeholder="Semester" />
@@ -507,11 +577,21 @@ export function ActivitiesPage() {
                   </colgroup>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nama Kegiatan</TableHead>
-                      <TableHead>Jenis Tridharma</TableHead>
-                      <TableHead>Tanggal Mulai</TableHead>
-                      <TableHead>Tanggal Selesai</TableHead>
-                      <TableHead>Tahun Akademik</TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("name")}>
+                        Nama Kegiatan <SortIcon column="name" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("jenisTridharma")}>
+                        Jenis Tridharma <SortIcon column="jenisTridharma" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalMulai")}>
+                        Tanggal Mulai <SortIcon column="tanggalMulai" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("tanggalSelesai")}>
+                        Tanggal Selesai <SortIcon column="tanggalSelesai" />
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none" onClick={() => handleSort("periode")}>
+                        Tahun Akademik <SortIcon column="periode" />
+                      </TableHead>
                       <TableHead>Peran</TableHead>
                       <TableHead className="text-center">Anggota</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>

@@ -30,7 +30,6 @@ import {
 import {
   Loader2,
   ArrowLeft,
-  Calendar,
   User,
   Filter,
   FileText,
@@ -62,7 +61,6 @@ export function RekapLaporanEditPage() {
   const [rekap, setRekap] = useState<RekapLaporan | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [nama, setNama] = useState("");
-  const [tanggalPerekapan, setTanggalPerekapan] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isKajur = location.pathname.includes("/monitoring/jurusan");
@@ -79,7 +77,6 @@ export function RekapLaporanEditPage() {
       const data = await getRekap(id!, isKajur);
       setRekap(data);
       setNama(data.nama);
-      setTanggalPerekapan(data.tanggalPerekapan.split('T')[0]);
     } catch (error) {
       toast.error("Gagal memuat rekap");
     } finally {
@@ -121,24 +118,6 @@ export function RekapLaporanEditPage() {
     try { return format(new Date(dateStr), "dd MMM yyyy HH:mm"); } catch { return dateStr; }
   };
 
-  const getKegiatanDateRange = (): { mulai: string; selesai: string } | null => {
-    const dates = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_mulai)
-      .map((k: any) => new Date(k.tanggal_mulai).getTime());
-    if (dates.length === 0) return null;
-    const min = new Date(Math.min(...dates));
-    const max = rekap.kegiatanData
-      .filter((k: any) => k.tanggal_selesai)
-      .reduce((latest: Date | null, k: any) => {
-        const d = new Date(k.tanggal_selesai);
-        return !latest || d > latest ? d : latest;
-      }, null);
-    return {
-      mulai: formatDate(min.toISOString()),
-      selesai: max ? formatDate(max.toISOString()) : formatDate(min.toISOString()),
-    };
-  };
-
   const getJenisBadge = (jenis: string) => {
     switch (jenis) {
       case "PENDIDIKAN": return <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">Pendidikan</Badge>;
@@ -164,16 +143,11 @@ export function RekapLaporanEditPage() {
       toast.error("Nama rekap harus diisi");
       return;
     }
-    if (!tanggalPerekapan) {
-      toast.error("Tanggal perekapan harus diisi");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       const updated = await updateRekap(rekap.id, {
         nama: nama.trim(),
-        tanggalPerekapan,
       }, isKajur);
       
       if (updated) {
@@ -248,13 +222,8 @@ export function RekapLaporanEditPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-tanggal">Tanggal Perekapan *</Label>
-                <Input
-                  id="edit-tanggal"
-                  type="date"
-                  value={tanggalPerekapan}
-                  onChange={(e) => setTanggalPerekapan(e.target.value)}
-                />
+                <Label>Tanggal Perekapan</Label>
+                <p className="text-sm py-2">{formatDate(rekap.tanggalPerekapan)}</p>
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -288,18 +257,6 @@ export function RekapLaporanEditPage() {
                   <BookOpen className="w-3 h-3" /> Jumlah Kegiatan
                 </p>
                 <p className="font-medium text-sm">{rekap.kegiatanData.length}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Tgl Mulai Pelaksanaan
-                </p>
-                <p className="font-medium text-sm">{getKegiatanDateRange()?.mulai || '-'}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Tgl Selesai Pelaksanaan
-                </p>
-                <p className="font-medium text-sm">{getKegiatanDateRange()?.selesai || '-'}</p>
               </div>
               {isKajur && rekap.prodiNama && (
                 <div className="space-y-1">

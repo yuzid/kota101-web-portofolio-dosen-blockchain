@@ -15,6 +15,7 @@ import {
 } from "../lib/api";
 import { SessionWarningDialog } from "../components/ui/session-warning-dialog";
 import { fetchAndCacheJenisDokumen } from "../lib/utils";
+import { sanitizeError } from "@/lib/errors";
 
 export type UserRole = "admin" | "staf_tu" | "dosen" | "kaprodi" | "kajur";
 
@@ -203,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
         );
       }
-      throw new Error(result.error || "Terjadi kesalahan. Silakan coba lagi.");
+      throw new Error(result.error ? sanitizeError(result.error) : "Terjadi kesalahan. Silakan coba lagi.");
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);
@@ -249,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "Terjadi kesalahan pada server. Silakan coba beberapa saat lagi."
         );
       }
-      throw new Error(result.error || "Terjadi kesalahan. Silakan coba lagi.");
+      throw new Error(result.error ? sanitizeError(result.error) : "Terjadi kesalahan. Silakan coba lagi.");
     }
 
     const authenticatedUser = mapBackendUserToFrontend(result.data);

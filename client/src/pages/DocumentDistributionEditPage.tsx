@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAllJenisDokumen } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 
 interface Dosen {
   id: string;
@@ -70,7 +71,7 @@ export function DocumentDistributionEditPage() {
   const [allDosen, setAllDosen] = useState<Dosen[]>([]);
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<string[]>([]);
   const [initialRecipientIds, setInitialRecipientIds] = useState<string[]>([]);
-  const [acceptedRecipientIds, setAcceptedRecipientIds] = useState<string[]>([]);
+  const [boundRecipientIds, setBoundRecipientIds] = useState<string[]>([]);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [selectedProdiId, setSelectedProdiId] = useState<string>("all");
   const [showNewJenisInput, setShowNewJenisInput] = useState(false);
@@ -94,8 +95,8 @@ export function DocumentDistributionEditPage() {
   }, [allDosen, selectedProdiId, recipientSearch]);
 
   const toggleRecipient = (dosenId: string) => {
-    if (acceptedRecipientIds.includes(dosenId)) {
-      toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+    if (boundRecipientIds.includes(dosenId)) {
+      toast.warning("Dosen ini tidak bisa dihapus karena dokumen sudah dilampirkan ke kegiatan oleh dosen tersebut.");
       return;
     }
     setSelectedRecipientIds(prev =>
@@ -154,10 +155,10 @@ export function DocumentDistributionEditPage() {
         const existing = (d.distribusi || []).map((item: any) => item.dosen_id);
         setSelectedRecipientIds(existing);
         setInitialRecipientIds(existing);
-        const accepted = (d.distribusi || [])
-          .filter((item: any) => item.status === "DISETUJUI")
+        const bound = (d.distribusi || [])
+          .filter((item: any) => item.kegiatan_id !== null)
           .map((item: any) => item.dosen_id);
-        setAcceptedRecipientIds(accepted);
+        setBoundRecipientIds(bound);
       } else {
         toast.error("Gagal memuat data dokumen");
         navigate("/document-distribution");
@@ -188,8 +189,8 @@ export function DocumentDistributionEditPage() {
 
   const confirmSubmit = async () => {
     setShowSubmitConfirm(false);
-    if (acceptedRecipientIds.length > 0) {
-      toast.error("Dokumen tidak dapat diubah karena sudah disetujui/diterima oleh salah satu dosen penerima.");
+    if (boundRecipientIds.length > 0) {
+      toast.error("Tidak dapat mengubah distribusi karena ada penerima yang dokumennya sudah dilampirkan ke kegiatan.");
       return;
     }
     setSaving(true);
@@ -200,7 +201,7 @@ export function DocumentDistributionEditPage() {
         method: "PUT", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(metaPayload),
       });
       const metaResult = await metaRes.json();
-      if (metaResult.status !== "success") throw new Error(metaResult.error || "Gagal menyimpan metadata.");
+      if (metaResult.status !== "success") throw new Error(metaResult.error ? sanitizeError(metaResult.error) : "Gagal menyimpan metadata.");
 
       // 2. Sync recipients
       const toRemove = initialRecipientIds.filter(id => !selectedRecipientIds.includes(id));
@@ -231,13 +232,13 @@ export function DocumentDistributionEditPage() {
           body: JSON.stringify({ dokumen_id: id, dosen_penerima_ids: toAdd }),
         });
         const addResult = await addRes.json();
-        if (addResult.status !== "success") throw new Error(addResult.error || "Gagal menambahkan penerima.");
+        if (addResult.status !== "success") throw new Error(addResult.error ? sanitizeError(addResult.error) : "Gagal menambahkan penerima.");
       }
 
       toast.success("Dokumen berhasil diperbarui.");
       navigate(`/document-distribution/${id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan perubahan.");
+      toast.error(err instanceof Error ? sanitizeError(err.message) : "Gagal menyimpan perubahan.");
     } finally {
       setSaving(false);
     }
@@ -281,12 +282,12 @@ export function DocumentDistributionEditPage() {
         </Button>
 
         {/* ── Read-only warning banner if any recipient accepted ── */}
-        {acceptedRecipientIds.length > 0 && (
+        {boundRecipientIds.length > 0 && (
           <div className="flex items-start gap-2.5 p-4 border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 rounded-xl text-sm leading-relaxed">
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
             <div>
               <p className="font-semibold mb-0.5">Dokumen Distribusi Dikunci</p>
-              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima.</p>
+              <p>Dokumen ini tidak dapat diubah atau dihapus karena sudah disetujui/diterima oleh salah satu dosen penerima. Namun, dokumen tetap dapat diunduh.</p>
             </div>
           </div>
         )}
@@ -312,7 +313,7 @@ export function DocumentDistributionEditPage() {
                   onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
                   placeholder="Masukkan nama dokumen"
                   maxLength={100}
-                  disabled={acceptedRecipientIds.length > 0}
+                  disabled={boundRecipientIds.length > 0}
                   className="border-gray-300 focus-visible:ring-primary/50 pr-14"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">
@@ -328,7 +329,7 @@ export function DocumentDistributionEditPage() {
               </Label>
               <Select
                 value={formData.jenis_dokumen}
-                disabled={acceptedRecipientIds.length > 0}
+                disabled={boundRecipientIds.length > 0}
                 onValueChange={(val) => {
                   if (val === '__TAMBAH__') {
                     setShowNewJenisInput(true);
@@ -379,7 +380,7 @@ export function DocumentDistributionEditPage() {
                           setNewJenisName("");
                           toast.success(`Jenis "${newJenisName.trim()}" berhasil ditambahkan.`);
                         } else {
-                          toast.error(result.error || 'Gagal menambahkan jenis dokumen');
+                          toast.error(result.error ? sanitizeError(result.error) : 'Gagal menambahkan jenis dokumen');
                         }
                       } catch {
                         toast.error('Gagal menghubungi server');
@@ -399,7 +400,7 @@ export function DocumentDistributionEditPage() {
               <Input
                 type="date"
                 value={formData.tanggal_upload}
-                disabled={acceptedRecipientIds.length > 0}
+                disabled={boundRecipientIds.length > 0}
                 onChange={(e) => setFormData({ ...formData, tanggal_upload: e.target.value })}
                 className="border-gray-300 focus-visible:ring-primary/50 w-full sm:w-64"
               />
@@ -517,9 +518,9 @@ export function DocumentDistributionEditPage() {
                     <span className="text-[11px] font-medium text-blue-700">{selectedRecipientIds.length} dosen dipilih</span>
                     <button
                       onClick={() => {
-                        setSelectedRecipientIds(acceptedRecipientIds);
-                        if (acceptedRecipientIds.length > 0) {
-                          toast.info("Penerima yang sudah menyetujui dokumen tetap dipertahankan.");
+                        setSelectedRecipientIds(boundRecipientIds);
+                        if (boundRecipientIds.length > 0) {
+                          toast.info("Penerima yang dokumennya sudah dilampirkan ke kegiatan tetap dipertahankan.");
                         }
                       }}
                       className="text-[11px] text-blue-600 hover:underline"
@@ -530,7 +531,7 @@ export function DocumentDistributionEditPage() {
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {selectedRecipientIds.map((id) => {
                       const d = allDosen.find(d => d.id === id);
-                      const isAccepted = acceptedRecipientIds.includes(id);
+                      const isAccepted = boundRecipientIds.includes(id);
                       return d ? (
                         <Badge
                           key={id}
@@ -540,7 +541,7 @@ export function DocumentDistributionEditPage() {
                           }`}
                           onClick={() => {
                             if (isAccepted) {
-                              toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+                              toast.warning("Dosen ini tidak bisa dihapus karena dokumen sudah dilampirkan ke kegiatan oleh dosen tersebut.");
                               return;
                             }
                             toggleRecipient(id);
@@ -563,7 +564,7 @@ export function DocumentDistributionEditPage() {
                   </p>
                 ) : filteredDosen.map((dosen) => {
                   const isSelected = selectedRecipientIds.includes(dosen.id);
-                  const isAccepted = acceptedRecipientIds.includes(dosen.id);
+                  const isAccepted = boundRecipientIds.includes(dosen.id);
                   return (
                     <div
                       key={dosen.id}
@@ -572,7 +573,7 @@ export function DocumentDistributionEditPage() {
                       } ${isAccepted ? "opacity-75 cursor-not-allowed" : ""}`}
                       onClick={() => {
                         if (isAccepted) {
-                          toast.warning("Dosen ini tidak bisa dihapus karena sudah menyetujui dokumen ini.");
+                          toast.warning("Dosen ini tidak bisa dihapus karena dokumen sudah dilampirkan ke kegiatan oleh dosen tersebut.");
                           return;
                         }
                         toggleRecipient(dosen.id);
@@ -599,7 +600,7 @@ export function DocumentDistributionEditPage() {
           <Button variant="outline" onClick={() => navigate(id ? `/document-distribution/${id}` : "/document-distribution")}>
             Batal
           </Button>
-          <RippleButton onClick={handleSubmit} disabled={saving || acceptedRecipientIds.length > 0} className="min-w-[150px]">
+          <RippleButton onClick={handleSubmit} disabled={saving || boundRecipientIds.length > 0} className="min-w-[150px]">
             {saving ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Menyimpan...</>
             ) : (

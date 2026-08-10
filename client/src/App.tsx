@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { isTokenExpired } from "./lib/api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Lazy load semua pages
 const LoginPage = lazy(() =>
@@ -78,14 +79,6 @@ const DocumentDistributionEditPage = lazy(() =>
 const FileManagementPage = lazy(() =>
   import("./pages/FileManagementPage").then((m) => ({
     default: m.FileManagementPage,
-  }))
-);
-const AMIRecapPage = lazy(() =>
-  import("./pages/AMIRecapPage").then((m) => ({ default: m.AMIRecapPage }))
-);
-const AMIActivityDetailPage = lazy(() =>
-  import("./pages/AMIActivityDetailPage").then((m) => ({
-    default: m.AMIActivityDetailPage,
   }))
 );
 const AcademicRoleActivitiesPage = lazy(() =>
@@ -217,8 +210,9 @@ function RoleProtectedRoute({
 
 function AppRoutes() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
-      <Routes>
+    <ErrorBoundary>
+      <Suspense fallback={<LoadingSpinner />}>
+        <Routes>
         {/* Public */}
         <Route
           path="/login"
@@ -391,24 +385,6 @@ function AppRoutes() {
           }
         />
 
-        {/* AMI */}
-        <Route
-          path="/ami-recap"
-          element={
-            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
-              <AMIRecapPage />
-            </RoleProtectedRoute>
-          }
-        />
-        <Route
-          path="/ami-recap/activity/:id"
-          element={
-            <RoleProtectedRoute allowedRoles={["staf_tu", "kajur", "kaprodi"]}>
-              <AMIActivityDetailPage />
-            </RoleProtectedRoute>
-          }
-        />
-
         {/* Academic Role Monitoring */}
         <Route
           path="/monitoring/jurusan"
@@ -495,7 +471,8 @@ function AppRoutes() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 

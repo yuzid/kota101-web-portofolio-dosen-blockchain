@@ -28,6 +28,7 @@ import { Badge } from "../components/ui/badge";
 import { Label } from "../components/ui/label";
 import { Plus, Search, Edit, Trash2, X, Loader2, Landmark, Building2, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
+import { sanitizeError } from "@/lib/errors";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -81,7 +82,7 @@ export function AkademikJurusanPage() {
       });
       const result = await res.json();
       if (result.status === "success") setItems(result.data);
-      else toast.error(result.error || "Gagal memuat data jurusan");
+      else toast.error(result.error ? sanitizeError(result.error) : "Gagal memuat data jurusan");
     } catch {
       toast.error("Terjadi kesalahan koneksi");
     } finally {
@@ -132,7 +133,7 @@ export function AkademikJurusanPage() {
         setShowAddDialog(false);
         fetchData();
       } else {
-        toast.error(result.error || "Gagal membuat jurusan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal membuat jurusan");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");
@@ -168,7 +169,7 @@ export function AkademikJurusanPage() {
         setShowEditDialog(false);
         fetchData();
       } else {
-        toast.error(result.error || "Gagal memperbarui jurusan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal memperbarui jurusan");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");
@@ -193,7 +194,7 @@ export function AkademikJurusanPage() {
         setShowDeleteDialog(false);
         fetchData();
       } else {
-        toast.error(result.error || "Gagal menghapus jurusan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus jurusan");
       }
     } catch {
       toast.error("Terjadi kesalahan koneksi");

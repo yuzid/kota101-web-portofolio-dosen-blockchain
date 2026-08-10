@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
+import { sanitizeError } from "@/lib/errors";
 import { Button } from "../components/ui/button";
 import { RippleButton } from "../components/ui/ripple-button";
 import { StatCard } from "../components/ui/stat-card";
@@ -151,7 +153,7 @@ const activityFieldLabels: Record<string, string> = {
   tanggal_selesai: "Tanggal selesai",
   periode: "Tahun akademik",
   semester: "Semester",
-  jenis_bukti: "Tipe bukti",
+  jenis_bukti: "Jenis Bukti",
 };
 
 const statusBadge: Record<
@@ -248,7 +250,7 @@ export function ActivityDetailPage() {
         toast.success("Undangan kegiatan diterima");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menerima undangan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menerima undangan");
       }
     } catch {
       toast.error("Gagal menerima undangan");
@@ -270,7 +272,7 @@ export function ActivityDetailPage() {
         toast.success("Undangan kegiatan ditolak");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menolak undangan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menolak undangan");
       }
     } catch {
       toast.error("Gagal menolak undangan");
@@ -297,7 +299,7 @@ export function ActivityDetailPage() {
         const act = result.data;
         setActivity(act);
       } else {
-        toast.error(result.error || "Gagal mengambil detail kegiatan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal mengambil detail kegiatan");
         navigate("/activities");
       }
     } catch {
@@ -318,7 +320,7 @@ export function ActivityDetailPage() {
       );
       const result = await response.json();
       if (!response.ok || result.status !== "success") {
-        throw new Error(result.error || "Gagal mengambil riwayat blockchain");
+        throw new Error(result.error ? sanitizeError(result.error) : "Gagal mengambil riwayat blockchain");
       }
       setLogs(result.data);
       setAuditLoaded(true);
@@ -339,23 +341,12 @@ export function ActivityDetailPage() {
   };
 
   const handleCopyLink = async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(activeShareLink);
-      } else {
-        const textarea = document.createElement("textarea");
-        textarea.value = activeShareLink;
-        textarea.style.position = "fixed";
-        textarea.style.opacity = "0";
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textarea);
-      }
+    const ok = await copyToClipboard(activeShareLink);
+    if (ok) {
       setCopied(true);
       toast.success("Link berhasil disalin!");
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       toast.error("Gagal menyalin link");
     }
   };
@@ -454,7 +445,7 @@ export function ActivityDetailPage() {
         toast.success("Kegiatan berhasil dihapus");
         navigate("/activities");
       } else {
-        toast.error(result.error || "Gagal menghapus kegiatan");
+        toast.error(result.error ? sanitizeError(result.error) : "Gagal menghapus kegiatan");
       }
     } catch {
       toast.error("Terjadi kesalahan saat menghapus kegiatan");
@@ -499,8 +490,7 @@ export function ActivityDetailPage() {
   const isCurrentUserMember = activity.dosenTerlibat.some(
     (d) => d.isCurrentUser
   );
-  const isReadOnlyView =
-    !isCurrentUserMember || location.pathname.includes("/ami-recap/");
+  const isReadOnlyView = !isCurrentUserMember;
   const shareLinkDetail = `${window.location.origin}/public/kegiatan/${id}`;
   const shareLinkDokumen = `${window.location.origin}/public/kegiatan/${id}/dokumen`;
   const activeShareLink = shareMode === "detail" ? shareLinkDetail : shareLinkDokumen;
@@ -544,8 +534,7 @@ export function ActivityDetailPage() {
                 <Edit className="w-4 h-4 mr-1.5" /> Edit
               </RippleButton>
             )}
-            {activity.isCurrentUserPencatat &&
-              !location.pathname.includes("/ami-recap/") && (
+            {activity.isCurrentUserPencatat && (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -798,7 +787,7 @@ export function ActivityDetailPage() {
                 </div>
                 {activity.jenisBukti === "MASING_MASING" && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Setiap dosen memiliki dokumen bukti masing-masing
+                    Setiap dosen mengunggah bukti secara individual
                   </p>
                 )}
               </CardHeader>
@@ -821,14 +810,14 @@ export function ActivityDetailPage() {
                             <span className="font-medium text-sm truncate">
                               {dosen.name}
                             </span>
-                            {dosen.isPencatat && (
-                               <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs h-5">
-                                 Pembuat
-                               </Badge>
-                             )}
-                             {dosen.isKetua && !dosen.isPencatat && (
+                            {dosen.isKetua && (
                                <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">
                                  Ketua
+                               </Badge>
+                             )}
+                             {!dosen.isKetua && (
+                               <Badge variant="secondary" className="text-xs h-5">
+                                 Anggota
                                </Badge>
                              )}
                           </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { motion } from "motion/react";
 import { MainLayout } from "../components/layout/MainLayout";
+import { copyToClipboard } from "@/lib/utils";
 import { Button } from "../components/ui/button";
 import { StatCard } from "../components/ui/stat-card";
 import { Input } from "../components/ui/input";
@@ -230,13 +231,13 @@ export function MonitoringActivityDetailPage() {
   };
 
   const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(activeShareLink);
+    const ok = await copyToClipboard(activeShareLink);
+    if (ok) {
       setCopied(true);
       toast.success("Link berhasil disalin!");
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.info(`Link: ${activeShareLink}`);
+    } else {
+      toast.error("Gagal menyalin link");
     }
   };
 
@@ -513,7 +514,7 @@ export function MonitoringActivityDetailPage() {
                 </div>
                 {activity.jenisBukti === "MASING_MASING" && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Setiap dosen memiliki dokumen bukti masing-masing
+                    Setiap dosen mengunggah bukti secara individual
                   </p>
                 )}
               </CardHeader>
@@ -535,14 +536,14 @@ export function MonitoringActivityDetailPage() {
                             <span className="font-medium text-sm truncate">
                               {dosen.name}
                             </span>
-                            {dosen.isPencatat && (
-                               <Badge className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs h-5">
-                                 Pembuat
-                               </Badge>
-                             )}
-                             {dosen.isKetua && !dosen.isPencatat && (
+                            {dosen.isKetua && (
                                <Badge className="border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs h-5">
                                  Ketua
+                               </Badge>
+                             )}
+                             {!dosen.isKetua && (
+                               <Badge variant="secondary" className="text-xs h-5">
+                                 Anggota
                                </Badge>
                              )}
                           </div>

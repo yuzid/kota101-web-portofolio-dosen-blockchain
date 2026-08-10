@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { apiFetch } from "./api";
+import { sanitizeError } from "@/lib/errors";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -63,7 +64,7 @@ export async function createRekap(data: any, isKajur: boolean): Promise<RekapLap
     body: JSON.stringify(data)
   });
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal membuat rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal membuat rekap');
   return mapFromBackend(result.data);
 }
 
@@ -71,7 +72,7 @@ export async function listRekap(isKajur: boolean): Promise<RekapLaporan[]> {
   const endpoint = isKajur ? 'kajur/rekap/semua' : 'prodi/rekap';
   const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}`);
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil daftar rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal mengambil daftar rekap');
   return result.data.map(mapFromBackend);
 }
 
@@ -79,7 +80,7 @@ export async function getRekap(id: string, isKajur: boolean): Promise<RekapLapor
   const endpoint = isKajur ? 'jurusan' : 'prodi';
   const response = await apiFetch(`${API_URL}/api/dosen/akademik-role/${endpoint}/rekap/${id}`);
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal mengambil detail rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal mengambil detail rekap');
   return mapFromBackend(result.data);
 }
 
@@ -90,7 +91,7 @@ export async function updateRekap(id: string, data: any, isKajur: boolean): Prom
     body: JSON.stringify(data)
   });
   const result = await response.json();
-  if (result.status !== 'success') throw new Error(result.error || 'Gagal memperbarui rekap');
+  if (result.status !== 'success') throw new Error(result.error ? sanitizeError(result.error) : 'Gagal memperbarui rekap');
   return mapFromBackend(result.data);
 }
 
@@ -113,11 +114,27 @@ function formatDokumenLinks(k: any): string {
 }
 
 export function exportRekapXlsx(rekap: RekapLaporan): void {
+  const formatDosen = (k: any) => {
+    const pencatat = k.dosen?.nama && k.dosen?.nidn
+      ? `${k.dosen.nama} (${k.dosen.nidn})`
+      : k.dosen?.nama || '-';
+    const anggota = (k.partisipasi || [])
+      .filter((p: any) => p.status === 'DITERIMA' && p.dosen && p.dosen.nama !== k.dosen?.nama)
+      .map((p: any) => `${p.dosen.nama} (${p.dosen.nidn})`);
+    return anggota.length > 0
+      ? `${pencatat},\n${anggota.join(',\n')}`
+      : pencatat;
+  };
+
+  const formatTanggal = (val: string) => {
+    if (!val) return '-';
+    return new Date(val).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const rows = rekap.kegiatanData.map((k: any, i: number) => ({
     No: i + 1,
     'Nama Kegiatan': k.nama_kegiatan || '-',
-    Dosen: k.dosen?.nama || '-',
-    NIDN: k.dosen?.nidn || '-',
+    Dosen: formatDosen(k),
     'Program Studi': k.dosen?.program_studi?.nama_prodi || '-',
     'Kategori Tridharma': k.kategori_tridharma || '-',
     'Jenis Kegiatan': k.jenis_kegiatan || '-',
@@ -134,7 +151,7 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
   const ws = XLSX.utils.json_to_sheet(rows);
 
   const colWidths = [
-    { wch: 4 }, { wch: 40 }, { wch: 25 }, { wch: 20 },
+    { wch: 4 }, { wch: 40 }, { wch: 35 }, { wch: 20 },
     { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 12 },
     { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 50 },
   ];
@@ -144,12 +161,12 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
 
   const metaRows = [
     { Key: 'Nama Rekap', Value: rekap.nama },
-    { Key: 'Tanggal Perekapan', Value: rekap.tanggalPerekapan },
+    { Key: 'Tanggal Perekapan', Value: formatTanggal(rekap.tanggalPerekapan) },
     { Key: 'Dibuat Oleh', Value: rekap.dibuatOleh.nama },
     { Key: 'Peran', Value: rekap.dibuatOleh.role },
     { Key: 'Jumlah Kegiatan', Value: rekap.kegiatanData.length },
-    { Key: 'Tanggal Filter Awal', Value: rekap.filter.tanggalAwal || '-' },
-    { Key: 'Tanggal Filter Akhir', Value: rekap.filter.tanggalAkhir || '-' },
+    { Key: 'Tanggal Filter Awal', Value: formatTanggal(rekap.filter.tanggalAwal || '') },
+    { Key: 'Tanggal Filter Akhir', Value: formatTanggal(rekap.filter.tanggalAkhir || '') },
     { Key: 'Kategori Filter', Value: rekap.filter.kategori?.join(', ') || 'Semua' },
   ];
   const metaWs = XLSX.utils.json_to_sheet(metaRows);
@@ -160,11 +177,27 @@ export function exportRekapXlsx(rekap: RekapLaporan): void {
 }
 
 export function exportRekapCsv(rekap: RekapLaporan): void {
+  const formatDosen = (k: any) => {
+    const pencatat = k.dosen?.nama && k.dosen?.nidn
+      ? `${k.dosen.nama} (${k.dosen.nidn})`
+      : k.dosen?.nama || '-';
+    const anggota = (k.partisipasi || [])
+      .filter((p: any) => p.status === 'DITERIMA' && p.dosen && p.dosen.nama !== k.dosen?.nama)
+      .map((p: any) => `${p.dosen.nama} (${p.dosen.nidn})`);
+    return anggota.length > 0
+      ? `${pencatat}, ${anggota.join(', ')}`
+      : pencatat;
+  };
+
+  const formatTanggal = (val: string) => {
+    if (!val) return '-';
+    return new Date(val).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   const rows = rekap.kegiatanData.map((k: any, i: number) => ({
     No: i + 1,
     Nama_Kegiatan: k.nama_kegiatan || '-',
-    Dosen: k.dosen?.nama || '-',
-    NIDN: k.dosen?.nidn || '-',
+    Dosen: formatDosen(k),
     Program_Studi: k.dosen?.program_studi?.nama_prodi || '-',
     Kategori_Tridharma: k.kategori_tridharma || '-',
     Jenis_Kegiatan: k.jenis_kegiatan || '-',

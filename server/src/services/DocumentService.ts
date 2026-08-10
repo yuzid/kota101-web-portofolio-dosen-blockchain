@@ -196,6 +196,7 @@ export class DocumentService {
       jenis: document.jenis_dokumen,
       sumber: document.sumber_dokumen,
       ownershipStatus: userOwnership ? userOwnership.status : null,
+      terikatKegiatan: document.kepemilikan.some((k: any) => k.kegiatan_id !== null),
       tanggalUpload: document.tanggal_upload.toISOString(),
       contentType: this.getMimeType(file.contentType, document.file_path),
       size: file.contentLength,
@@ -267,6 +268,7 @@ export class DocumentService {
       asal: doc.sumber_dokumen === "TATA_USAHA" ? "tu" : "dosen",
       size: "Undetermined",
       hasHighlight: doc.kepemilikan.some((k: any) => k.highlights.length > 0),
+      terikatKegiatan: doc.kepemilikan.some((k: any) => k.kegiatan_id !== null),
     }));
   }
 
